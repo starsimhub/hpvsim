@@ -221,15 +221,24 @@ def _death_rate(location):
     })
 
 
-def _network_pars(location):
+def _network_pars(location, overrides=None):
     """Build network parameters for ``hpv.SexualNetwork``.
 
     Returns ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ...,
     'm': ...}}``. Each layer dict carries: partners, mixing, layer_probs,
     cross_layer, duration, acts. ``debut`` is shared across layers (one
     per-agent sample).
+
+    ``overrides`` is an optional dict whose keys replace entries in the raw
+    ``_default_network_pars`` result *before* the Starsim-shaping wrapping
+    (so it carries raw forms: ``debut``/``*_partners`` as v2 dist dicts,
+    ``layer_probs`` as the (3, N) arrays, ``*_cross_layer`` as annual floats).
+    Used by analysis scripts to supply a per-country network calibration
+    (see ``tests/regression/rwanda_calib.py``) without forking this builder.
     """
     default_pars = _default_network_pars(location)
+    if overrides:
+        default_pars = {**default_pars, **overrides}
     annual = ss.years(1)  # unit shared by all annual probability params
 
     # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` for a
