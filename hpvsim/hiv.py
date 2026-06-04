@@ -17,7 +17,8 @@ from . import misc
 from .hpv import HPV
 from .network import SexualNetwork
 
-__all__ = ['HIV', 'hiv_art', 'hpv_hiv_connector', 'HIVStratifiedResults']
+__all__ = ['HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector',
+           'HIVStratifiedResults']
 
 
 # CD4-stratified HIV→HPV effect multipliers. Copied by value from v2's
@@ -74,7 +75,11 @@ class HIV(sti.HIV):
         """
         from . import data as _data
         inputs = _data.load_hiv(location)
-        return cls(beta_m2f=beta_m2f, init_prev_data=inputs['init_prev'], **kwargs)
+        # Allow the caller to override the seed (e.g. init_prev_data=0.0 for the
+        # incidence-driven build, where the epidemic is constructed by the
+        # importer rather than by seeding).
+        kwargs.setdefault('init_prev_data', inputs['init_prev'])
+        return cls(beta_m2f=beta_m2f, **kwargs)
 
     def init_pre(self, sim):
         super().init_pre(sim)
@@ -91,6 +96,135 @@ class HIV(sti.HIV):
         for net in nets:
             beta[net.name] = [self._beta_m2f * self._rel_beta_f2m, self._beta_m2f]
         self.pars.beta = beta
+
+
+class hiv_incidence_import(ss.Intervention):
+    """Incidence-driven HIV importer (v2-faithful).
+
+    Imposes a per-(year, sex, age) HIV incidence curve directly onto STIsim's
+    HIV module instead of relying on network transmission. Each step it selects
+    living HIV-negative susceptibles, draws each at their age/sex/year-specific
+    per-timestep infection probability, and calls
+    ``sim.diseases.hiv.set_prognoses(selected)`` — which flips them to infected
+    AND wires the full CD4 trajectory (acute -> latent -> falling -> AIDS death)
+    plus ART/mortality machinery. With HIV ``beta_m2f=0`` and ``init_prev=0`` the
+    epidemic is built entirely here, so the prevalence trajectory matches the
+    target incidence curve by construction (as v2 did).
+
+    The incidence DataFrame has columns ``[age, sex, year, incidence]`` (sex
+    'f'/'m'; ``incidence`` = the per-year HIV acquisition rate among
+    susceptibles). Use ``hiv_incidence_import.from_location('rwanda')`` for the
+    bundled Rwanda curve, or pass a frame of that shape via ``incidence``.
+
+    Pass explicitly via ``interventions=[...]``; it is NOT auto-wired. If no HIV
+    module is present in the sim, ``init_pre`` raises a clear ValueError (the
+    importer is meaningless without a target HIV disease).
+
+    FOI -> per-step probability: a per-year rate ``r`` is converted to a
+    per-timestep infection probability with the exponential survival form
+    ``p = 1 - exp(-r * dt_years)`` (correct for non-small rates), then drawn via
+    a CRN-safe ``ss.bernoulli``. Years outside the data's [min, max] range are
+    nearest-year clamped (incidence is 0 before the curve begins).
+    """
+
+    def __init__(self, incidence=None, **kwargs):
+        super().__init__(**kwargs)
+        if incidence is None:
+            raise ValueError(
+                'hiv_incidence_import requires an incidence DataFrame '
+                '[age, sex, year, incidence]; use from_location() or pass incidence=.'
+            )
+        self.incidence = incidence
+        # Per-agent infection draw; p is set per-step from the looked-up rates.
+        self.infect_bern = ss.bernoulli(p=0.0)
+        # Filled in init_pre:
+        self._years = None          # sorted unique years (int)
+        self._year_index = None     # {year: row index into the rate cube}
+        self._ages = None           # sorted unique ages (int)
+        self._age_min = None
+        self._age_max = None
+        # rate_cube[sex][year_idx, age_idx] -> incidence rate; sex in {0:'f',1:'m'}
+        self._rate_cube = None
+
+    @classmethod
+    def from_location(cls, location, **kwargs):
+        """Build an importer from a country's bundled HIV incidence curve.
+
+        Args:
+            location (str): country name (only ``'rwanda'`` supported now).
+            **kwargs: forwarded to ``hiv_incidence_import.__init__``.
+        """
+        from . import data as _data
+        inc = _data.load_hiv(location)['incidence']
+        return cls(incidence=inc, **kwargs)
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        if 'hiv' not in sim.diseases:
+            raise ValueError(
+                'hiv_incidence_import requires an HIV disease in the sim '
+                "(sim.diseases.hiv); none found."
+            )
+        # Precompute a fast lookup cube indexed by [sex, year, age].
+        df = self.incidence
+        self._years = np.sort(df['year'].unique()).astype(int)
+        self._year_index = {int(y): i for i, y in enumerate(self._years)}
+        self._ages = np.sort(df['age'].unique()).astype(int)
+        self._age_min = int(self._ages.min())
+        self._age_max = int(self._ages.max())
+        n_year, n_age = len(self._years), len(self._ages)
+        age_index = {int(a): i for i, a in enumerate(self._ages)}
+        cube = {0: np.zeros((n_year, n_age)), 1: np.zeros((n_year, n_age))}
+        sex_code = {'f': 0, 'm': 1}
+        for r in df.itertuples(index=False):
+            s = sex_code.get(str(r.sex).lower()[0])
+            if s is None:
+                continue
+            yi = self._year_index[int(r.year)]
+            ai = age_index[int(r.age)]
+            cube[s][yi, ai] = float(r.incidence)
+        self._rate_cube = cube
+
+    def _lookup_rates(self, year, ages, female):
+        """Per-agent annual incidence rate for the given calendar year.
+
+        ``ages`` is a float array of agent ages; ``female`` a bool mask. Years
+        are nearest-year clamped to the data range; ages are clamped to the data
+        age range; integer-floored age indexes the per-single-year curve.
+        """
+        # Nearest-year clamp: years before the curve start -> first year (which
+        # is 0 incidence in the Rwanda data); after the end -> last year.
+        y = int(np.clip(int(np.floor(year)), int(self._years[0]), int(self._years[-1])))
+        yi = self._year_index[y]
+        # Clamp/floor ages into the per-single-year curve index space.
+        ai = np.clip(np.floor(ages).astype(int), self._age_min, self._age_max) - self._age_min
+        rates = np.empty(len(ages), dtype=float)
+        f_curve = self._rate_cube[0][yi]
+        m_curve = self._rate_cube[1][yi]
+        rates[female] = f_curve[ai[female]]
+        rates[~female] = m_curve[ai[~female]]
+        return rates
+
+    def step(self):
+        hiv = self.sim.diseases.hiv
+        people = self.sim.people
+        # Living, HIV-negative susceptibles (not currently infected).
+        eligible = (hiv.susceptible & ~hiv.infected & people.alive).uids
+        if not len(eligible):
+            return
+        ages = np.asarray(people.age[eligible], dtype=float)
+        female = np.asarray(people.female[eligible], dtype=bool)
+        year = float(self.t.now('year'))
+        rates = self._lookup_rates(year, ages, female)
+        # Annual rate -> per-timestep probability via the exponential survival
+        # form (exact for non-small rates): p = 1 - exp(-rate * dt_years).
+        dt_years = float(self.t.dt_year)
+        p = 1.0 - np.exp(-rates * dt_years)
+        self.infect_bern.set(p=p)
+        selected = self.infect_bern.filter(eligible)
+        if len(selected):
+            hiv.set_prognoses(selected)
+        return selected
 
 
 def _reshape_art_coverage(df):
