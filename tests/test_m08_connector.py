@@ -1,6 +1,7 @@
 import numpy as np
+import pytest
 import hpvsim as hpv
-from hpvsim.hiv import hpv_hiv_connector, _HIV_EFFECTS
+from hpvsim.hiv import hpv_hiv_connector, HIVStratifiedResults, _HIV_EFFECTS
 
 
 def test_cd4_stratum_boundaries():
@@ -59,3 +60,52 @@ def test_rel_sus_gt200_stratum():
     conn.step()
     assert np.isclose(hpvmod.rel_sus[uid], _HIV_EFFECTS['rel_sus']['gt200'])
     assert np.isclose(conn.hiv_rel_sev[uid], _HIV_EFFECTS['rel_sev']['gt200'])
+
+
+# --- Configurable effects (location calibration override) -------------------
+
+_RWANDA_EFFECTS = {
+    'rel_sus': {'lt200': 4.75, 'gt200': 2.75},
+    'rel_sev': {'lt200': 2.5, 'gt200': 3.5},
+    'rel_imm': {'lt200': 0.36, 'gt200': 0.76},
+}
+
+
+def test_effects_override_applied():
+    """A connector built with custom effects= uses those multipliers, not defaults."""
+    h = hpv.HIV(beta_m2f=0.0)
+    conn = hpv_hiv_connector(effects=_RWANDA_EFFECTS)
+    sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25,
+                  location='nigeria', genotypes=[16], diseases=[h],
+                  connectors=[conn])
+    sim.init()
+    hivmod = sim.diseases.hiv
+    hpvmod = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)][0]
+    # Auto-wiring must NOT add a second connector when one is user-supplied.
+    conns = [c for c in sim.connectors.values() if isinstance(c, hpv_hiv_connector)]
+    assert len(conns) == 1
+    conn = conns[0]
+    uid = sim.people.auids[0]
+    hivmod.infected[uid] = True
+    hivmod.cd4[uid] = 100.0  # lt200
+    hpvmod.rel_sus[sim.people.auids] = 1.0
+    conn.step()
+    assert np.isclose(hpvmod.rel_sus[uid], 4.75)          # Rwanda lt200 rel_sus
+    assert np.isclose(conn.hiv_rel_sev[uid], 2.5)         # Rwanda lt200 rel_sev
+    assert np.isclose(conn.hiv_rel_imm[uid], 0.36)
+
+
+def test_effects_override_validates_shape():
+    with pytest.raises(ValueError, match='rel_sus'):
+        hpv_hiv_connector(effects={'rel_sus': {'lt200': 2.0}})  # missing keys
+
+
+def test_user_supplied_analyzer_not_duplicated():
+    """Auto-wiring skips a second HIVStratifiedResults when the user supplies one."""
+    h = hpv.HIV(beta_m2f=0.0)
+    sim = hpv.Sim(n_agents=200, start=2000, stop=2001, dt=0.25,
+                  location='nigeria', genotypes=[16], diseases=[h],
+                  analyzers=[HIVStratifiedResults()])
+    sim.init()
+    strat = [a for a in sim.analyzers.values() if isinstance(a, HIVStratifiedResults)]
+    assert len(strat) == 1

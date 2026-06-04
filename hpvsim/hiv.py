@@ -26,6 +26,12 @@ __all__ = ['HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector',
 # rule. Strata: 'lt200' = CD4 < 200; 'gt200' = CD4 >= 200 (v2's 200-500 band,
 # extended to all CD4 >= 200 for HIV+ agents). Agents with CD4 > 500 (newly
 # infected in v2's model) had no multiplier in v2; here they receive the gt200 factor.
+#
+# These are the generic HIVsim class defaults. A *location calibration* may
+# override them: e.g. v2's Rwanda calibration (results/rwanda_pars.obj) tuned
+# rel_sus to {lt200: 4.75, gt200: 2.75} and rel_sev to {lt200: 2.5, gt200: 3.5}
+# (rel_imm unchanged). Pass such overrides via ``hpv_hiv_connector(effects=...)``;
+# see ``tests/regression/rwanda_calib.py`` for the Rwanda values in use.
 _HIV_EFFECTS = {
     'rel_sus': {'lt200': 2.2, 'gt200': 2.2},   # increased HPV acquisition
     'rel_sev': {'lt200': 1.5, 'gt200': 1.2},   # faster/worse CIN->cancer progression
@@ -324,8 +330,24 @@ class hpv_hiv_connector(ss.Connector):
     Must be registered AFTER CrossImmunity in the connectors list.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, effects=None, **kwargs):
         super().__init__(**kwargs)
+        # CD4-stratified effect multipliers; defaults to the generic HIVsim
+        # values (_HIV_EFFECTS). A location calibration passes its own dict
+        # (same {effect: {'lt200':.., 'gt200':..}} shape) — e.g. the Rwanda
+        # rel_sus/rel_sev overrides. Validated for the required keys here so a
+        # malformed override fails at construction, not mid-run.
+        if effects is None:
+            effects = _HIV_EFFECTS
+        else:
+            for eff in ('rel_sus', 'rel_sev', 'rel_imm'):
+                if eff not in effects or not {'lt200', 'gt200'} <= set(effects[eff]):
+                    raise ValueError(
+                        "hpv_hiv_connector effects must provide 'rel_sus', "
+                        "'rel_sev', 'rel_imm', each with 'lt200' and 'gt200' keys; "
+                        f'got {effects!r}'
+                    )
+        self.effects = effects
         self.hpv_modules = None
         self.hiv_module = None
         self.define_states(
@@ -362,8 +384,8 @@ class hpv_hiv_connector(ss.Connector):
     def _factor_array(self, effect, hiv_pos, strata, n):
         """Build a per-agent factor array (1.0 for HIV-, stratum value for HIV+)."""
         out = np.ones(n, dtype=float)
-        lt200 = _HIV_EFFECTS[effect]['lt200']
-        gt200 = _HIV_EFFECTS[effect]['gt200']
+        lt200 = self.effects[effect]['lt200']
+        gt200 = self.effects[effect]['gt200']
         vals = np.where(strata == 0, lt200, gt200)
         out[hiv_pos] = vals[hiv_pos]
         return out

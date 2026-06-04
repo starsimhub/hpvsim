@@ -153,9 +153,14 @@ class Sim(ss.Sim):
         # If HIV is present, auto-wire its connector (appended last, so it runs
         # after CrossImmunity, which overwrites rel_sus each step; see
         # hpv_hiv_connector.init_pre) and its stratified-results analyzer.
+        # A user may supply their own (e.g. an hpv_hiv_connector with calibrated
+        # `effects=`); in that case do NOT auto-add a second one, which would
+        # double-apply the rel_sus multiply / double-count the results.
         if any(isinstance(d, HIV) for d in other_diseases):
-            auto_connectors.append(hpv_hiv_connector())
-            auto_analyzers.append(HIVStratifiedResults())
+            if not any(isinstance(c, hpv_hiv_connector) for c in user_connectors):
+                auto_connectors.append(hpv_hiv_connector())
+            if not any(isinstance(a, HIVStratifiedResults) for a in user_analyzers):
+                auto_analyzers.append(HIVStratifiedResults())
         connectors = auto_connectors + user_connectors
 
         networks = kwargs.pop('networks', None)
