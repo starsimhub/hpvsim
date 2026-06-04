@@ -18,7 +18,6 @@ API notes (STIsim 1.5.0):
 Run as a script to print HIV prevalence + HIV+ cancer count:
     python tests/regression/anchor_hiv_hpv.py
 """
-import starsim as ss
 import stisim as sti
 import hpvsim as hpv
 
