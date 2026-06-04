@@ -23,9 +23,11 @@ __all__ = ['HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector',
 
 # CD4-stratified HIV→HPV effect multipliers. Copied by value from v2's
 # HIVsim defaults (hpvsim/_v2_legacy/hiv.py:29-44) per the no-quarantine-import
-# rule. Strata: 'lt200' = CD4 < 200; 'gt200' = CD4 >= 200 (v2's 200-500 band,
-# extended to all CD4 >= 200 for HIV+ agents). Agents with CD4 > 500 (newly
-# infected in v2's model) had no multiplier in v2; here they receive the gt200 factor.
+# rule. v2's CD4 strata are 'lt200' = [0, 200) and 'gt200' = [200, 500); agents
+# with CD4 >= 500 fall in NEITHER stratum and so receive NO HIV→HPV effect
+# (factor 1.0, biological). This is load-bearing: HIV+ agents start at CD4~594
+# and ART reconstitutes CD4 above 500, so most HIV+ person-time is CD4 >= 500 —
+# applying gt200 there (as an earlier draft did) over-amplifies HIV+ cancer ~10x.
 #
 # These are the generic HIVsim class defaults. A *location calibration* may
 # override them: e.g. v2's Rwanda calibration (results/rwanda_pars.obj) tuned
@@ -37,7 +39,8 @@ _HIV_EFFECTS = {
     'rel_sev': {'lt200': 1.5, 'gt200': 1.2},   # faster/worse CIN->cancer progression
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76}, # reduced post-infection/vaccine immunity
 }
-_CD4_THRESHOLD = 200.0
+_CD4_THRESHOLD = 200.0   # lt200 / gt200 boundary
+_CD4_UPPER = 500.0       # CD4 >= this -> no HIV→HPV effect (v2's gt200 ceiling)
 
 
 class HIV(sti.HIV):
@@ -378,7 +381,12 @@ class hpv_hiv_connector(ss.Connector):
                       'CrossImmunity.')
 
     def _cd4_stratum(self, cd4):
-        """Return 0 for lt200 (CD4<200), 1 for gt200 (CD4>=200)."""
+        """Return 0 for lt200 (CD4<200), 1 for gt200 (CD4>=200).
+
+        This is the lt200/gt200 split only; the CD4>=500 'no effect' band is
+        applied separately in ``step`` (such agents are excluded from the
+        effect mask), matching v2's strata [0,200) and [200,500).
+        """
         return (np.asarray(cd4) >= _CD4_THRESHOLD).astype(int)
 
     def _factor_array(self, effect, hiv_pos, strata, n):
@@ -399,7 +407,11 @@ class hpv_hiv_connector(ss.Connector):
         # HIV- agents have NaN cd4 (never initialized); an HIV+ agent whose cd4
         # is still NaN (pre-init edge case) is treated as neutral (factor 1.0)
         # rather than silently binned into a stratum.
-        hiv_pos = np.asarray(self.hiv_module.infected[auids], dtype=bool) & ~np.isnan(cd4)
+        # v2-faithful: effects apply only to HIV+ agents with an initialized CD4
+        # in [0, 500). CD4 >= 500 (newly infected at ~594, or ART-reconstituted)
+        # falls outside v2's gt200=[200,500) band and gets NO effect (factor 1.0).
+        infected = np.asarray(self.hiv_module.infected[auids], dtype=bool)
+        hiv_pos = infected & ~np.isnan(cd4) & (cd4 < _CD4_UPPER)
         strata = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
         n = len(auids)
         rel_sus = self._factor_array('rel_sus', hiv_pos, strata, n)
