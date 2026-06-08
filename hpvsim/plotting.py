@@ -76,6 +76,10 @@ def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwa
     `source` may be a run ``hpv.Sim`` (uses ``results_by_genotype``) or an
     ``hpv.AgeResults`` analyzer (uses its type-distribution result `key`, e.g.
     'cancerous_genotype_dist'). `year` defaults to the last recorded year.
+
+    Note: the default ``key='cum_cancers'`` is only valid for the Sim source;
+    for an AgeResults source pass a type-distribution key like
+    'cancerous_genotype_dist'.
     """
     if isinstance(source, AgeResults):
         df = source.to_dataframe(key, normalize=True)  # index=year, cols=genotypes
@@ -91,6 +95,6 @@ def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwa
     ax.bar(x, row.values, **kwargs)
     ax.set_xticks(x)
     ax.set_xticklabels(list(row.index))
-    ax.set_ylabel('Share of cancers')
+    ax.set_ylabel(f'{key} (share)')
     ax.set_title(f'Genotype distribution ({key})')
     return fig

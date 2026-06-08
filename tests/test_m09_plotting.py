@@ -58,3 +58,12 @@ def test_plot_type_distribution_bars_sum_to_one():
     heights = [p.get_height() for p in ax.patches]
     assert len(heights) == 2                          # one bar per genotype
     assert np.isclose(sum(heights), 1.0)              # normalized shares
+
+
+def test_plot_type_distribution_age_results_source():
+    _, ar = _sim_with_age_results(genotypes=('hpv16', 'hpv18'))
+    fig = hpv.plot_type_distribution(ar, key='cancerous_genotype_dist')
+    ax = fig.axes[0]
+    heights = [p.get_height() for p in ax.patches]
+    assert len(heights) == 2                  # one bar per genotype
+    assert np.isclose(sum(heights), 1.0)      # normalized shares
