@@ -177,3 +177,10 @@ def test_analyzer_plot_methods_return_figures():
     # Pyramid sign convention: male bars drawn on the left (negative width).
     assert min(p.get_width() for p in f1.axes[0].patches) < 0
     plt.close('all')
+
+
+def test_plotting_exports():
+    for name in ['plot_sim', 'plot_by_age', 'plot_by_genotype',
+                 'plot_type_distribution', 'plot_intervention_impact',
+                 'plot_calibration']:
+        assert hasattr(hpv, name), f'hpv.{name} not exported'
