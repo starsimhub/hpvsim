@@ -225,8 +225,9 @@ class HPV(ss.Infection):
         # CIN->cancer decision purely for the RESULTS. ``_ledger_onset`` maps a
         # future onset ti -> list of pending extra events; ``_ledger_death`` maps a
         # future death ti -> realized extra cancer-deaths; ``_cancer_events``
-        # accumulates realized (causal_age, cin_age, cancer_age, weight) tuples
-        # for the by-event distribution analyzer (own cancers + extras).
+        # accumulates realized (onset_ti, causal_age, cin_age, cancer_age,
+        # death_age, weight) tuples for the by-event analyzers (age_causal_infection
+        # and dalys) over own cancers + extras.
         self._ledger_onset = {}
         self._ledger_death = {}
         self._cancer_events = []
@@ -598,7 +599,7 @@ class HPV(ss.Infection):
                 claims[key] = ti
                 n_w += w
                 age_w += cancer_age * w
-                self._cancer_events.append((causal, cin_age, cancer_age, w))
+                self._cancer_events.append((ti, causal, cin_age, cancer_age, death_age, w))
                 self._ledger_death.setdefault(death_ti, []).append((u, death_age, w))
             if n_w:
                 res.new_cancers[ti] += n_w
@@ -785,10 +786,12 @@ class HPV(ss.Infection):
             if ratio > 1:
                 ti_inf = np.asarray(self.ti_infected[to_cancerous], dtype=float)
                 ti_cinv = np.asarray(self.ti_cin[to_cancerous], dtype=float)
+                ti_dead = np.asarray(self.ti_dead_cancer[to_cancerous], dtype=float)
                 causal_ages = ages_at_cancer - (ti - ti_inf) * dt_yr
                 cin_ages = ages_at_cancer - (ti - ti_cinv) * dt_yr
-                for ca, cia, cca in zip(causal_ages, cin_ages, ages_at_cancer):
-                    self._cancer_events.append((float(ca), float(cia), float(cca), w_own))
+                death_ages = ages_at_cancer + (ti_dead - ti) * dt_yr
+                for ca, cia, cca, da in zip(causal_ages, cin_ages, ages_at_cancer, death_ages):
+                    self._cancer_events.append((ti, float(ca), float(cia), float(cca), float(da), w_own))
             self._cancel_other_genotype_progression_for(to_cancerous)
 
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
