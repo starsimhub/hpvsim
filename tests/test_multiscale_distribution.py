@@ -65,8 +65,8 @@ class _CancerPathwayAges(ss.Analyzer):
       - single-scale (ratio==1): scan agent ``ti_cancerous`` per step and
         back-trace via ``ti_infected``/``ti_cin`` (the manuscript's method).
       - multiscale (ratio>1): read the disease's cancer-event LEDGER
-        (``_cancer_events``), which holds one (causal, cin, cancer, weight)
-        row per resolved sub-cancer — the agent's own cancer AND the ratio-1
+        (``_cancer_events``), which holds one (onset_ti, causal, cin, cancer,
+        death, weight) row per resolved sub-cancer — the agent's own cancer AND the ratio-1
         extra sub-resolutions. The ledger weight is intentionally IGNORED here:
         Fig 5 is unweighted, and treating each sub-cancer as one sample is
         exactly the ratio-x sample-size gain multiscale exists to provide.
@@ -103,7 +103,7 @@ class _CancerPathwayAges(ss.Analyzer):
         super().finalize()
         if self._use_ledger:
             for m in self.mods:
-                for (causal, cin_age, cancer_age, _w) in m._cancer_events:
+                for (_oti, causal, cin_age, cancer_age, _da, _w) in m._cancer_events:
                     self.causal.append(causal)
                     self.cin.append(cin_age)
                     self.cancer.append(cancer_age)
