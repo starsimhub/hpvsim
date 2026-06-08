@@ -5,7 +5,7 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection']
+__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys']
 
 
 def _make_age_labels(edges):
@@ -561,3 +561,91 @@ class age_causal_infection(ss.Analyzer):
         self.weights = np.array(self.weights)
         for k in self.dwelltime:
             self.dwelltime[k] = np.array(self.dwelltime[k])
+
+
+class dalys(ss.Analyzer):
+    """Incidence-based DALYs (YLL + YLD) from cervical cancer, by calendar year.
+
+    YLL and YLD are attributed at the year of cancer onset (incidence-based),
+    weighted by ``people.scale``. Ledger-aware: reads live agents at
+    ms_agent_ratio==1 and the per-module ``_cancer_events`` ledger at ratio>1.
+    Absolute population DALYs require multiplying by ``sim.pars.pop_scale``
+    (same convention as v2's per-agent-scale analyzer output).
+
+    Args:
+        start: ss.date-coercible; only count onsets at/after this year.
+        life_expectancy: reference life expectancy for YLL (default 84;
+            pass a country-specific value where available).
+    """
+
+    def __init__(self, start=None, life_expectancy=84, **kwargs):
+        super().__init__(**kwargs)
+        self.start = start
+        self.life_expectancy = life_expectancy
+        self.disability_weights = sc.objdict(
+            weights=[0.288, 0.049, 0.451, 0.54],     # GBD2017
+            time_fraction=[0.05, 0.85, 0.09, 0.01],
+        )
+
+    @property
+    def av_disutility(self):
+        dw = self.disability_weights
+        return sum(dw.weights[i] * dw.time_fraction[i] for i in range(len(dw.weights)))
+
+    def init_pre(self, sim):
+        from .hpv import HPV
+        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        super().init_pre(sim)
+        tv_years = np.asarray(sim.timevec.years, dtype=float)
+        self.start_year = (int(np.floor(ss.date(self.start).years)) if self.start is not None
+                           else int(np.floor(tv_years[0])))
+        self.end_year = int(np.floor(tv_years[-1]))
+        self.years = np.arange(self.start_year, self.end_year + 1)
+        n = len(self.years)
+        self.yll = np.zeros(n)
+        self.yld = np.zeros(n)
+        self.dalys = np.zeros(n)
+        self._use_ledger = any(int(m.pars.ms_agent_ratio) > 1 for m in self.hpv_modules)
+
+    def _accumulate(self, year, cancer_age, death_age, weight):
+        if year < self.start_year or year > self.end_year:
+            return
+        idx = year - self.start_year
+        cancer_age = np.asarray(cancer_age, dtype=float)
+        death_age = np.asarray(death_age, dtype=float)
+        weight = np.asarray(weight, dtype=float)
+        dur = death_age - cancer_age
+        self.yld[idx] += float((weight * dur * self.av_disutility).sum())
+        years_left = np.maximum(0.0, self.life_expectancy - death_age)
+        self.yll[idx] += float((weight * years_left).sum())
+
+    def step(self):
+        if self._use_ledger:
+            return
+        sim = self.sim
+        ti = sim.ti
+        year = int(np.floor(sim.timevec[ti].years))
+        if year < self.start_year:
+            return
+        dt = float(sim.t.dt)
+        age_raw = np.asarray(sim.people.age.raw)
+        scale = getattr(sim.people, 'scale', None)
+        scale_raw = np.asarray(scale.raw) if scale is not None else None
+        for m in self.hpv_modules:
+            new = np.where(np.asarray(m.ti_cancerous.raw) == ti)[0]
+            if not len(new):
+                continue
+            cancer_age = age_raw[new]
+            ti_dead = np.asarray(m.ti_dead_cancer.raw)[new]
+            death_age = cancer_age + (ti_dead - ti) * dt
+            w = scale_raw[new] if scale_raw is not None else np.ones(len(new))
+            self._accumulate(year, cancer_age, death_age, w)
+
+    def finalize(self):
+        super().finalize()
+        if self._use_ledger:
+            for m in self.hpv_modules:
+                for (onset_ti, _causal, _cin, cancer_age, death_age, w) in m._cancer_events:
+                    year = int(np.floor(self.sim.timevec[int(onset_ti)].years))
+                    self._accumulate(year, [cancer_age], [death_age], [w])
+        self.dalys = self.yll + self.yld

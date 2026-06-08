@@ -147,3 +147,37 @@ def test_age_causal_infection_ledger_unbiased():
     mean3, n3 = run(3)
     assert n3 > n1                      # ledger yields ~ratio x more samples
     assert abs(mean3 - mean1) < 2.0     # mean age at cancer within 2 years
+
+
+def test_dalys_basic_and_av_disutility():
+    d = hpv.dalys(start=2000, life_expectancy=84)
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
+                  n_agents=3000, rand_seed=1, analyzers=[d])
+    sim.run()
+    a = sim.analyzers['dalys']
+    # av_disutility matches the v2 GBD2017 constant exactly.
+    expected = 0.288*0.05 + 0.049*0.85 + 0.451*0.09 + 0.54*0.01
+    assert np.isclose(a.av_disutility, expected)
+    # DALYs decompose into YLL + YLD, all non-negative, indexed by year.
+    assert len(a.dalys) == len(a.years)
+    assert np.allclose(a.dalys, a.yll + a.yld)
+    assert (a.yll >= 0).all() and (a.yld >= 0).all()
+    assert a.dalys.sum() > 0
+    assert a.years[0] == 2000
+
+
+def test_dalys_ledger_overlaps_single_scale():
+    def total(ratio):
+        d = hpv.dalys(start=2000)
+        sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
+                      n_agents=3000, rand_seed=2, ms_agent_ratio=ratio, analyzers=[d])
+        sim.run()
+        return sim.analyzers['dalys'].dalys.sum()
+    t1 = total(1)
+    t3 = total(3)
+    # Weighted DALYs total within 40% across ratios.
+    # The ledger path at ratio>1 stores own+extras each at weight 1/ratio, so the
+    # weighted event count should equal the ratio==1 count in expectation.  In
+    # practice the two sims have different cancer dynamics (different RNG streams),
+    # so total-DALY equivalence is loose (~25-35% spread at n=3000).
+    assert abs(t3 - t1) / t1 < 0.40
