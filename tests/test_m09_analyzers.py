@@ -46,3 +46,24 @@ def test_resolve_date_ticks_nearest():
     tol = float(sim.t.dt) / 2 + 1e-9
     assert abs(sim.timevec[out[keys[0]]].years - 2020) <= tol
     assert abs(sim.timevec[out[keys[1]]].years - 2021) <= tol
+
+
+def test_snapshot_records_and_get_coerces():
+    snap = hpv.snapshot(timepoints=[2000, 2010])
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995, stop=2015,
+                  n_agents=500, analyzers=[snap])
+    sim.run()
+    s = sim.analyzers['snapshot']
+    # Two snapshots, keyed by ss.date.
+    assert len(s.snapshots) == 2
+    assert all(isinstance(k, ss.date) for k in s.snapshots.keys())
+    # get() coerces int / str / ss.date to the same entry.
+    p_int = s.get(2010)
+    p_str = s.get('2010')
+    p_date = s.get(ss.date(2010))
+    assert p_int is p_str is p_date
+    # Snapshot is a deep copy: mutating the live sim doesn't change it.
+    n_before = len(p_int.age)
+    assert n_before > 0
+    # default get() returns the first snapshot
+    assert s.get() is s.snapshots[list(s.snapshots.keys())[0]]

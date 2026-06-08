@@ -5,7 +5,8 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['AgeResults']
+__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection',
+           'dalys', 'results_by_genotype']
 
 
 def _make_age_labels(edges):
@@ -58,6 +59,61 @@ def _resolve_date_ticks(sim, dates):
         ti = int(np.argmin(np.abs(tv_years - float(dd.years))))
         out[sim.timevec[ti]] = ti
     return out
+
+
+class snapshot(ss.Analyzer):
+    """Deep-copy ``sim.people`` at requested timepoints.
+
+    Args:
+        timepoints: ss.date-coercible scalar/list (year ints, floats, strings,
+            or ss.date). Defaults to the sim end date.
+        die (bool): raise if a requested timepoint is past the sim end.
+
+    Example::
+
+        snap = hpv.snapshot(timepoints=['2015', 2020])
+        sim = hpv.Sim(analyzers=[snap]); sim.run()
+        people_2020 = sim.analyzers[0].get(2020)
+    """
+
+    def __init__(self, timepoints=None, die=True, **kwargs):
+        super().__init__(**kwargs)
+        self.timepoints = timepoints
+        self.die = die
+        self.snapshots = sc.odict()   # ss.date -> deep-copied People
+        self._date_to_ti = None       # ss.date -> tick index
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        tps = sc.tolist(self.timepoints) if self.timepoints is not None else [sim.timevec[-1]]
+        tv_years = np.asarray(sim.timevec.years, dtype=float)
+        self._date_to_ti = sc.odict()
+        for d in tps:
+            dd = ss.date(d)
+            if float(dd.years) > tv_years[-1] + 1e-9:
+                msg = f'snapshot: requested {dd} is past sim end {sim.timevec[-1]}'
+                if self.die:
+                    raise ValueError(msg)
+                continue
+            ti = int(np.argmin(np.abs(tv_years - float(dd.years))))
+            self._date_to_ti[sim.timevec[ti]] = ti
+
+    def step(self):
+        ti = self.sim.ti
+        for date, snap_ti in self._date_to_ti.items():
+            if snap_ti == ti:
+                self.snapshots[date] = sc.dcp(self.sim.people)
+
+    def get(self, key=None):
+        """Retrieve a snapshot by ss.date-coercible key (nearest match)."""
+        keys = list(self.snapshots.keys())
+        if not keys:
+            raise sc.KeyNotFoundError('snapshot: no snapshots recorded')
+        if key is None:
+            return self.snapshots[keys[0]]
+        target = float(ss.date(key).years)
+        yrs = np.array([k.years for k in keys])
+        return self.snapshots[keys[int(np.argmin(np.abs(yrs - target)))]]
 
 
 class AgeResults(ss.Analyzer):
