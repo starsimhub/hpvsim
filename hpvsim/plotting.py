@@ -203,11 +203,26 @@ def plot_calibration(calib, sim=None, fig=None):
         ax = fig.add_subplot(1, len(keys), i + 1)
         expected = data[key]
         actual = _extract_actual(ar, key, expected)
-        for col in expected.columns:
-            ax.plot(expected.index, expected[col].values, 'o', label=f'data {col}')
-            ax.plot(actual.index, actual[col].values, '-', label=f'fit {col}')
+        if len(expected.index) == 1:
+            # Single-year, age-stratified target (the common HPV cancer-incidence
+            # case): plot the age profile (age bins on x), data vs fit, rather
+            # than collapsing every age bin to a point at one year.
+            yr = expected.index[0]
+            x = np.arange(len(expected.columns))
+            ax.plot(x, expected.iloc[0].values, 'o-', label=f'data {yr:g}')
+            ax.plot(x, actual.iloc[0].values, 's--', label=f'fit {yr:g}')
+            ax.set_xticks(x)
+            ax.set_xticklabels(list(expected.columns), rotation=45, ha='right')
+            ax.set_xlabel('Age group')
+        else:
+            # Multi-year target: one data + one fit series per age-bin column,
+            # over time.
+            for col in expected.columns:
+                ax.plot(expected.index, expected[col].values, 'o', label=f'data {col}')
+                ax.plot(actual.index, actual[col].values, '-', label=f'fit {col}')
+            ax.set_xlabel('Year')
         ax.set_title(key)
-        ax.set_xlabel('Year')
+        ax.legend()
     fig.tight_layout()
     return fig
 
