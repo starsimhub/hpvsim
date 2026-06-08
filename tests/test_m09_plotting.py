@@ -139,3 +139,23 @@ def test_plot_intervention_impact_multisim_smoke():
     assert len(fig.axes) == 2
     # Each arm renders a 10/90 band (one fill_between collection per arm).
     assert len(fig.axes[0].collections) == 2
+
+
+def test_plot_calibration_data_vs_fit():
+    import pandas as pd
+    edges = np.array([0., 30., 50., 100.])
+    def make_sim(seed=1):
+        ar = hpv.AgeResults(result_args=sc.objdict(
+            cancers=sc.objdict(years=[2020], edges=edges)))
+        return hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
+                       stop=2020, n_agents=600, rand_seed=seed, analyzers=[ar])
+    target = pd.DataFrame({'0-30': [1.0], '30-50': [5.0], '50+': [3.0]},
+                          index=pd.Index([2020.0], name='t'))
+    calib = hpv.Calibration(
+        make_sim(), calib_pars=dict(beta=dict(low=0.1, high=0.3, value=0.2)),
+        data={'cancers': target}, total_trials=2, n_workers=1)
+    calib.calibrate()
+    fig = hpv.plot_calibration(calib)
+    assert len(fig.axes) == 1            # one panel per target
+    ax = fig.axes[0]
+    assert len(ax.lines) >= 2            # observed markers + fit line

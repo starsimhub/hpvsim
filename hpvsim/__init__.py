@@ -26,7 +26,7 @@ from .cross_genotype import CrossImmunity, HPVTotal
 from .analyzers import AgeResults, snapshot, age_pyramid, age_causal_infection, dalys, results_by_genotype
 from .calibration import Calibration
 from . import calibration
-from .plotting import plot_by_age, plot_by_genotype, plot_type_distribution, plot_sim, plot_intervention_impact
+from .plotting import plot_by_age, plot_by_genotype, plot_type_distribution, plot_sim, plot_intervention_impact, plot_calibration
 from .products import vx, dx, tx, txvx, radiation
 from .interventions import (
     BaseVaccination, routine_vx, campaign_vx,
@@ -44,7 +44,7 @@ __all__ = [
     'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'AnnualBirths', 'CrossImmunity', 'HPVTotal',
     'AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys', 'results_by_genotype',
     'Calibration', 'calibration',
-    'plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim', 'plot_intervention_impact',
+    'plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim', 'plot_intervention_impact', 'plot_calibration',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
     'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
     'GENOTYPE_KEYS',

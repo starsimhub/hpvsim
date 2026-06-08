@@ -8,7 +8,7 @@ from .analyzers import AgeResults, results_by_genotype
 
 
 __all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim',
-           'plot_intervention_impact']
+           'plot_intervention_impact', 'plot_calibration']
 
 
 class _FigProxy:
@@ -157,6 +157,57 @@ def plot_intervention_impact(baseline, scenario, key='cum_cancers',
 
 
 _PREV_KEYS = ('hpv_prevalence', 'precin_prevalence', 'cin_prevalence')
+
+
+def _best_fit_sim(calib):
+    """Rebuild and run the sim at the calibration's best parameters
+    (mirrors ss.Calibration.plot_final)."""
+    pars = sc.dcp(calib.calib_pars)
+    for parname, spec in pars.items():
+        # Only overwrite 'value' for parameters that Optuna actually sampled
+        # (i.e. those present in best_pars). Parameters supplied with a fixed
+        # 'value' in the spec are skipped by _sample_from_trial and therefore
+        # never appear in study.best_params.
+        if parname in calib.best_pars:
+            spec['value'] = calib.best_pars[parname]
+    sim = calib.build_fn(calib.sim.copy(), calib_pars=pars, **calib.build_kw)
+    sim.run()
+    if isinstance(sim, ss.MultiSim):
+        sim = sim.sims[0]
+    return sim
+
+
+def plot_calibration(calib, sim=None, fig=None):
+    """Overlay simulated vs observed for each calibration target (data-vs-fit).
+
+    `calib` is a run ``hpv.Calibration`` (after ``calibrate()``). If `sim` is
+    None, the best-fit sim is rebuilt at ``calib.best_pars`` and run once.
+    `fig` is honored if provided. Convergence and parameter-distribution views
+    are available directly via ``calib.plot_optuna()`` and ``calib.plot_final()``.
+    """
+    from .calibration import _find_age_results as _find_ar, _extract_actual
+    data = (calib.eval_kw or {}).get('data')
+    if not data:
+        raise ValueError('plot_calibration: calibration has no target data '
+                         "(expected calib.eval_kw['data']).")
+    if sim is None:
+        sim = _best_fit_sim(calib)
+    elif isinstance(sim, ss.MultiSim):
+        sim = sim.sims[0]
+    ar = _find_ar(sim)
+    keys = list(data.keys())
+    fig = fig or plt.figure(figsize=(5 * len(keys), 4))
+    for i, key in enumerate(keys):
+        ax = fig.add_subplot(1, len(keys), i + 1)
+        expected = data[key]
+        actual = _extract_actual(ar, key, expected)
+        for col in expected.columns:
+            ax.plot(expected.index, expected[col].values, 'o', label=f'data {col}')
+            ax.plot(actual.index, actual[col].values, '-', label=f'fit {col}')
+        ax.set_title(key)
+        ax.set_xlabel('Year')
+    fig.tight_layout()
+    return fig
 
 
 def _find_age_results(sim):
