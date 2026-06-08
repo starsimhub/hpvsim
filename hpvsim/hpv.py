@@ -33,6 +33,14 @@ from .utils import compute_severity
 
 _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
+# Max rejection-sampling rounds for the CIN-conditional precin draw on multiscale
+# extras (see _multiscale_ledger). Acceptance per round is the per-agent
+# CIN-reaching probability (~25-30% typical), so ~50 rounds leaves ~1e-7
+# unresolved; those fall back to the (also CIN-conditional) source precin, which
+# is unbiased. This cap only trades extra diversification for compute, not
+# accuracy, so a fixed value is appropriate; the loop early-exits once resolved.
+_PRECIN_RESAMPLE_ROUNDS = 50
+
 
 def _normalize_genotype(key):
     """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
@@ -214,13 +222,13 @@ class HPV(ss.Infection):
         # resolved at ratio-finer granularity as scheduled DATA — no fine People
         # agents. The agent lives its single-scale life (its own cancer drives
         # the population); the ledger overlays ratio-1 EXTRA sub-cancers per
-        # CIN->cancer decision purely for the RESULTS. ``_led_onset`` maps a
-        # future onset ti -> list of pending extra events; ``_led_death`` maps a
+        # CIN->cancer decision purely for the RESULTS. ``_ledger_onset`` maps a
+        # future onset ti -> list of pending extra events; ``_ledger_death`` maps a
         # future death ti -> realized extra cancer-deaths; ``_cancer_events``
         # accumulates realized (causal_age, cin_age, cancer_age, weight) tuples
         # for the by-event distribution analyzer (own cancers + extras).
-        self._led_onset = {}
-        self._led_death = {}
+        self._ledger_onset = {}
+        self._ledger_death = {}
         self._cancer_events = []
         # Sim-shared registry (uid, sub_idx) -> onset ti of the first realized
         # cancer for that sub-individual, used by _realize_ledger to enforce
@@ -426,7 +434,7 @@ class HPV(ss.Infection):
         resamples its own ``dur_precin`` (CIN-conditional, length-biased via the
         CIN gate) and ``dur_cin``, draws cancer at ``f(dur_cin)``, and — for the
         successes — appends ``(source_uid, causal/cin/cancer/death ages,
-        onset_ti, death_ti, weight=1/ratio)`` to ``_led_onset[onset_ti]``. The
+        onset_ti, death_ti, weight=1/ratio)`` to ``_ledger_onset[onset_ti]``. The
         event is only COUNTED at realization (``step_state``) if its source
         agent survives to its onset, so each sub-cancer shares the real source's
         competing risk (the fix for the grow design's decoupled-fate drift).
@@ -506,7 +514,7 @@ class HPV(ss.Infection):
         size = n * m
         precin_yr = src_precin_yr.copy()
         need = np.ones(size, dtype=bool)
-        for _ in range(50):
+        for _ in range(_PRECIN_RESAMPLE_ROUNDS):
             idx = np.where(need)[0]
             if len(idx) == 0:
                 break
@@ -537,7 +545,7 @@ class HPV(ss.Infection):
         for u, j, ca, cia, cca, da, oti, dti, w in zip(
                 kept_uid, kept_sub, causal, cin_age, cancer_age, death_age,
                 onset_ti, death_ti, kept_w):
-            self._led_onset.setdefault(int(oti), []).append(
+            self._ledger_onset.setdefault(int(oti), []).append(
                 (int(u), int(j), float(ca), float(cia), float(cca), float(da), int(dti), float(w)))
         return
 
@@ -560,14 +568,14 @@ class HPV(ss.Infection):
         source reinfects and reaches CIN again.
 
         Realized onsets add their pathway ages to ``_cancer_events`` and schedule
-        the matching cancer death into ``_led_death``. Events whose ti falls past
+        the matching cancer death into ``_ledger_death``. Events whose ti falls past
         the sim window are never popped, so they are correctly truncated. Pure
         results overlay — touches no agent state.
         """
         res = self.results
         claims = self.sim._ms_cancer_claims  # shared (uid, sub_idx) -> claimed
 
-        onsets = self._led_onset.pop(ti, None)
+        onsets = self._ledger_onset.pop(ti, None)
         if onsets:
             avail = self._sources_available([e[0] for e in onsets])
             n_w = 0.0
@@ -582,12 +590,12 @@ class HPV(ss.Infection):
                 n_w += w
                 age_w += cancer_age * w
                 self._cancer_events.append((causal, cin_age, cancer_age, w))
-                self._led_death.setdefault(death_ti, []).append((u, death_age, w))
+                self._ledger_death.setdefault(death_ti, []).append((u, death_age, w))
             if n_w:
                 res.new_cancers[ti] += n_w
                 res.sum_age_at_cancer[ti] += age_w
 
-        deaths = self._led_death.pop(ti, None)
+        deaths = self._ledger_death.pop(ti, None)
         if deaths:
             avail = self._sources_available([e[0] for e in deaths])
             n_w = 0.0
@@ -793,7 +801,7 @@ class HPV(ss.Infection):
         # become RESULTS here (no population effect — pure overlay), each gated
         # on its SOURCE agent surviving to the scheduled ti (shared competing
         # risk). Empty at ratio==1, so this is a no-op in the single-scale case.
-        if self._led_onset or self._led_death:
+        if self._ledger_onset or self._ledger_death:
             self._realize_ledger(ti)
 
     def step_die(self, uids):

@@ -286,7 +286,7 @@ extra sub-individuals:
   (length-biased `dur_cin` → correct, diversified cancer-onset ages).
 - **Record.** For each kept extra, compute continuous `causal`/`cin`/`cancer`/
   `death` ages and integer `onset_ti`/`death_ti`, and append
-  `(uid, sub_idx, ages…, death_ti, weight)` to `self._led_onset[onset_ti]`.
+  `(uid, sub_idx, ages…, death_ti, weight)` to `self._ledger_onset[onset_ti]`.
   Weight = `source_scale / ratio`, captured here while the source is alive (the
   same `w_own · people.scale` convention the own cancer uses; uniform `1/ratio`
   today since `people.scale == 1`).
@@ -301,7 +301,7 @@ Each step, after the agent's own natural-history transitions:
 - The agent's **own** cancer (sub-resolution 0) is tallied at weight `1/ratio`
   (`new_cancers[ti] = w_own · scale.sum()`), and its pathway ages are recorded
   to `_cancer_events` (the analyzer's data source).
-- `_realize_ledger(ti)` pops `_led_onset[ti]` and `_led_death[ti]` and, for each
+- `_realize_ledger(ti)` pops `_ledger_onset[ti]` and `_ledger_death[ti]` and, for each
   available, un-claimed extra, adds its weight to `new_cancers` /
   `new_cancer_deaths` and its ages to `_cancer_events`. Events whose ti falls
   past the sim window are never popped → correctly truncated.
