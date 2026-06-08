@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from .analyzers import AgeResults, results_by_genotype
 
 
-__all__ = ['plot_by_age', 'plot_by_genotype']
+__all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution']
 
 
 def _new_fig_ax(fig=None, figsize=(7, 5)):
@@ -67,4 +67,30 @@ def plot_by_genotype(sim, key='cum_cancers', normalize=False, fig=None, **kwargs
     ax.set_ylabel(f'{key} (share)' if normalize else key)
     ax.set_title(f'{key} by genotype')
     ax.legend(title='Genotype')
+    return fig
+
+
+def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwargs):
+    """Bar chart of each genotype's share of `key` at a given year.
+
+    `source` may be a run ``hpv.Sim`` (uses ``results_by_genotype``) or an
+    ``hpv.AgeResults`` analyzer (uses its type-distribution result `key`, e.g.
+    'cancerous_genotype_dist'). `year` defaults to the last recorded year.
+    """
+    if isinstance(source, AgeResults):
+        df = source.to_dataframe(key, normalize=True)  # index=year, cols=genotypes
+    else:
+        df = results_by_genotype(source, key=key, normalize=True)
+    if year is None:
+        row = df.iloc[-1]
+    else:
+        yrs = np.asarray(df.index, dtype=float)
+        row = df.iloc[int(np.argmin(np.abs(yrs - float(year))))]
+    fig, ax = _new_fig_ax(fig)
+    x = np.arange(len(row))
+    ax.bar(x, row.values, **kwargs)
+    ax.set_xticks(x)
+    ax.set_xticklabels(list(row.index))
+    ax.set_ylabel('Share of cancers')
+    ax.set_title(f'Genotype distribution ({key})')
     return fig

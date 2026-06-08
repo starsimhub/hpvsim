@@ -47,3 +47,14 @@ def test_plot_by_genotype_line_per_genotype():
     # Normalized variant uses stacked areas (one collection per genotype).
     fig2 = hpv.plot_by_genotype(sim, key='cum_cancers', normalize=True)
     assert len(fig2.axes[0].collections) == 2
+
+
+def test_plot_type_distribution_bars_sum_to_one():
+    sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria',
+                  start=1990, stop=2030, n_agents=1000, rand_seed=1)
+    sim.run()
+    fig = hpv.plot_type_distribution(sim)            # Sim source, last year
+    ax = fig.axes[0]
+    heights = [p.get_height() for p in ax.patches]
+    assert len(heights) == 2                          # one bar per genotype
+    assert np.isclose(sum(heights), 1.0)              # normalized shares
