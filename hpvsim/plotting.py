@@ -90,6 +90,7 @@ def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwa
     Note: the default ``key='cum_cancers'`` is only valid for the Sim source;
     for an AgeResults source pass a type-distribution key like
     'cancerous_genotype_dist'.
+    For a year with zero cancers the normalized shares are all 0 (not 1).
     """
     if isinstance(source, AgeResults):
         df = source.to_dataframe(key, normalize=True)  # index=year, cols=genotypes
@@ -233,18 +234,26 @@ def plot_age_pyramid(age_pyramid_az, date=None, fig=None):
 
 
 def plot_age_causal_infection(aci, fig=None):
-    """Histograms of age at causal infection / CIN / cancer (weighted)."""
-    fig = fig or plt.figure(figsize=(10, 4))
-    series = [('age_causal', aci.age_causal), ('age_cin', aci.age_cin),
-              ('age_cancer', aci.age_cancer)]
+    """Histograms of age at causal infection / CIN2+ / cancer and the precin /
+    cin / total dwell-time distributions (weight-aware)."""
+    fig = fig or plt.figure(figsize=(10, 7))
     w = aci.weights if len(aci.weights) == len(aci.age_cancer) else None
-    for i, (name, vals) in enumerate(series):
-        ax = fig.add_subplot(1, 3, i + 1)
+    age_series = [('age_causal', aci.age_causal), ('age_cin', aci.age_cin),
+                  ('age_cancer', aci.age_cancer)]
+    for i, (name, vals) in enumerate(age_series):
+        ax = fig.add_subplot(2, 3, i + 1)
         vals = np.asarray(vals, dtype=float)
         if len(vals):
             ax.hist(vals, bins=20, weights=w, alpha=0.7)
         ax.set_title(name)
         ax.set_xlabel('Age')
+    for j, state in enumerate(('precin', 'cin', 'total')):
+        ax = fig.add_subplot(2, 3, j + 4)
+        vals = np.asarray(aci.dwelltime[state], dtype=float)
+        if len(vals):
+            ax.hist(vals, bins=20, weights=w, alpha=0.7, color='#9e1149')
+        ax.set_title(f'dwelltime: {state}')
+        ax.set_xlabel('Years')
     fig.tight_layout()
     return fig
 
@@ -277,6 +286,8 @@ def plot_sim(sim, which='default', fig=None, **kwargs):
     AgeResults analyzer recording a prevalence key and 'cancers'.
     Any other value (e.g. 'all') delegates to ss.Sim.plot.
     `fig` is honored in both modes (a new figure is created if None).
+    Pass a fresh/empty figure: multi-panel helpers add subplots rather than
+    reusing existing axes.
     """
     if which != 'default':
         return sim.plot(fig=fig, **kwargs)
