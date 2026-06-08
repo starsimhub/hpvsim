@@ -419,7 +419,8 @@ class age_pyramid(ss.Analyzer):
         age_labels: optional bin labels; auto-generated if omitted.
         datafile: optional path/dataframe of observed data (stored on
             ``self.data`` for the later plotting layer; not plotted here).
-        die (bool): reserved for symmetry with snapshot.
+        die (bool): raise if a requested timepoint is past the sim end
+            (otherwise it is skipped).
 
     Output: ``self.age_pyramids`` is an sc.odict keyed by ss.date, each value an
     ``(nbins, 2)`` array with columns [male, female].
@@ -449,9 +450,17 @@ class age_pyramid(ss.Analyzer):
         if self.datafile is not None:
             self.data = (pd.read_csv(self.datafile) if isinstance(self.datafile, str)
                          else pd.DataFrame(self.datafile))
-        self._date_to_ti = _resolve_date_ticks(sim, self.timepoints
-                                                if self.timepoints is not None
-                                                else [sim.timevec[-1]])
+        tps = sc.tolist(self.timepoints) if self.timepoints is not None else [sim.timevec[-1]]
+        tv_end = float(np.asarray(sim.timevec.years, dtype=float)[-1])
+        kept = []
+        for d in tps:
+            dd = ss.date(d)
+            if float(dd.years) > tv_end + 1e-9:
+                if self.die:
+                    raise ValueError(f'age_pyramid: requested {dd} is past sim end {sim.timevec[-1]}')
+                continue
+            kept.append(dd)
+        self._date_to_ti = _resolve_date_ticks(sim, kept)
 
     def step(self):
         ti = self.sim.ti
@@ -538,8 +547,7 @@ class age_causal_infection(ss.Analyzer):
             # onset, so the bare time-match overcounts vs realized incidence
             # (and vs the multiscale ledger, which records only realized cancers).
             # This also drops the rare agent who reaches cancer and dies of a
-            # competing cause on the same tick (~1%) — correct for dalys, since
-            # that agent is not a cancer death.
+            # competing cause on the same tick (~1%), matching the ledger.
             new = np.where((np.asarray(m.ti_cancerous.raw) == ti)
                            & np.asarray(m.cancerous.raw) & alive)[0]
             if not len(new):

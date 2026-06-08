@@ -214,3 +214,33 @@ def test_public_api_exports():
     for name in ['snapshot', 'age_pyramid', 'age_causal_infection', 'dalys',
                  'results_by_genotype', 'AgeResults']:
         assert hasattr(hpv, name), f'hpv.{name} not exported'
+
+
+def test_start_filter_excludes_earlier_onsets():
+    """`start` excludes cancer onsets before that year in dalys + age_causal.
+
+    Two same-seed sims (identical trajectory): a later `start` must capture
+    strictly fewer DALYs and fewer counted cancers than an earlier `start`.
+    """
+    def run(start):
+        d = hpv.dalys(start=start)
+        a = hpv.age_causal_infection(start=start)
+        sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
+                      n_agents=3000, rand_seed=1, analyzers=[d, a])
+        sim.run()
+        return sim.analyzers['dalys'], sim.analyzers['age_causal_infection']
+    d0, a0 = run(1990)
+    d1, a1 = run(2025)
+    assert d0.years[0] == 1990 and d1.years[0] == 2025
+    assert 0 < d1.dalys.sum() < d0.dalys.sum()
+    assert 0 < len(a1.age_cancer) < len(a0.age_cancer)
+
+
+def test_age_pyramid_die_on_past_end():
+    """age_pyramid raises when a timepoint is past sim end and die=True."""
+    import pytest
+    ap = hpv.age_pyramid(timepoints=[2099], die=True)
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2010,
+                  n_agents=200, analyzers=[ap])
+    with pytest.raises(ValueError):
+        sim.run()

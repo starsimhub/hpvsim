@@ -123,10 +123,12 @@ generalizes the M07 prototype `_cancerpathwayages`.
 
 - Accumulator lists: `age_causal`, `age_cin`, `age_cancer`, weights, and
   `dwelltime{precin, cin, total}`.
-- At `ratio == 1`: read live agents — for each HPV module,
-  `new = (mod.ti_cancerous == sim.ti).uids` (filtered to `>= start`), compute
-  causal/cin/cancer ages from `ti_first_infection`, `ti_cin`, current age, all at
-  weight 1.
+- At `ratio == 1`: read live agents — for each HPV module, select agents with
+  `ti_cancerous == sim.ti` **gated on `cancerous & alive`** (a bare time-match
+  overcounts agents scheduled for cancer who die of other causes first), compute
+  causal/cin/cancer ages from `ti_infected` (the current persistent infection —
+  the one that progressed; matches the ledger's own-cancer computation), `ti_cin`,
+  current age, all at weight 1.
 - At `ratio > 1`: read each module's enriched `_cancer_events` stream (own +
   extra sub-cancers), which already carries the pathway ages and the per-event
   weight.
