@@ -174,4 +174,6 @@ def test_analyzer_plot_methods_return_figures():
     f3 = sim.analyzers['dalys'].plot()
     for f in (f1, f2, f3):
         assert f is not None and len(f.axes) >= 1
+    # Pyramid sign convention: male bars drawn on the left (negative width).
+    assert min(p.get_width() for p in f1.axes[0].patches) < 0
     plt.close('all')
