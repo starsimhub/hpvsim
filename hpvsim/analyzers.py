@@ -487,6 +487,11 @@ class age_pyramid(ss.Analyzer):
                 rows.append(dict(date=date, age_bin=label, sex='female', count=float(arr[bi, 1])))
         return pd.DataFrame(rows)
 
+    def plot(self, date=None, fig=None):
+        """Plot this age pyramid (see hpvsim.plotting.plot_age_pyramid)."""
+        from .plotting import plot_age_pyramid
+        return plot_age_pyramid(self, date=date, fig=fig)
+
 
 class age_causal_infection(ss.Analyzer):
     """Age at causal infection / CIN2+ / cancer, and dwell times, per cancer.
@@ -579,6 +584,11 @@ class age_causal_infection(ss.Analyzer):
         self.weights = np.array(self.weights)
         for k in self.dwelltime:
             self.dwelltime[k] = np.array(self.dwelltime[k])
+
+    def plot(self, fig=None):
+        """Plot age-at-causal/CIN/cancer histograms (see plotting.plot_age_causal_infection)."""
+        from .plotting import plot_age_causal_infection
+        return plot_age_causal_infection(self, fig=fig)
 
 
 class dalys(ss.Analyzer):
@@ -676,6 +686,11 @@ class dalys(ss.Analyzer):
                     year = int(np.floor(self.sim.timevec[int(onset_ti)].years))
                     self._accumulate(year, [cancer_age], [death_age], [w])
         self.dalys = self.yll + self.yld
+
+    def plot(self, fig=None):
+        """Plot stacked YLL/YLD over time (see plotting.plot_dalys)."""
+        from .plotting import plot_dalys
+        return plot_dalys(self, fig=fig)
 
 
 def results_by_genotype(sim, key='cum_cancers', normalize=False):

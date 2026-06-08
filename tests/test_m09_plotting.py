@@ -160,3 +160,18 @@ def test_plot_calibration_data_vs_fit():
     assert len(fig.axes) == 1            # one panel per target
     ax = fig.axes[0]
     assert len(ax.lines) >= 2            # observed markers + fit line
+
+
+def test_analyzer_plot_methods_return_figures():
+    ap = hpv.age_pyramid(timepoints=[2010])
+    aci = hpv.age_causal_infection(start=2000)
+    dal = hpv.dalys(start=2000)
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2030,
+                  n_agents=1500, rand_seed=1, analyzers=[ap, aci, dal])
+    sim.run()
+    f1 = sim.analyzers['age_pyramid'].plot()
+    f2 = sim.analyzers['age_causal_infection'].plot()
+    f3 = sim.analyzers['dalys'].plot()
+    for f in (f1, f2, f3):
+        assert f is not None and len(f.axes) >= 1
+    plt.close('all')

@@ -8,7 +8,8 @@ from .analyzers import AgeResults, results_by_genotype
 
 
 __all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim',
-           'plot_intervention_impact', 'plot_calibration']
+           'plot_intervention_impact', 'plot_calibration',
+           'plot_age_pyramid', 'plot_age_causal_infection', 'plot_dalys']
 
 
 class _FigProxy:
@@ -207,6 +208,56 @@ def plot_calibration(calib, sim=None, fig=None):
         ax.set_title(key)
         ax.set_xlabel('Year')
     fig.tight_layout()
+    return fig
+
+
+def plot_age_pyramid(age_pyramid_az, date=None, fig=None):
+    """Back-to-back male/female age-pyramid bars from an age_pyramid analyzer."""
+    pyr = age_pyramid_az.age_pyramids
+    if not len(pyr):
+        raise ValueError('plot_age_pyramid: analyzer recorded no pyramids')
+    key = list(pyr.keys())[0] if date is None else min(
+        pyr.keys(), key=lambda k: abs(k.years - float(ss.date(date).years)))
+    arr = pyr[key]                                  # (nbins, 2): male, female
+    labels = age_pyramid_az.age_labels
+    fig, ax = _new_fig_ax(fig)
+    y = np.arange(len(labels))
+    ax.barh(y, -arr[:, 0], label='male')
+    ax.barh(y, arr[:, 1], label='female')
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel('Count (male left / female right)')
+    ax.set_title(f'Age pyramid {key}')
+    ax.legend()
+    return fig
+
+
+def plot_age_causal_infection(aci, fig=None):
+    """Histograms of age at causal infection / CIN / cancer (weighted)."""
+    fig = fig or plt.figure(figsize=(10, 4))
+    series = [('age_causal', aci.age_causal), ('age_cin', aci.age_cin),
+              ('age_cancer', aci.age_cancer)]
+    w = aci.weights if len(aci.weights) == len(aci.age_cancer) else None
+    for i, (name, vals) in enumerate(series):
+        ax = fig.add_subplot(1, 3, i + 1)
+        vals = np.asarray(vals, dtype=float)
+        if len(vals):
+            ax.hist(vals, bins=20, weights=w, alpha=0.7)
+        ax.set_title(name)
+        ax.set_xlabel('Age')
+    fig.tight_layout()
+    return fig
+
+
+def plot_dalys(dal, fig=None):
+    """Stacked YLL/YLD over the analyzer's year axis."""
+    fig, ax = _new_fig_ax(fig)
+    ax.bar(dal.years, dal.yld, label='YLD')
+    ax.bar(dal.years, dal.yll, bottom=dal.yld, label='YLL')
+    ax.set_xlabel('Year')
+    ax.set_ylabel('DALYs')
+    ax.set_title('DALYs (YLL + YLD)')
+    ax.legend()
     return fig
 
 
