@@ -23,7 +23,7 @@ from .network import SexualNetwork
 from .sim import Sim
 from .demographics import AgeMigration, AnnualBirths
 from .cross_genotype import CrossImmunity, HPVTotal
-from .analyzers import AgeResults, snapshot, age_pyramid
+from .analyzers import AgeResults, snapshot, age_pyramid, age_causal_infection
 from .calibration import Calibration
 from . import calibration
 from .products import vx, dx, tx, txvx, radiation
@@ -41,7 +41,7 @@ rootdir = sc.thispath(__file__).parent
 
 __all__ = [
     'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'AnnualBirths', 'CrossImmunity', 'HPVTotal',
-    'AgeResults', 'snapshot', 'age_pyramid', 'Calibration', 'calibration',
+    'AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection', 'Calibration', 'calibration',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
     'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
     'GENOTYPE_KEYS',

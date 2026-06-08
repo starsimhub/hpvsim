@@ -5,7 +5,7 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['AgeResults', 'snapshot', 'age_pyramid']
+__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection']
 
 
 def _make_age_labels(edges):
@@ -476,3 +476,83 @@ class age_pyramid(ss.Analyzer):
                 rows.append(dict(date=date, age_bin=label, sex='male',   count=float(arr[bi, 0])))
                 rows.append(dict(date=date, age_bin=label, sex='female', count=float(arr[bi, 1])))
         return pd.DataFrame(rows)
+
+
+class age_causal_infection(ss.Analyzer):
+    """Age at causal infection / CIN2+ / cancer, and dwell times, per cancer.
+
+    For each cervical-cancer onset, back-traces to the age at the causal
+    (current persistent) HPV infection and at CIN2+, and records the dwell
+    times precin (causal->CIN), cin (CIN->cancer), and total. Ledger-aware:
+    reads live agents at ms_agent_ratio==1 and the per-module ``_cancer_events``
+    ledger (own + extra sub-cancers) at ratio>1.
+
+    Args:
+        start: ss.date-coercible; only count cancers at/after this date.
+            Defaults to sim start.
+    """
+
+    def __init__(self, start=None, **kwargs):
+        super().__init__(**kwargs)
+        self.start = start
+
+    def init_pre(self, sim):
+        from .hpv import HPV
+        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        super().init_pre(sim)
+        self.start_year = (float(ss.date(self.start).years) if self.start is not None
+                           else float(sim.timevec.years[0]))
+        self.age_causal = []
+        self.age_cin = []
+        self.age_cancer = []
+        self.weights = []
+        self.dwelltime = {k: [] for k in ('precin', 'cin', 'total')}
+        self._use_ledger = any(int(m.pars.ms_agent_ratio) > 1 for m in self.hpv_modules)
+
+    def _record(self, cancer_age, causal_age, cin_age, weight):
+        cancer_age = np.asarray(cancer_age, dtype=float)
+        causal_age = np.asarray(causal_age, dtype=float)
+        cin_age = np.asarray(cin_age, dtype=float)
+        self.age_cancer.extend(cancer_age.tolist())
+        self.age_causal.extend(causal_age.tolist())
+        self.age_cin.extend(cin_age.tolist())
+        self.weights.extend(np.asarray(weight, dtype=float).tolist())
+        self.dwelltime['precin'].extend((cin_age - causal_age).tolist())
+        self.dwelltime['cin'].extend((cancer_age - cin_age).tolist())
+        self.dwelltime['total'].extend((cancer_age - causal_age).tolist())
+
+    def step(self):
+        if self._use_ledger:
+            return  # events read from the ledger in finalize
+        sim = self.sim
+        ti = sim.ti
+        if float(sim.timevec[ti].years) < self.start_year:
+            return
+        dt = float(sim.t.dt)
+        age_raw = np.asarray(sim.people.age.raw)
+        for m in self.hpv_modules:
+            new = np.where(np.asarray(m.ti_cancerous.raw) == ti)[0]
+            if not len(new):
+                continue
+            ti_inf = np.asarray(m.ti_infected.raw)[new]
+            ti_cin = np.asarray(m.ti_cin.raw)[new]
+            ok = np.isfinite(ti_inf) & np.isfinite(ti_cin)
+            new, ti_inf, ti_cin = new[ok], ti_inf[ok], ti_cin[ok]
+            cur = age_raw[new]
+            self._record(cur, cur - (ti - ti_inf) * dt, cur - (ti - ti_cin) * dt,
+                         np.ones(len(new)))
+
+    def finalize(self):
+        super().finalize()
+        if self._use_ledger:
+            for m in self.hpv_modules:
+                for (onset_ti, causal, cin_age, cancer_age, _death, w) in m._cancer_events:
+                    if float(self.sim.timevec[int(onset_ti)].years) < self.start_year:
+                        continue
+                    self._record([cancer_age], [causal], [cin_age], [w])
+        self.age_causal = np.array(self.age_causal)
+        self.age_cin = np.array(self.age_cin)
+        self.age_cancer = np.array(self.age_cancer)
+        self.weights = np.array(self.weights)
+        for k in self.dwelltime:
+            self.dwelltime[k] = np.array(self.dwelltime[k])

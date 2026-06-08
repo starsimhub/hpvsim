@@ -115,3 +115,35 @@ def test_age_pyramid_bins_sum_to_alive():
     assert set(df['sex']) == {'male', 'female'}
     assert (df['count'] >= 0).all()
     assert df['count'].sum() > 0
+
+
+def test_age_causal_infection_single_scale():
+    aci = hpv.age_causal_infection(start=2000)
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
+                  n_agents=3000, rand_seed=1, analyzers=[aci])
+    sim.run()
+    a = sim.analyzers['age_causal_infection']
+    assert len(a.age_cancer) > 0
+    # Ordering: causal infection precedes CIN precedes cancer, on average.
+    assert np.nanmean(a.age_causal) < np.nanmean(a.age_cin) < np.nanmean(a.age_cancer)
+    # Dwell times non-negative and consistent: total ~= precin + cin.
+    assert np.all(a.dwelltime['total'] >= -1e-9)
+    assert np.allclose(a.dwelltime['total'],
+                       a.dwelltime['precin'] + a.dwelltime['cin'], atol=1e-6)
+    # At ratio==1 every event has weight 1.
+    assert np.allclose(a.weights, 1.0)
+
+
+def test_age_causal_infection_ledger_unbiased():
+    """Mean ages at ratio>1 (ledger) overlap ratio==1 (agents)."""
+    def run(ratio):
+        aci = hpv.age_causal_infection(start=2000)
+        sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
+                      n_agents=3000, rand_seed=2, ms_agent_ratio=ratio, analyzers=[aci])
+        sim.run()
+        a = sim.analyzers['age_causal_infection']
+        return np.nanmean(a.age_cancer), len(a.age_cancer)
+    mean1, n1 = run(1)
+    mean3, n3 = run(3)
+    assert n3 > n1                      # ledger yields ~ratio x more samples
+    assert abs(mean3 - mean1) < 2.0     # mean age at cancer within 2 years
