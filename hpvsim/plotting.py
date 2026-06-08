@@ -59,7 +59,7 @@ def plot_by_genotype(sim, key='cum_cancers', normalize=False, fig=None, **kwargs
     fig, ax = _new_fig_ax(fig)
     x = df.index.values
     if normalize:
-        ax.stackplot(x, *[df[c].values for c in df.columns], labels=list(df.columns))
+        ax.stackplot(x, *[df[c].values for c in df.columns], labels=list(df.columns), **kwargs)
     else:
         for c in df.columns:
             ax.plot(x, df[c].values, label=c, **kwargs)
