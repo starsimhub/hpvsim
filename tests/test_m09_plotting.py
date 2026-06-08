@@ -120,3 +120,22 @@ def test_plot_intervention_impact_averted_identity():
     other.run()
     with pytest.raises(ValueError):
         hpv.plot_intervention_impact(base, other, key='cum_cancers')
+
+
+def test_plot_intervention_impact_multisim_smoke():
+    def make_msim(seeds, interventions=None):
+        sims = [hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
+                        stop=2025, n_agents=600, rand_seed=s,
+                        interventions=interventions or [])
+                for s in seeds]
+        msim = ss.MultiSim(sims)
+        msim.run()
+        return msim
+    base = make_msim([1, 2])
+    vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 10],
+                        start_year=2000)
+    scen = make_msim([1, 2], interventions=[vx])
+    fig = hpv.plot_intervention_impact(base, scen, key='cum_cancers')
+    assert len(fig.axes) == 2
+    # Each arm renders a 10/90 band (one fill_between collection per arm).
+    assert len(fig.axes[0].collections) == 2
