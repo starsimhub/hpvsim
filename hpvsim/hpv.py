@@ -490,9 +490,18 @@ class HPV(ss.Infection):
         # ``w_own * people.scale`` convention in step_state, so own and extra
         # cancers use one weighting rule (uniform 1/ratio today, since hpvsim
         # keeps people.scale==1 and applies population scaling via the global
-        # pop_scale; this stays correct if a future feature varies per-agent
-        # scale). Captured at schedule time, not read at realization, to avoid
-        # depending on a dead source's scale.
+        # pop_scale).
+        #
+        # We honor people.scale read-only rather than hardcoding 1.0: that is
+        # Starsim's defined population count (scale_flows == scale[inds].sum(),
+        # not len), so it stays correct for any STATIC per-agent scale, not just
+        # ==1. CAVEAT: it is NOT valid under DYNAMIC rescaling (people.scale
+        # changing over an agent's life) — we freeze src_scale at schedule time
+        # and reuse it at realization, so a source rescaled in between would be
+        # counted at its stale scale. (The earlier grow design wrote
+        # people.scale on spawned fine agents and so could track dynamic scale;
+        # the ledger trades that for a bit-identical population. Revisit this
+        # capture if dynamic rescaling is ever introduced.)
         src_scale = np.repeat(np.asarray(ppl.scale[cin_uids], dtype=float), m)
         rel_sev = np.repeat(np.asarray(rel_sev_cin, dtype=float), m)
         amod = np.repeat(np.asarray(age_mod, dtype=float), m)
@@ -760,6 +769,10 @@ class HPV(ss.Infection):
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
             self.ti_clearance[to_cancerous] = np.nan  # cancer supersedes clearance
+            # people.scale honored read-only (Starsim's scale_flows count, not
+            # len): correct for any STATIC per-agent scale; hpvsim keeps it ==1.
+            # See _multiscale_ledger's src_scale capture for the dynamic-scale
+            # caveat the ledger shares.
             scale = np.asarray(self.sim.people.scale[to_cancerous])
             ages_at_cancer = np.asarray(self.sim.people.age[to_cancerous])
             self.results.new_cancers[ti] = w_own * float(scale.sum())
