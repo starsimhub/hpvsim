@@ -7,7 +7,15 @@ import matplotlib.pyplot as plt
 from .analyzers import AgeResults, results_by_genotype
 
 
-__all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution']
+__all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim']
+
+
+class _FigProxy:
+    """Adapts a single Axes to the (fig.gca())-based helper interface."""
+    def __init__(self, ax):
+        self._ax = ax
+    def gca(self):
+        return self._ax
 
 
 def _new_fig_ax(fig=None, figsize=(7, 5)):
@@ -97,4 +105,59 @@ def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwa
     ax.set_xticklabels(list(row.index))
     ax.set_ylabel(f'{key} (share)')
     ax.set_title(f'Genotype distribution ({key})')
+    return fig
+
+
+_PREV_KEYS = ('hpv_prevalence', 'precin_prevalence', 'cin_prevalence')
+
+
+def _find_age_results(sim):
+    """Return the first AgeResults analyzer on `sim`, or None."""
+    for a in sim.analyzers.values():
+        if isinstance(a, AgeResults):
+            return a
+    return None
+
+
+def plot_sim(sim, which='default', fig=None, **kwargs):
+    """HPV-specific summary figure.
+
+    which='default': 4-panel canonical figure (cumulative cancers over time,
+    prevalence by age, cancers by age, genotype distribution). Requires an
+    AgeResults analyzer recording a prevalence key and 'cancers'.
+    Any other value (e.g. 'all') delegates to ss.Sim.plot.
+    """
+    if which != 'default':
+        return sim.plot(**kwargs)
+
+    ar = _find_age_results(sim)
+    if ar is None:
+        raise ValueError(
+            "plot_sim(which='default') needs an AgeResults analyzer recording "
+            "'cancers' and a prevalence key (one of %s). Add e.g. "
+            "hpv.AgeResults(result_args=...) to the sim, or call "
+            "plot_sim(sim, which='all')." % (_PREV_KEYS,))
+    prev_key = next((k for k in _PREV_KEYS if k in ar.outputs), None)
+    if prev_key is None or 'cancers' not in ar.outputs:
+        raise ValueError(
+            "plot_sim(which='default') needs the AgeResults analyzer to record "
+            "'cancers' and one of %s; found %s." % (_PREV_KEYS, list(ar.outputs)))
+
+    fig = fig or plt.figure(figsize=(12, 9))
+    # Panel 1: total cumulative cancers over time (summed across genotypes).
+    ax1 = fig.add_subplot(2, 2, 1)
+    cum = results_by_genotype(sim, key='cum_cancers').sum(axis=1)
+    ax1.plot(cum.index.values, cum.values, color='#5f5cd2')
+    ax1.set_title('Cumulative cancers')
+    ax1.set_xlabel('Year')
+    # Panel 2: prevalence by age.
+    ax2 = fig.add_subplot(2, 2, 2)
+    plot_by_age(ar, prev_key, fig=_FigProxy(ax2))
+    # Panel 3: cancers by age.
+    ax3 = fig.add_subplot(2, 2, 3)
+    plot_by_age(ar, 'cancers', fig=_FigProxy(ax3))
+    # Panel 4: genotype distribution of cancers.
+    ax4 = fig.add_subplot(2, 2, 4)
+    plot_type_distribution(sim, fig=_FigProxy(ax4))
+    fig.tight_layout()
     return fig

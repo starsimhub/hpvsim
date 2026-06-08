@@ -67,3 +67,20 @@ def test_plot_type_distribution_age_results_source():
     heights = [p.get_height() for p in ax.patches]
     assert len(heights) == 2                  # one bar per genotype
     assert np.isclose(sum(heights), 1.0)      # normalized shares
+
+
+import pytest
+
+
+def test_plot_sim_default_four_panels_and_requires_age_results():
+    sim, _ = _sim_with_age_results(genotypes=('hpv16', 'hpv18'))
+    fig = hpv.plot_sim(sim, which='default')
+    assert len(fig.axes) == 4
+    # 'all' delegates to ss.Sim.plot and still returns a Figure.
+    assert hpv.plot_sim(sim, which='all') is not None
+    # Without an AgeResults analyzer, 'default' raises a clear error.
+    bare = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
+                   stop=2010, n_agents=500, rand_seed=1)
+    bare.run()
+    with pytest.raises(ValueError):
+        hpv.plot_sim(bare, which='default')
