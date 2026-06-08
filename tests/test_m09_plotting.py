@@ -35,3 +35,15 @@ def test_plot_by_age_one_series_per_year():
     # Subsetting years works.
     fig2 = hpv.plot_by_age(ar, 'cancers', years=[2025])
     assert len(fig2.axes[0].lines) == 1
+
+
+def test_plot_by_genotype_line_per_genotype():
+    sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria',
+                  start=1990, stop=2030, n_agents=1000, rand_seed=1)
+    sim.run()
+    fig = hpv.plot_by_genotype(sim, key='cum_cancers')
+    ax = fig.axes[0]
+    assert len(ax.lines) == 2  # one line per genotype
+    # Normalized variant uses stacked areas (one collection per genotype).
+    fig2 = hpv.plot_by_genotype(sim, key='cum_cancers', normalize=True)
+    assert len(fig2.axes[0].collections) == 2

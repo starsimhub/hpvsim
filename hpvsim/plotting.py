@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from .analyzers import AgeResults, results_by_genotype
 
 
-__all__ = ['plot_by_age']
+__all__ = ['plot_by_age', 'plot_by_genotype']
 
 
 def _new_fig_ax(fig=None, figsize=(7, 5)):
@@ -46,4 +46,25 @@ def plot_by_age(age_results, key, years=None, kind='line', fig=None, **kwargs):
     ax.set_ylabel(key)
     ax.set_title(f'{key} by age')
     ax.legend(title='Year')
+    return fig
+
+
+def plot_by_genotype(sim, key='cum_cancers', normalize=False, fig=None, **kwargs):
+    """Overlay a per-genotype result across genotypes over time.
+
+    Lines (one per genotype) by default; stacked areas when ``normalize=True``
+    (per-year genotype shares summing to 1).
+    """
+    df = results_by_genotype(sim, key=key, normalize=normalize)
+    fig, ax = _new_fig_ax(fig)
+    x = df.index.values
+    if normalize:
+        ax.stackplot(x, *[df[c].values for c in df.columns], labels=list(df.columns))
+    else:
+        for c in df.columns:
+            ax.plot(x, df[c].values, label=c, **kwargs)
+    ax.set_xlabel('Year')
+    ax.set_ylabel(f'{key} (share)' if normalize else key)
+    ax.set_title(f'{key} by genotype')
+    ax.legend(title='Genotype')
     return fig
