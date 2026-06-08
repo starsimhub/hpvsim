@@ -8,6 +8,50 @@ import starsim as ss
 __all__ = ['AgeResults']
 
 
+def _make_age_labels(edges):
+    """['0-5', '5-10', ..., '95+'] from bin edges."""
+    labels = [f'{int(edges[i])}-{int(edges[i+1])}' for i in range(len(edges) - 2)]
+    labels.append(f'{int(edges[-2])}+')
+    return labels
+
+
+def _histogram(ages, mask, edges, weights):
+    """np.histogram of ages[mask] with optional weights[mask]."""
+    w = weights[mask] if weights is not None else None
+    counts, _ = np.histogram(ages[mask], bins=edges, weights=w)
+    return counts
+
+
+def _resolve_year_ticks(sim, years):
+    """Map calendar years -> last timeline tick within each year (year-end flows)."""
+    tv_years = np.asarray(sim.timevec.years, dtype=float)
+    out = {}
+    for y in years:
+        mask = (tv_years >= y) & (tv_years < y + 1)
+        ticks = np.where(mask)[0]
+        if len(ticks) == 0:
+            raise ValueError(f'AgeResults: year {y} not in sim timevec '
+                             f'({tv_years[0]} to {tv_years[-1]})')
+        out[float(y)] = int(ticks[-1])
+    return out
+
+
+def _resolve_date_ticks(sim, dates):
+    """Map ss.date-coercible inputs -> nearest timeline tick (instantaneous).
+
+    Returns an sc.odict keyed by the resolved ss.date (``sim.timevec[ti]``),
+    value = tick index. Point-in-time semantics for snapshots/pyramids, in
+    contrast to _resolve_year_ticks' year-end flow capture.
+    """
+    tv_years = np.asarray(sim.timevec.years, dtype=float)
+    out = sc.odict()
+    for d in sc.tolist(dates):
+        dd = ss.date(d)
+        ti = int(np.argmin(np.abs(tv_years - float(dd.years))))
+        out[sim.timevec[ti]] = ti
+    return out
+
+
 class AgeResults(ss.Analyzer):
     """Snapshot age-binned simulation outputs at specified years.
 
@@ -123,27 +167,11 @@ class AgeResults(ss.Analyzer):
 
     @staticmethod
     def _make_age_labels(edges):
-        labels = [f'{int(edges[i])}-{int(edges[i+1])}' for i in range(len(edges) - 2)]
-        labels.append(f'{int(edges[-2])}+')
-        return labels
+        return _make_age_labels(edges)
 
     @staticmethod
     def _resolve_year_ticks(sim, years):
-        """Map calendar years -> timeline tick indices.
-
-        Picks the last tick whose date falls within each calendar year, so
-        annual flows accumulated through the year are captured.
-        """
-        tv_years = np.asarray(sim.timevec.years, dtype=float)
-        out = {}
-        for y in years:
-            mask = (tv_years >= y) & (tv_years < y + 1)
-            ticks = np.where(mask)[0]
-            if len(ticks) == 0:
-                raise ValueError(f'AgeResults: year {y} not in sim timevec '
-                                 f'({tv_years[0]} to {tv_years[-1]})')
-            out[float(y)] = int(ticks[-1])
-        return out
+        return _resolve_year_ticks(sim, years)
 
     @classmethod
     def _is_type_dist(cls, rkey):
@@ -185,10 +213,7 @@ class AgeResults(ss.Analyzer):
 
     @staticmethod
     def _histogram(ages, mask, edges, weights):
-        """np.histogram of ages[mask] with optional weights[mask]."""
-        w = weights[mask] if weights is not None else None
-        counts, _ = np.histogram(ages[mask], bins=edges, weights=w)
-        return counts
+        return _histogram(ages, mask, edges, weights)
 
     def _bin_count(self, rdict, attr):
         """Bin alive-agent count of (union-across-genotypes) BoolState `attr`."""

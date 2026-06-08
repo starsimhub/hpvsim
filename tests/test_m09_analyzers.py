@@ -33,3 +33,15 @@ def test_ledger_empty_at_ratio_one():
     sim.run()
     for m in _hpv_mods(sim):
         assert len(m._cancer_events) == 0
+
+
+def test_resolve_date_ticks_nearest():
+    from hpvsim.analyzers import _resolve_date_ticks
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2018, stop=2022, n_agents=300)
+    sim.init()
+    out = _resolve_date_ticks(sim, [2020, ss.date(2021)])
+    # Keys are ss.date; values are tick indices whose year matches the request.
+    keys = list(out.keys())
+    assert all(isinstance(k, ss.date) for k in keys)
+    assert abs(sim.timevec[out[keys[0]]].years - 2020) < 0.5
+    assert abs(sim.timevec[out[keys[1]]].years - 2021) < 0.5
