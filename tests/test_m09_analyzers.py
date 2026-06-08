@@ -208,3 +208,9 @@ def test_results_by_genotype_stacks_and_normalizes():
     row_sums = ndf.sum(axis=1)
     nonzero = row_sums[df.sum(axis=1) > 0]
     assert np.allclose(nonzero, 1.0)
+
+
+def test_public_api_exports():
+    for name in ['snapshot', 'age_pyramid', 'age_causal_infection', 'dalys',
+                 'results_by_genotype', 'AgeResults']:
+        assert hasattr(hpv, name), f'hpv.{name} not exported'
