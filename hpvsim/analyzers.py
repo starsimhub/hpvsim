@@ -536,6 +536,9 @@ class age_causal_infection(ss.Analyzer):
             # ti_cancerous persists on agents who die of other causes before
             # onset, so the bare time-match overcounts vs realized incidence
             # (and vs the multiscale ledger, which records only realized cancers).
+            # This also drops the rare agent who reaches cancer and dies of a
+            # competing cause on the same tick (~1%) — correct for dalys, since
+            # that agent is not a cancer death.
             new = np.where((np.asarray(m.ti_cancerous.raw) == ti)
                            & np.asarray(m.cancerous.raw) & alive)[0]
             if not len(new):
@@ -643,6 +646,9 @@ class dalys(ss.Analyzer):
             # ti_cancerous persists on agents who die of other causes before
             # onset, so the bare time-match overcounts vs realized incidence
             # (and vs the multiscale ledger, which records only realized cancers).
+            # This also drops the rare agent who reaches cancer and dies of a
+            # competing cause on the same tick (~1%) — correct for dalys, since
+            # that agent is not a cancer death.
             new = np.where((np.asarray(m.ti_cancerous.raw) == ti)
                            & np.asarray(m.cancerous.raw) & alive)[0]
             if not len(new):
