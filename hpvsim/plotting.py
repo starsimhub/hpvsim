@@ -126,9 +126,10 @@ def plot_sim(sim, which='default', fig=None, **kwargs):
     prevalence by age, cancers by age, genotype distribution). Requires an
     AgeResults analyzer recording a prevalence key and 'cancers'.
     Any other value (e.g. 'all') delegates to ss.Sim.plot.
+    `fig` is honored in both modes (a new figure is created if None).
     """
     if which != 'default':
-        return sim.plot(**kwargs)
+        return sim.plot(fig=fig, **kwargs)
 
     ar = _find_age_results(sim)
     if ar is None:

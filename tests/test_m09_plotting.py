@@ -2,6 +2,7 @@ import matplotlib
 matplotlib.use('Agg')  # headless, before pyplot import
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import sciris as sc
 import starsim as ss
 import hpvsim as hpv
@@ -69,9 +70,6 @@ def test_plot_type_distribution_age_results_source():
     assert np.isclose(sum(heights), 1.0)      # normalized shares
 
 
-import pytest
-
-
 def test_plot_sim_default_four_panels_and_requires_age_results():
     sim, _ = _sim_with_age_results(genotypes=('hpv16', 'hpv18'))
     fig = hpv.plot_sim(sim, which='default')
@@ -84,3 +82,15 @@ def test_plot_sim_default_four_panels_and_requires_age_results():
     bare.run()
     with pytest.raises(ValueError):
         hpv.plot_sim(bare, which='default')
+
+
+def test_plot_sim_default_raises_when_age_results_lacks_keys():
+    # AgeResults present but recording neither 'cancers' nor a prevalence key.
+    edges = np.array([0., 50., 100.])
+    ar = hpv.AgeResults(result_args=sc.objdict(
+        cin_incidence=sc.objdict(years=[2010], edges=edges)))
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2010,
+                  n_agents=400, rand_seed=1, analyzers=[ar])
+    sim.run()
+    with pytest.raises(ValueError):
+        hpv.plot_sim(sim, which='default')
