@@ -210,7 +210,7 @@ def plot_calibration(calib, sim=None, fig=None):
     return fig
 
 
-def _find_age_results(sim):
+def _find_age_results_or_none(sim):
     """Return the first AgeResults analyzer on `sim`, or None."""
     for a in sim.analyzers.values():
         if isinstance(a, AgeResults):
@@ -230,7 +230,7 @@ def plot_sim(sim, which='default', fig=None, **kwargs):
     if which != 'default':
         return sim.plot(fig=fig, **kwargs)
 
-    ar = _find_age_results(sim)
+    ar = _find_age_results_or_none(sim)
     if ar is None:
         raise ValueError(
             "plot_sim(which='default') needs an AgeResults analyzer recording "

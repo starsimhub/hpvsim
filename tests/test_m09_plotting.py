@@ -152,9 +152,10 @@ def test_plot_calibration_data_vs_fit():
     target = pd.DataFrame({'0-30': [1.0], '30-50': [5.0], '50+': [3.0]},
                           index=pd.Index([2020.0], name='t'))
     calib = hpv.Calibration(
-        make_sim(), calib_pars=dict(beta=dict(low=0.1, high=0.3, value=0.2)),
+        make_sim(), calib_pars=dict(beta=dict(low=0.1, high=0.3)),
         data={'cancers': target}, total_trials=2, n_workers=1)
     calib.calibrate()
+    assert 'beta' in calib.best_pars   # beta is a free (sampled) parameter
     fig = hpv.plot_calibration(calib)
     assert len(fig.axes) == 1            # one panel per target
     ax = fig.axes[0]
