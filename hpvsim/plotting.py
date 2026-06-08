@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 from .analyzers import AgeResults, results_by_genotype
 
 
-__all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution',
-           'plot_sim', 'plot_intervention_impact', 'plot_calibration']
+__all__ = ['plot_by_age']
 
 
 def _new_fig_ax(fig=None, figsize=(7, 5)):
@@ -34,9 +33,11 @@ def plot_by_age(age_results, key, years=None, kind='line', fig=None, **kwargs):
         df = df.loc[[float(y) for y in sc.tolist(years)]]
     fig, ax = _new_fig_ax(fig)
     x = np.arange(len(df.columns))
+    if kind == 'bar':
+        kwargs.setdefault('alpha', 0.6)
     for yr, row in df.iterrows():
         if kind == 'bar':
-            ax.bar(x, row.values, alpha=0.6, label=f'{yr:g}', **kwargs)
+            ax.bar(x, row.values, label=f'{yr:g}', **kwargs)
         else:
             ax.plot(x, row.values, marker='o', label=f'{yr:g}', **kwargs)
     ax.set_xticks(x)
