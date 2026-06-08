@@ -789,9 +789,11 @@ class HPV(ss.Infection):
                 ti_dead = np.asarray(self.ti_dead_cancer[to_cancerous], dtype=float)
                 causal_ages = ages_at_cancer - (ti - ti_inf) * dt_yr
                 cin_ages = ages_at_cancer - (ti - ti_cinv) * dt_yr
+                # death_age here is the true projected age at cancer death (no
+                # +dt_yr step-ordering offset); the dalys analyzer consumes it directly.
                 death_ages = ages_at_cancer + (ti_dead - ti) * dt_yr
                 for ca, cia, cca, da in zip(causal_ages, cin_ages, ages_at_cancer, death_ages):
-                    self._cancer_events.append((ti, float(ca), float(cia), float(cca), float(da), w_own))
+                    self._cancer_events.append((int(ti), float(ca), float(cia), float(cca), float(da), w_own))
             self._cancel_other_genotype_progression_for(to_cancerous)
 
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
