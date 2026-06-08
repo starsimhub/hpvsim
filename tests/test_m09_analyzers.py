@@ -73,16 +73,44 @@ def test_snapshot_records_and_get_coerces():
 
 
 def test_age_pyramid_bins_sum_to_alive():
-    ap = hpv.age_pyramid(timepoints=[2010])
+    edges = np.array([0., 15., 50., 100.])
+    ap = hpv.age_pyramid(timepoints=[2010], edges=edges)
+    snap = hpv.snapshot(timepoints=[2010])
     sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2012,
-                  n_agents=800, analyzers=[ap])
+                  n_agents=800, analyzers=[ap, snap])
     sim.run()
     a = sim.analyzers['age_pyramid']
     assert len(a.age_pyramids) == 1
     date = list(a.age_pyramids.keys())[0]
     assert isinstance(date, ss.date)
-    arr = a.age_pyramids[date]                  # (nbins, 2): male, female
+    arr = a.age_pyramids[date]                  # (nbins, 2): col0=male, col1=female
     assert arr.shape == (len(a.bins), 2)
+
+    # Ground truth: recompute the scale-weighted age histograms from the
+    # snapshot of People taken at the SAME tick. This independently verifies
+    # the male/female column assignment, the alive mask, and scale-weighting.
+    ppl = sim.analyzers['snapshot'].get(2010)
+    alive = ppl.alive.values
+    ages = ppl.age.values
+    female = ppl.female.values
+    scale = getattr(ppl, 'scale', None)
+    w = scale.values if scale is not None else None
+
+    def hist(mask):
+        ww = w[mask] if w is not None else None
+        return np.histogram(ages[mask], bins=edges, weights=ww)[0]
+
+    exp_male = hist(alive & ~female)
+    exp_female = hist(alive & female)
+    assert np.allclose(arr[:, 0], exp_male), 'male column mismatch (possible male/female swap)'
+    assert np.allclose(arr[:, 1], exp_female), 'female column mismatch (possible male/female swap)'
+
+    # Named invariant: total binned count == scale-weighted alive within [0, 100).
+    in_range = alive & (ages >= edges[0]) & (ages < edges[-1])
+    expected_total = float(w[in_range].sum()) if w is not None else float(in_range.sum())
+    assert abs(arr.sum() - expected_total) < 1e-6
+
+    # tidy-frame sanity
     df = a.to_dataframe()
     assert set(df['sex']) == {'male', 'female'}
     assert (df['count'] >= 0).all()
