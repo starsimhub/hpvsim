@@ -545,6 +545,11 @@ class age_causal_infection(ss.Analyzer):
     def finalize(self):
         super().finalize()
         if self._use_ledger:
+            # Ledger-path note: for EXTRA sub-cancers, `causal` derives from the
+            # source agent's infection-age basis in HPV._multiscale_ledger, so the
+            # ledger-path age_causal distribution is not identical to the
+            # ratio==1 agent path. Cross-ratio comparisons should use age_cancer /
+            # age_cin (age_causal stays valid as a within-run distribution).
             for m in self.hpv_modules:
                 for (onset_ti, causal, cin_age, cancer_age, _death, w) in m._cancer_events:
                     if float(self.sim.timevec[int(onset_ti)].years) < self.start_year:
