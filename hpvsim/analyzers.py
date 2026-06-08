@@ -23,14 +23,19 @@ def _histogram(ages, mask, edges, weights):
 
 
 def _resolve_year_ticks(sim, years):
-    """Map calendar years -> last timeline tick within each year (year-end flows)."""
+    """Map calendar years -> timeline tick indices.
+
+    Picks the last tick whose date falls within each calendar year, so annual
+    flows accumulated through the year are captured (year-end semantics, in
+    contrast to _resolve_date_ticks' nearest-tick point-in-time semantics).
+    """
     tv_years = np.asarray(sim.timevec.years, dtype=float)
     out = {}
     for y in years:
         mask = (tv_years >= y) & (tv_years < y + 1)
         ticks = np.where(mask)[0]
         if len(ticks) == 0:
-            raise ValueError(f'AgeResults: year {y} not in sim timevec '
+            raise ValueError(f'_resolve_year_ticks: year {y} not in sim timevec '
                              f'({tv_years[0]} to {tv_years[-1]})')
         out[float(y)] = int(ticks[-1])
     return out
@@ -42,6 +47,9 @@ def _resolve_date_ticks(sim, dates):
     Returns an sc.odict keyed by the resolved ss.date (``sim.timevec[ti]``),
     value = tick index. Point-in-time semantics for snapshots/pyramids, in
     contrast to _resolve_year_ticks' year-end flow capture.
+    Out-of-range dates clamp to the nearest endpoint tick. If two inputs
+    resolve to the same tick, the later one overwrites the earlier in the
+    returned odict.
     """
     tv_years = np.asarray(sim.timevec.years, dtype=float)
     out = sc.odict()
