@@ -62,8 +62,11 @@ def test_snapshot_records_and_get_coerces():
     p_str = s.get('2010')
     p_date = s.get(ss.date(2010))
     assert p_int is p_str is p_date
-    # Snapshot is a deep copy: mutating the live sim doesn't change it.
-    n_before = len(p_int.age)
-    assert n_before > 0
+    # Deep copy: mutating the live sim's people after the run leaves the snapshot intact.
+    assert len(p_int.age) > 0
+    snap_ages_before = np.asarray(p_int.age.values).copy()
+    sim.people.age[:] = -999.0
+    assert np.allclose(np.asarray(p_int.age.values), snap_ages_before)
+    assert not np.allclose(np.asarray(p_int.age.values), -999.0)
     # default get() returns the first snapshot
     assert s.get() is s.snapshots[list(s.snapshots.keys())[0]]

@@ -5,8 +5,7 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection',
-           'dalys', 'results_by_genotype']
+__all__ = ['AgeResults', 'snapshot']
 
 
 def _make_age_labels(edges):
@@ -86,17 +85,16 @@ class snapshot(ss.Analyzer):
     def init_pre(self, sim):
         super().init_pre(sim)
         tps = sc.tolist(self.timepoints) if self.timepoints is not None else [sim.timevec[-1]]
-        tv_years = np.asarray(sim.timevec.years, dtype=float)
-        self._date_to_ti = sc.odict()
+        tv_end = float(np.asarray(sim.timevec.years, dtype=float)[-1])
+        kept = []
         for d in tps:
             dd = ss.date(d)
-            if float(dd.years) > tv_years[-1] + 1e-9:
-                msg = f'snapshot: requested {dd} is past sim end {sim.timevec[-1]}'
+            if float(dd.years) > tv_end + 1e-9:
                 if self.die:
-                    raise ValueError(msg)
+                    raise ValueError(f'snapshot: requested {dd} is past sim end {sim.timevec[-1]}')
                 continue
-            ti = int(np.argmin(np.abs(tv_years - float(dd.years))))
-            self._date_to_ti[sim.timevec[ti]] = ti
+            kept.append(dd)
+        self._date_to_ti = _resolve_date_ticks(sim, kept)
 
     def step(self):
         ti = self.sim.ti
@@ -105,7 +103,10 @@ class snapshot(ss.Analyzer):
                 self.snapshots[date] = sc.dcp(self.sim.people)
 
     def get(self, key=None):
-        """Retrieve a snapshot by ss.date-coercible key (nearest match)."""
+        """Retrieve a snapshot by ss.date-coercible key (nearest match).
+
+        If key is None, returns the first recorded snapshot.
+        """
         keys = list(self.snapshots.keys())
         if not keys:
             raise sc.KeyNotFoundError('snapshot: no snapshots recorded')
