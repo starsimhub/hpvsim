@@ -5,7 +5,7 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['AgeResults', 'snapshot']
+__all__ = ['AgeResults', 'snapshot', 'age_pyramid']
 
 
 def _make_age_labels(edges):
@@ -407,3 +407,72 @@ class AgeResults(ss.Analyzer):
                 index=pd.Index(years, name='t'),
             )
         return result
+
+
+class age_pyramid(ss.Analyzer):
+    """Age/sex pyramid (scale-weighted histograms) at requested timepoints.
+
+    Args:
+        timepoints: ss.date-coercible scalar/list; defaults to sim end.
+        edges: age bin edges; defaults to ``np.linspace(0, 100, 11)``.
+        age_labels: optional bin labels; auto-generated if omitted.
+        datafile: optional path/dataframe of observed data (stored on
+            ``self.data`` for the later plotting layer; not plotted here).
+        die (bool): reserved for symmetry with snapshot.
+
+    Output: ``self.age_pyramids`` is an sc.odict keyed by ss.date, each value an
+    ``(nbins, 2)`` array with columns [male, female].
+    """
+
+    def __init__(self, timepoints=None, edges=None, age_labels=None,
+                 datafile=None, die=False, **kwargs):
+        super().__init__(**kwargs)
+        self.timepoints = timepoints
+        self.edges = edges
+        self.age_labels = age_labels
+        self.datafile = datafile
+        self.die = die
+        self.data = None
+        self.bins = None
+        self.age_pyramids = sc.odict()
+        self._date_to_ti = None
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        if self.edges is None:
+            self.edges = np.linspace(0, 100, 11)
+        self.edges = np.asarray(self.edges, dtype=float)
+        self.bins = self.edges[:-1]
+        if self.age_labels is None:
+            self.age_labels = _make_age_labels(self.edges)
+        if self.datafile is not None:
+            self.data = (pd.read_csv(self.datafile) if isinstance(self.datafile, str)
+                         else pd.DataFrame(self.datafile))
+        self._date_to_ti = _resolve_date_ticks(sim, self.timepoints
+                                                if self.timepoints is not None
+                                                else [sim.timevec[-1]])
+
+    def step(self):
+        ti = self.sim.ti
+        for date, snap_ti in self._date_to_ti.items():
+            if snap_ti != ti:
+                continue
+            people = self.sim.people
+            alive = people.alive.values
+            ages = people.age.values
+            female = people.female.values
+            scale = getattr(people, 'scale', None)
+            weights = scale.values if scale is not None else None
+            out = np.zeros((len(self.bins), 2), dtype=float)
+            out[:, 0] = _histogram(ages, alive & ~female, self.edges, weights)
+            out[:, 1] = _histogram(ages, alive & female, self.edges, weights)
+            self.age_pyramids[date] = out
+
+    def to_dataframe(self):
+        """Tidy long-form (date, age_bin, sex, count)."""
+        rows = []
+        for date, arr in self.age_pyramids.items():
+            for bi, label in enumerate(self.age_labels):
+                rows.append(dict(date=date, age_bin=label, sex='male',   count=float(arr[bi, 0])))
+                rows.append(dict(date=date, age_bin=label, sex='female', count=float(arr[bi, 1])))
+        return pd.DataFrame(rows)

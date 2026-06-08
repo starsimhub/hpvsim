@@ -70,3 +70,20 @@ def test_snapshot_records_and_get_coerces():
     assert not np.allclose(np.asarray(p_int.age.values), -999.0)
     # default get() returns the first snapshot
     assert s.get() is s.snapshots[list(s.snapshots.keys())[0]]
+
+
+def test_age_pyramid_bins_sum_to_alive():
+    ap = hpv.age_pyramid(timepoints=[2010])
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2012,
+                  n_agents=800, analyzers=[ap])
+    sim.run()
+    a = sim.analyzers['age_pyramid']
+    assert len(a.age_pyramids) == 1
+    date = list(a.age_pyramids.keys())[0]
+    assert isinstance(date, ss.date)
+    arr = a.age_pyramids[date]                  # (nbins, 2): male, female
+    assert arr.shape == (len(a.bins), 2)
+    df = a.to_dataframe()
+    assert set(df['sex']) == {'male', 'female'}
+    assert (df['count'] >= 0).all()
+    assert df['count'].sum() > 0
