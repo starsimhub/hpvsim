@@ -530,8 +530,14 @@ class age_causal_infection(ss.Analyzer):
             return
         dt = float(sim.t.dt)
         age_raw = np.asarray(sim.people.age.raw)
+        alive = np.asarray(sim.people.alive.raw)
         for m in self.hpv_modules:
-            new = np.where(np.asarray(m.ti_cancerous.raw) == ti)[0]
+            # Gate on cancerous & alive, not just ti_cancerous==ti: a scheduled
+            # ti_cancerous persists on agents who die of other causes before
+            # onset, so the bare time-match overcounts vs realized incidence
+            # (and vs the multiscale ledger, which records only realized cancers).
+            new = np.where((np.asarray(m.ti_cancerous.raw) == ti)
+                           & np.asarray(m.cancerous.raw) & alive)[0]
             if not len(new):
                 continue
             ti_inf = np.asarray(m.ti_infected.raw)[new]
@@ -631,8 +637,14 @@ class dalys(ss.Analyzer):
         age_raw = np.asarray(sim.people.age.raw)
         scale = getattr(sim.people, 'scale', None)
         scale_raw = np.asarray(scale.raw) if scale is not None else None
+        alive = np.asarray(sim.people.alive.raw)
         for m in self.hpv_modules:
-            new = np.where(np.asarray(m.ti_cancerous.raw) == ti)[0]
+            # Gate on cancerous & alive, not just ti_cancerous==ti: a scheduled
+            # ti_cancerous persists on agents who die of other causes before
+            # onset, so the bare time-match overcounts vs realized incidence
+            # (and vs the multiscale ledger, which records only realized cancers).
+            new = np.where((np.asarray(m.ti_cancerous.raw) == ti)
+                           & np.asarray(m.cancerous.raw) & alive)[0]
             if not len(new):
                 continue
             cancer_age = age_raw[new]

@@ -167,17 +167,28 @@ def test_dalys_basic_and_av_disutility():
 
 
 def test_dalys_ledger_overlaps_single_scale():
-    def total(ratio):
-        d = hpv.dalys(start=2000)
-        sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
-                      n_agents=3000, rand_seed=2, ms_agent_ratio=ratio, analyzers=[d])
-        sim.run()
-        return sim.analyzers['dalys'].dalys.sum()
-    t1 = total(1)
-    t3 = total(3)
-    # Weighted DALYs total within 40% across ratios.
-    # The ledger path at ratio>1 stores own+extras each at weight 1/ratio, so the
-    # weighted event count should equal the ratio==1 count in expectation.  In
-    # practice the two sims have different cancer dynamics (different RNG streams),
-    # so total-DALY equivalence is loose (~25-35% spread at n=3000).
-    assert abs(t3 - t1) / t1 < 0.40
+    """Mean total DALYs converge across ms_agent_ratio (multiscale-equivalence).
+
+    DALYs are dominated by rare young-onset cancers, so single-seed totals are
+    high-variance; the unbiased quantity is the mean over seeds. The ledger path
+    (ratio>1) records own+extra sub-cancers each at weight 1/ratio, so the
+    weighted DALY total matches the ratio==1 agent path in expectation. (This
+    only holds because both paths count REALIZED cancers — the ratio==1 path
+    gates on cancerous & alive, not a bare ti_cancerous==ti time-match, which
+    would overcount agents who die before onset and inflate ratio==1 ~30%.)
+    """
+    seeds = [1, 2, 3, 4]
+
+    def mean_total(ratio):
+        tots = []
+        for s in seeds:
+            d = hpv.dalys(start=2000)
+            sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
+                          n_agents=5000, rand_seed=s, ms_agent_ratio=ratio, analyzers=[d])
+            sim.run(verbose=0)
+            tots.append(sim.analyzers['dalys'].dalys.sum())
+        return float(np.mean(tots))
+
+    m1 = mean_total(1)
+    m3 = mean_total(3)
+    assert abs(m3 - m1) / m1 < 0.15
