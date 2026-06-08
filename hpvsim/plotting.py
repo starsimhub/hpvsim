@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 from .analyzers import AgeResults, results_by_genotype
 
 
-__all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim']
+__all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim',
+           'plot_intervention_impact']
 
 
 class _FigProxy:
@@ -105,6 +106,53 @@ def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwa
     ax.set_xticklabels(list(row.index))
     ax.set_ylabel(f'{key} (share)')
     ax.set_title(f'Genotype distribution ({key})')
+    return fig
+
+
+def _genotype_total_trajectories(obj, key):
+    """Return (years, matrix) where matrix is (n_sims, n_years) of `key`
+    summed across genotypes. Works for an ss.Sim or an ss.MultiSim."""
+    sims = obj.sims if isinstance(obj, ss.MultiSim) else [obj]
+    rows = []
+    years = None
+    for s in sims:
+        df = results_by_genotype(s, key=key)
+        years = np.asarray(df.index, dtype=float)
+        rows.append(df.sum(axis=1).values)
+    return years, np.vstack(rows)
+
+
+def plot_intervention_impact(baseline, scenario, key='cum_cancers',
+                             labels=('baseline', 'scenario'), fig=None):
+    """Compare a baseline vs an intervention scenario.
+
+    `baseline`/`scenario` are each an ss.Sim or ss.MultiSim. Top panel: median
+    `key` trajectory per arm (10/90 band when a MultiSim); bottom panel:
+    averted = baseline_median - scenario_median. Raises if the two arms have
+    different timevecs.
+    """
+    yb, mb = _genotype_total_trajectories(baseline, key)
+    ys, ms = _genotype_total_trajectories(scenario, key)
+    if not np.array_equal(yb, ys):
+        raise ValueError('plot_intervention_impact: baseline and scenario have '
+                         'different timevecs')
+    fig = fig or plt.figure(figsize=(8, 8))
+    ax1 = fig.add_subplot(2, 1, 1)
+    ax2 = fig.add_subplot(2, 1, 2)
+    for y, m, lab in [(yb, mb, labels[0]), (ys, ms, labels[1])]:
+        med = np.median(m, axis=0)
+        ax1.plot(y, med, label=lab)
+        if m.shape[0] > 1:
+            ax1.fill_between(y, np.quantile(m, 0.1, axis=0),
+                             np.quantile(m, 0.9, axis=0), alpha=0.2)
+    averted = np.median(mb, axis=0) - np.median(ms, axis=0)
+    ax2.plot(yb, averted, color='k')
+    ax2.axhline(0, ls='--', color='grey')
+    ax1.set_ylabel(key)
+    ax1.set_title('Intervention impact')
+    ax1.legend()
+    ax2.set_ylabel(f'{key} averted')
+    ax2.set_xlabel('Year')
     return fig
 
 

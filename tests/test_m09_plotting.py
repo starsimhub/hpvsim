@@ -94,3 +94,29 @@ def test_plot_sim_default_raises_when_age_results_lacks_keys():
     sim.run()
     with pytest.raises(ValueError):
         hpv.plot_sim(sim, which='default')
+
+
+def test_plot_intervention_impact_averted_identity():
+    base = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
+                   stop=2030, n_agents=1000, rand_seed=1)
+    base.run()
+    # Scenario with routine vaccination from 2000.
+    vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 10],
+                        start_year=2000)
+    scen = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
+                   stop=2030, n_agents=1000, rand_seed=1, interventions=[vx])
+    scen.run()
+    fig = hpv.plot_intervention_impact(base, scen, key='cum_cancers')
+    assert len(fig.axes) == 2
+    # Bottom-panel line is exactly baseline_total - scenario_total.
+    from hpvsim.analyzers import results_by_genotype
+    b = results_by_genotype(base, 'cum_cancers').sum(axis=1).values
+    s = results_by_genotype(scen, 'cum_cancers').sum(axis=1).values
+    averted = fig.axes[1].lines[0].get_ydata()
+    assert np.allclose(averted, b - s)
+    # Mismatched timevecs raise.
+    other = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
+                    stop=2025, n_agents=300, rand_seed=1)
+    other.run()
+    with pytest.raises(ValueError):
+        hpv.plot_intervention_impact(base, other, key='cum_cancers')
