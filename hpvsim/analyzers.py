@@ -5,7 +5,8 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys']
+__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys',
+           'results_by_genotype']
 
 
 def _make_age_labels(edges):
@@ -667,3 +668,26 @@ class dalys(ss.Analyzer):
                     year = int(np.floor(self.sim.timevec[int(onset_ti)].years))
                     self._accumulate(year, [cancer_age], [death_age], [w])
         self.dalys = self.yll + self.yld
+
+
+def results_by_genotype(sim, key='cum_cancers', normalize=False):
+    """Stack a per-genotype HPV result into a year-indexed DataFrame.
+
+    Columns are genotype names; index is ``sim.timevec.years``. With
+    ``normalize=True``, each row is divided by its total (genotype distribution
+    of `key`), leaving all-zero rows as zeros.
+
+    Args:
+        sim: a run hpv.Sim.
+        key: a result name present on each HPV module (e.g. 'cum_cancers',
+            'new_cancers', 'cum_cancer_deaths').
+        normalize (bool): row-normalize to a distribution.
+    """
+    from .hpv import HPV
+    mods = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+    data = {m.name: np.asarray(m.results[key], dtype=float) for m in mods}
+    df = pd.DataFrame(data, index=pd.Index(np.asarray(sim.timevec.years), name='year'))
+    if normalize:
+        totals = df.sum(axis=1)
+        df = df.div(totals.where(totals > 0, 1.0), axis=0)
+    return df

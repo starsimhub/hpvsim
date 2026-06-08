@@ -192,3 +192,19 @@ def test_dalys_ledger_overlaps_single_scale():
     m1 = mean_total(1)
     m3 = mean_total(3)
     assert abs(m3 - m1) / m1 < 0.15
+
+
+def test_results_by_genotype_stacks_and_normalizes():
+    sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria',
+                  start=1990, stop=2030, n_agents=1500, rand_seed=1)
+    sim.run()
+    df = hpv.results_by_genotype(sim, key='cum_cancers')
+    assert list(df.columns) == ['hpv16', 'hpv18']
+    assert len(df) == len(sim.timevec)
+    # cum_cancers is non-decreasing in time per genotype.
+    assert (df['hpv16'].diff().dropna() >= -1e-9).all()
+    # Normalized rows sum to 1 where any cancers exist.
+    ndf = hpv.results_by_genotype(sim, key='cum_cancers', normalize=True)
+    row_sums = ndf.sum(axis=1)
+    nonzero = row_sums[df.sum(axis=1) > 0]
+    assert np.allclose(nonzero, 1.0)
