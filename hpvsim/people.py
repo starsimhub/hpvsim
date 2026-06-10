@@ -301,20 +301,47 @@ class People(hpb.BasePeople):
                 len(inds),
                 n_extra,
             )  # Main axis is indices, but include columns for multiscale agents
-            extra_dur_cin = hpu.sample(**gpars["dur_cin"], size=full_size)
-            extra_dur_precin = hpu.sample(**gpars["dur_precin"], size=full_size)
+            # Apply the same age_risk modifier to the extras' CIN duration that
+            # set_prognoses applies to the base agent (women past age_risk["age"]
+            # progress to cancer at a different rate). The extras share their
+            # source's age, so the modifier is taken from the source.
+            extra_age_mod = np.ones(len(inds))
+            extra_age_mod[self.age[inds] >= self.pars["age_risk"]["age"]] = self.pars[
+                "age_risk"
+            ]["risk"]
+            extra_dur_cin = (
+                hpu.sample(**gpars["dur_cin"], size=full_size) * extra_age_mod[:, None]
+            )
             extra_rel_sevs = np.ones(full_size) * self.rel_sev[inds][:, None]
 
-            extra_cin_probs = hppar.compute_severity(
-                extra_dur_precin, rel_sev=extra_rel_sevs, pars=gpars["cin_fn"]
-            )
-            extra_cin_bools = hpu.binomial_arr(extra_cin_probs[:, 1:])
+            # The extra agents stand in for additional women who, like the base
+            # agent, have ALREADY progressed to CIN (set_severity is only called
+            # on CIN-reachers). Their pre-CIN duration must therefore come from
+            # the CIN-conditional (length-biased) distribution, not the
+            # unconditional one: rejection-sample dur_precin until it passes the
+            # precin->CIN gate. This reproduces the base agent's precin selection
+            # (set_prognoses) exactly, so (a) every extra is CIN -- all extras are
+            # cancer-eligible and weighted consistently with the base, removing
+            # the incidence-deflation bug -- and (b) each extra's date_cin
+            # timeline matches a true CIN-reacher.
+            extra_dur_precin = hpu.sample(**gpars["dur_precin"], size=full_size)
+            pending = np.ones(full_size, dtype=bool)
+            while pending.any():
+                cin_prob = hppar.compute_severity(
+                    extra_dur_precin, rel_sev=extra_rel_sevs, pars=gpars["cin_fn"]
+                )
+                passed = hpu.binomial_arr(cin_prob) & pending
+                pending &= ~passed
+                if pending.any():
+                    extra_dur_precin[pending] = hpu.sample(
+                        **gpars["dur_precin"], size=int(pending.sum())
+                    )
 
             extra_cancer_probs = hppar.compute_severity(
                 extra_dur_cin, rel_sev=extra_rel_sevs, pars=cancer_pars
             )  # Calculate probability of cancer
-            extra_cancer_probs[:, 1:][~extra_cin_bools] = 0
-            # Based on the extra severity values, determine additional transformation probabilities
+            # Every extra is CIN, so resolve the CIN->cancer transition for all of
+            # them, exactly as for the base agent (no precin->CIN re-gating).
             extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs[:, 1:])
             extra_cancer_bools *= self.level0[
                 inds, None
