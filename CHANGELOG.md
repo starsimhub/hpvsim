@@ -3,6 +3,26 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
+## Version 2.3.1 (2026-06-10)
+
+- Fixes a multiscale (`ms_agent_ratio > 1`) bias that deflated cervical-cancer
+  incidence. `People.set_severity` is called only on women already at CIN, so
+  the base agent is unconditionally CIN; but the spawned extra agents re-rolled
+  the precin→CIN gate (and zeroed cancer probability for "non-CIN" extras) while
+  being weighted equally with the base, deflating expected cancer weight per CIN
+  woman by `[1 + (ms_agent_ratio−1)·P(cin)] / ms_agent_ratio`. The extras now
+  (a) draw a CIN-conditional (length-biased) pre-CIN duration via rejection
+  sampling and are all treated as CIN, and (b) receive the same `age_risk`
+  modifier on their CIN duration as the base agent. Cancer incidence is now
+  invariant to `ms_agent_ratio`.
+- Adds `tests/devtests/test_multiscale_bias.py` asserting cancer incidence is
+  flat across `ms_agent_ratio`.
+- **Regression information:** the default `ms_agent_ratio` is 10, so default
+  cancer / cancer-death / CIN outputs (and the screening/treatment cascades that
+  depend on them) increase substantially (~3–4×); baselines have been
+  regenerated. Parameter sets calibrated against the previous (deflated)
+  behavior will over-predict cancer and require recalibration.
+
 ## Version 2.3.0 (2026-04-20)
 
 - Fixes dt-dependent results by scaling partnership formation rates to
