@@ -1,8 +1,15 @@
-"""Rwanda HPV–HIV calibration port (M08 T12/T13).
+"""Rwanda HPV–HIV calibration (M08).
 
-Ports the *published* v2.3 Rwanda calibration into v3 parameter forms so the
-v3 co-infection sim reproduces v2's HIV-stratified cervical-cancer incidence
-WITHOUT re-running Optuna. Two upstream sources, read once at authoring time:
+The NETWORK / behavioural / HIV-input parameters are ported from the published
+v2.3 Rwanda calibration (debut, partners, layer_probs, init_hpv_dist, beta=0.12,
+rel_imm). The CANCER natural-history scalars (_TP_SCALE, _CIN_K_SCALE,
+_DUR_CIN_SCALE) and the HIV cancer-effect strengths (RWANDA_HIV_EFFECTS rel_sus /
+rel_sev) were RE-CALIBRATED for v3 directly against the 2017 registry cancer-
+incidence targets, because v2's values were fit against v2's multiscale-biased
+engine and overshoot ~10x on v3's unbiased engine. See the _TP_SCALE comment
+block below and tests/regression/calibrate_rwanda.py.
+
+Two upstream sources for the ported parts, read once at authoring time:
 
   1. ``hpvsim_rwanda/results/rwanda_pars.obj`` (the Optuna posterior point
      estimate): ``genotype_pars`` (per-genotype dur/cin_fn/cancer_fn/rel_beta/
@@ -57,29 +64,29 @@ _RWANDA_CIN_K = {'hi5': 0.24, 'ohr': 0.14}
 _DUR_CIN = {'hpv16': (5.0, 20.0), 'hpv18': (5.0, 20.0),
             'hi5': (4.5, 20.0), 'ohr': (4.5, 20.0)}
 
-# Cancer-level re-calibration for v3's multiscale-UNBIASED engine.
+# Cancer natural-history re-calibration for v3's multiscale-UNBIASED engine.
 #
-# The published v2.3 Rwanda numbers were produced at ``ms_agent_ratio=100``,
-# whose multiscale set_severity scales cancer incidence DOWN ~4x (the n_extra
-# fine agents RE-ROLL the precin->CIN gate; verified v2 ms=100->14.5 vs
-# ms=1->63 /100k). v2's transform_prob was calibrated against that scaled
-# behavior. v3's engine is multiscale-unbiased, so v2's transform_prob verbatim
-# overshoots cancer ~4x.
-#
-# We re-calibrate to the registry data directly (not by scaling transform_prob,
-# which saturates: it cuts unsaturated peak-age cancers more than saturated
-# long-duration/old-age ones, flattening the age curve and inflating HIV+ RR).
-# Instead we shorten dur_cin, which reduces cumulative cin_integral severity
-# (lower level), un-saturates, AND shifts cancer slightly earlier -- preserving
-# the declining 45-55-peak age shape that matches the registry. Value tuned in
-# tests/regression/diag_rwanda_calib_check.py / plot_rwanda_calib.py.
-_DUR_CIN_SCALE = 1.0  # TODO: set by the re-calibration sweep below
+# The published v2.3 Rwanda numbers were produced under v2's multiscale-BIASED
+# engine (extra fine agents re-roll the precin->CIN gate, deflating cancer
+# ~4-10x); v2's transform_prob was fit against that. v3's engine is multiscale-
+# unbiased, so the v2 params overshoot cancer ~10x. These three GLOBAL scalars
+# are the converged best fit (gof 1.84) from a 7-param Optuna calibration to the
+# 2017 registry cancer-incidence targets (by-age + aggregate, HIV-stratified) --
+# see tests/regression/calibrate_rwanda.py and results/rwanda_calib/. BASE_BETA
+# stays 0.12 (v2's HPV-prevalence calibration, uncontaminated by the cancer-only
+# bug). A per-genotype refinement was tried (calibrate_rwanda_genotype.py) but
+# did not improve the cancer genotype mix (structural 'ohr' lumping limit), so
+# these global scalars are the adopted calibration.
+_TP_SCALE = 0.102       # x cancer_fn.transform_prob (all genotypes) -- cancer LEVEL
+_CIN_K_SCALE = 0.380    # x cin_fn.k (all genotypes; cancer_fn.k synced) -- age SHAPE
+_DUR_CIN_SCALE = 1.043  # x dur_cin (mean & std, all genotypes)
 
-# CD4-stratified HIV->HPV effects, Rwanda-calibrated (rwanda_pars.obj hiv_pars).
-# These REPLACE the connector's generic defaults (2.2/2.2, 1.5/1.2, .36/.76).
+# CD4-stratified HIV->HPV effects. rel_sus / rel_sev are the v3 calibration best
+# fit (they drive the HIV+/HIV- cancer RR; replace v2's 4.75/2.75 and 2.5/3.5);
+# rel_imm retains the v2 Rwanda value (rwanda_pars.obj hiv_pars).
 RWANDA_HIV_EFFECTS = {
-    'rel_sus': {'lt200': 4.75, 'gt200': 2.75},
-    'rel_sev': {'lt200': 2.5, 'gt200': 3.5},
+    'rel_sus': {'lt200': 3.58, 'gt200': 1.88},
+    'rel_sev': {'lt200': 5.12, 'gt200': 3.25},
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76},
 }
 
@@ -133,10 +140,12 @@ def _layer_probs_annual():
 
 
 def rwanda_genotype_pars():
-    """Per-genotype overrides: base beta=0.12 rebuilt into the directional dict,
-    the two cin_fn slope (k) fixes (hi5/ohr), and the dur_cin re-calibration for
-    v3's multiscale-unbiased engine. Other genotype pars already match v3
-    defaults, so they are left untouched."""
+    """Per-genotype overrides applying the v3 calibration:
+      - beta: base BASE_BETA=0.12 rebuilt into the directional (f2m/m2f) dict.
+      - dur_cin: scaled by _DUR_CIN_SCALE.
+      - cin_fn.k: (Rwanda override for hi5/ohr, else the genotype default) x
+        _CIN_K_SCALE, applied to ALL genotypes; cancer_fn.k kept in sync.
+      - cancer_fn.transform_prob: scaled by _TP_SCALE (all genotypes)."""
     out = {}
     for key in _GENO_KEYS:
         gp = get_genotype_pars(key)
@@ -149,14 +158,18 @@ def rwanda_genotype_pars():
             mean, std = _DUR_CIN[key]
             d['dur_cin'] = ss.lognorm_ex(mean=ss.years(mean * _DUR_CIN_SCALE),
                                          std=ss.years(std * _DUR_CIN_SCALE))
-        if key in _RWANDA_CIN_K:
-            k = _RWANDA_CIN_K[key]
-            d['cin_fn'] = {'form': 'logf2', 'k': k, 'x_infl': 0, 'ttc': 50}
-            # cancer_fn (cin_integral) integrates the same curve and carries a
-            # duplicate k; keep them in sync.
-            cf = dict(gp.cancer_fn)
-            cf['k'] = k
-            d['cancer_fn'] = cf
+        # cin_fn.k: Rwanda override (hi5/ohr) or genotype default, x _CIN_K_SCALE.
+        base_k = _RWANDA_CIN_K.get(key, float(gp.cin_fn['k']))
+        k = base_k * _CIN_K_SCALE
+        cin = dict(gp.cin_fn)
+        cin['k'] = k
+        d['cin_fn'] = cin
+        # cancer_fn (cin_integral): scale transform_prob (level); sync the
+        # duplicate k with cin_fn.k.
+        cf = dict(gp.cancer_fn)
+        cf['transform_prob'] = cf['transform_prob'] * _TP_SCALE
+        cf['k'] = k
+        d['cancer_fn'] = cf
         out[key] = d
     return out
 
