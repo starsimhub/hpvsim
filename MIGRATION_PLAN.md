@@ -80,7 +80,8 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 | M5 | 🟡 Implementation complete; PR not yet opened | branch `m05-vaccination-scenarios` |
 | M6: Test-and-treat cascade | 🟡 In progress | branch `m06-test-and-treat-cascade` |
 | M7: MultiSim and scenarios | 🟡 In progress | branch `m07-multisim` |
-| M8–M10 | ⬜ Not started | — |
+| M8: HIV–HPV co-infection | 🟡 Implementation complete; calibrated; CI green; PR #118 open | branch `m08-hiv-rwanda-validation` → `v3.0-dev` |
+| M9–M10 | ⬜ Not started | — |
 
 ### M0: Foundation
 

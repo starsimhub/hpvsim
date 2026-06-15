@@ -4,7 +4,8 @@
 **Milestone:** M08 (HIV–HPV co-infection)
 **Branch:** `m08-hiv-hpv-coinfection` (off `v3.0-dev`; PR targets `v3.0-dev`)
 **Predecessor:** [M07 MultiSim and Scenarios](2026-05-27-m07-multisim-design.md) — merged to `v3.0-dev` via PR #113.
-**Status:** Design approved; implementation not started.
+**Status:** Implemented and calibrated on branch `m08-hiv-rwanda-validation`
+(CI green; PR #118 → `v3.0-dev`). See **Post-implementation deltas** at the end.
 
 ## Dependencies and branch strategy
 
@@ -388,6 +389,47 @@ implementation (2026-06-04) and refine/supersede earlier ones as noted.
     understates HIV prevalence ~2× (M05-class artifact). T13's tolerance-band gate
     (not a z-score gate — the cached v2 baseline is posterior quantiles, not a seed
     sweep) compares against `load_hiv_baseline()` + the published 2017 points.
+
+## Post-implementation deltas (2026-06-15)
+
+Implemented on branch `m08-hiv-rwanda-validation` (PR #118 → `v3.0-dev`); CI green.
+
+- **Multiscale-bug pivot — supersedes the v2-parity acceptance test.** The published
+  v2 Rwanda numbers came from v2's multiscale-**biased** engine (extra fine agents
+  re-gate precin→CIN, deflating cancer ~4–10×), so on v3's multiscale-**unbiased**
+  engine the ported v2 params overshoot cancer ~10× and v2 outputs are not a valid
+  oracle. M08 was rebased onto `m07-multiscale-ledger` (unbiased engine; pre-rebase
+  backup `m08-backup-pre-ledger-rebase`) and v3 was recalibrated **directly to the
+  2017 registry** cancer-incidence targets instead of to v2.
+- **Recalibration outcome.** 7-param Optuna fit (`tests/regression/calibrate_rwanda.py`)
+  → gof 1.84 (honest ~2.05 at 20 seeds), finalized as global scalars in
+  `tests/regression/rwanda_calib.py` (`_TP_SCALE=0.102`, `_CIN_K_SCALE=0.380`,
+  `_DUR_CIN_SCALE=1.043`; HIV `rel_sus` 3.58/1.88, `rel_sev` 5.12/3.25;
+  `BASE_BETA=0.12` fixed). **No new model parameters** — a strict, more-parsimonious
+  subset of v2's (per-genotype natural history collapsed to global scales;
+  beta/network/`rel_imm`/per-genotype `rel_beta` held at v2 values). Matches published
+  v2 on HIV+ incidence and genotype mix; **improves** on it for HIV− incidence level
+  (v2 was bug-deflated). Comparison: `tests/regression/figures/v2_v3_comparison.png`.
+- **Documented structural residuals (shared with v2 — not v3 regressions):**
+  (1) cancer/precancer **genotype mix** — the lumped 4th "ohr" genotype cannot be both
+  common-in-CIN and rare-in-cancer; (2) **HIV− 55+ overshoot** — traced to the
+  level/shape coupling (slowing progression to fix the level pushes the 25–45
+  infection cohort's cancers into old age), NOT a network/`dur_cin`/conversion issue
+  (all three falsified; the `layer_probs` per-ts↔annual conversion round-trips
+  exactly). A `dur_cin_std_scale` lever and a per-genotype `rel_beta`/`tp` refinement
+  were both tried and rejected.
+- **T13 (HIV-stratified parity gate vs v2): dropped.** The v2 baseline is bug-biased,
+  so a parity gate is the wrong oracle. Validation is registry-based via analysis
+  scripts (`plot_v2_v3_comparison`, `validate_rwanda_genotypes`,
+  `diag_rwanda_hivpos_a55`); an automated registry gate was deliberately deferred.
+- **HIV epidemic is incidence-driven** (decision 9), not transmission-β-calibrated
+  (plan T12); β capability retained for future work.
+- **Data-layer generalization (cleanup).** `load_hiv(location)` is location-agnostic:
+  per-location `hpvsim/data/hiv/<location>/` folders with consistent filenames, gated
+  on the folder existing (allowlist dropped). General package docstrings de-Rwanda'd;
+  Rwanda retained only in the analysis/test scripts.
+- **Packaging fix.** Declared `stisim>=1.5` in `pyproject.toml` (imported by
+  `hpvsim/hiv.py` but previously undeclared → CI `ModuleNotFoundError`).
 
 ## Linked documents
 
