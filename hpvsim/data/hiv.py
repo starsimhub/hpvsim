@@ -15,9 +15,7 @@ used to build a co-infection sim:
 Data layout: ``hpvsim/data/hiv/<location>/`` holds four location-agnostic
 filenames — ``hiv_incidence.csv``, ``art_coverage_by_age_females.csv``,
 ``art_coverage_by_age_males.csv``, ``hiv_prevalence.csv``. Adding a country is
-therefore just dropping in a new ``<location>/`` folder with those four files
-and listing it in ``_KNOWN_LOCATIONS``. Data is bundled in-tree so nothing is
-imported from a sibling repo at runtime. (Currently only ``'rwanda'`` ships.)
+therefore just dropping in a new ``<location>/`` folder with those four files.
 """
 
 import numpy as np
@@ -29,16 +27,18 @@ _HIV_DATADIR = Path(__file__).parent / 'hiv'
 # v3 sim start year; used to pick the init-prev seed from the prevalence series.
 _START_YEAR = 1990
 
-# Locations with a bundled hpvsim/data/hiv/<location>/ data folder.
-_KNOWN_LOCATIONS = ['rwanda']
+
+def _available_locations():
+    """Locations with a bundled ``hpvsim/data/hiv/<location>/`` data folder."""
+    return sorted(p.name for p in _HIV_DATADIR.iterdir() if p.is_dir())
 
 
 def load_hiv(location):
     """Return the bundled HIV/ART inputs for ``location``.
 
     Args:
-        location (str): country name; must be one of ``_KNOWN_LOCATIONS``
-            (i.e. have a ``hpvsim/data/hiv/<location>/`` data folder).
+        location (str): country name; must have a bundled
+            ``hpvsim/data/hiv/<location>/`` data folder.
 
     Returns:
         dict with keys:
@@ -52,9 +52,10 @@ def load_hiv(location):
               age, sex ('f'/'m'), and calendar year.
     """
     location = location.lower()
-    if location not in _KNOWN_LOCATIONS:
+    if not (_HIV_DATADIR / location).is_dir():
         raise ValueError(
-            f"Unknown location {location!r}. Supported locations: {_KNOWN_LOCATIONS}."
+            f"No bundled HIV data for location {location!r} (expected directory "
+            f"{_HIV_DATADIR / location}). Available: {_available_locations()}."
         )
     return dict(
         art_coverage=_art_coverage(location),
