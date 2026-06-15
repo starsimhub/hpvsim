@@ -43,6 +43,7 @@ dependencies = [
     'pandas>=2.0.0',
     'sciris>=3.0.0',
     'starsim>=3.5',  # 3.5 changed Dist construction (see hpvsim/parameters.py ss.beta_dist); pinned baselines are 3.5-valued
+    'stisim>=1.5',  # transmission-based HIV for the HIV-HPV co-infection model (hpvsim/hiv.py)
     'matplotlib',
     'seaborn',
     'optuna',
