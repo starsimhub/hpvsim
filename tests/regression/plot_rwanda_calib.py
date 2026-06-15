@@ -7,7 +7,7 @@ validation panels against the published registry / data targets:
   1. Cancer incidence by age, 2017, HIV- women   (vs registry points)
   2. Cancer incidence by age, 2017, HIV+ women   (vs registry points)
   3. Cancer incidence time series: Total / HIV+ / HIV-  (+ 2017 target points)
-  4. Adult (15-49) HIV prevalence over time        (vs rwanda_hiv_prevalence.csv)
+  4. Adult (15-49) HIV prevalence over time        (vs rwanda/hiv_prevalence.csv)
   5. ART coverage among HIV+ over time
   6. Adult-female any-HPV prevalence by HIV status
 
@@ -209,7 +209,7 @@ def main(n_seeds=6, n_agents=15000):
     ts, yrs = _ts_ratio(probes, 'n_hiv_1549', 'n_1549')
     ax.plot(yrs, np.median(ts, axis=1), color='#aa3377', label='v3 model')
     ax.fill_between(yrs, np.percentile(ts, 25, axis=1), np.percentile(ts, 75, axis=1), color='#aa3377', alpha=0.2)
-    hivt = pd.read_csv(_ROOT / 'hpvsim' / 'data' / 'hiv' / 'rwanda_hiv_prevalence.csv')
+    hivt = pd.read_csv(_ROOT / 'hpvsim' / 'data' / 'hiv' / 'rwanda' / 'hiv_prevalence.csv')
     ax.scatter(hivt['year'], hivt['total'], color='k', marker='o', s=20, label='Rwanda data')
     ax.set_title('Adult (15-49) HIV prevalence'); ax.set_xlim(1985, 2020); ax.legend(fontsize=8)
 
