@@ -76,7 +76,7 @@ def _target_hiv_prevalence():
     data = hpv.data.load_hiv('rwanda')  # init_prev only; read the series file directly
     from pathlib import Path
     import hpvsim
-    f = Path(hpvsim.__file__).parent / 'data' / 'hiv' / 'rwanda_hiv_prevalence.csv'
+    f = Path(hpvsim.__file__).parent / 'data' / 'hiv' / 'rwanda' / 'hiv_prevalence.csv'
     df = pd.read_csv(f)
     return {int(r.year): float(r.total) for r in df.itertuples()}
 

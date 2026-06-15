@@ -233,8 +233,8 @@ def _network_pars(location, overrides=None):
     ``_default_network_pars`` result *before* the Starsim-shaping wrapping
     (so it carries raw forms: ``debut``/``*_partners`` as v2 dist dicts,
     ``layer_probs`` as the (3, N) arrays, ``*_cross_layer`` as annual floats).
-    Used by analysis scripts to supply a per-country network calibration
-    (see ``tests/regression/rwanda_calib.py``) without forking this builder.
+    Used by analysis scripts to supply a per-location network calibration
+    without forking this builder.
     """
     default_pars = _default_network_pars(location)
     if overrides:

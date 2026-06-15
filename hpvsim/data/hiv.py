@@ -1,21 +1,23 @@
-"""HIV-data adapter: load country HIV/ART inputs for the co-infection sim.
+"""HIV-data adapter: load per-location HIV/ART inputs for the co-infection sim.
 
-Mirrors ``hpvsim.data.country.load_country`` in style. Returns the Rwanda HIV
-inputs a later task (T10b/T12) consumes to build a co-infection sim:
+Mirrors ``hpvsim.data.country.load_country`` in style. Returns the HIV inputs
+used to build a co-infection sim:
 
 - ``art_coverage``: tidy long DataFrame ``[age, sex, year, coverage]`` parsed
-  from the bundled by-age ART coverage CSVs (females + males).
+  from the by-age ART coverage CSVs (females + males).
 - ``init_prev``: a scalar initial HIV prevalence to seed ``sti.HIV`` /
   ``hpv.HIV``. See ``_init_prev`` for the derivation and its caveats.
-- ``incidence``: tidy long DataFrame ``[age, sex, year, incidence]`` parsed
-  from ``hiv_incidence_rwanda.csv`` — the per-year HIV acquisition rate among
-  susceptibles by single-year age, sex ('f'/'m'), and calendar year. Consumed
-  by the incidence-driven HIV importer (``hpv.hiv_incidence_import``).
+- ``incidence``: tidy long DataFrame ``[age, sex, year, incidence]`` — the
+  per-year HIV acquisition rate among susceptibles by single-year age, sex
+  ('f'/'m'), and calendar year. Consumed by the incidence-driven HIV importer
+  (``hpv.hiv_incidence_import``).
 
-Underlying data lives in ``hpvsim/data/hiv/`` (copied from the Rwanda
-validation repo so nothing is imported from a sibling repo at runtime). The
-ART-coverage-application intervention (the "shortcut") is a SEPARATE task
-(T10b); this module only loads the coverage data, it does not apply it.
+Data layout: ``hpvsim/data/hiv/<location>/`` holds four location-agnostic
+filenames — ``hiv_incidence.csv``, ``art_coverage_by_age_females.csv``,
+``art_coverage_by_age_males.csv``, ``hiv_prevalence.csv``. Adding a country is
+therefore just dropping in a new ``<location>/`` folder with those four files
+and listing it in ``_KNOWN_LOCATIONS``. Data is bundled in-tree so nothing is
+imported from a sibling repo at runtime. (Currently only ``'rwanda'`` ships.)
 """
 
 import numpy as np
@@ -27,26 +29,27 @@ _HIV_DATADIR = Path(__file__).parent / 'hiv'
 # v3 sim start year; used to pick the init-prev seed from the prevalence series.
 _START_YEAR = 1990
 
+# Locations with a bundled hpvsim/data/hiv/<location>/ data folder.
 _KNOWN_LOCATIONS = ['rwanda']
 
 
 def load_hiv(location):
-    """Return Rwanda HIV/ART inputs for ``location``.
+    """Return the bundled HIV/ART inputs for ``location``.
 
     Args:
-        location (str): country name; must be one of ``_KNOWN_LOCATIONS``.
-            Only ``'rwanda'`` is supported now.
+        location (str): country name; must be one of ``_KNOWN_LOCATIONS``
+            (i.e. have a ``hpvsim/data/hiv/<location>/`` data folder).
 
     Returns:
         dict with keys:
             - 'art_coverage': DataFrame ``[age, sex, year, coverage]`` (long).
               ART coverage fraction by single-year age, sex ('f'/'m'), and
-              calendar year (2004-2030).
+              calendar year.
             - 'init_prev': float, an initial HIV prevalence to seed the HIV
               module at the v3 start year (see ``_init_prev``).
             - 'incidence': DataFrame ``[age, sex, year, incidence]`` (long).
               Per-year HIV acquisition rate among susceptibles by single-year
-              age, sex ('f'/'m'), and calendar year (1985-2030).
+              age, sex ('f'/'m'), and calendar year.
     """
     location = location.lower()
     if location not in _KNOWN_LOCATIONS:
@@ -60,15 +63,15 @@ def load_hiv(location):
     )
 
 
-def _incidence(location):  # noqa: ARG001  (single-location for now)
+def _incidence(location):
     """HIV incidence by age/sex/year as a tidy long DataFrame.
 
-    Reads ``hiv_incidence_rwanda.csv`` (long ``Age, Year, Sex, Incidence``;
-    ages 10-80, years 1985-2030, Sex already 'f'/'m', Incidence = per-year HIV
-    acquisition rate among susceptibles) and normalizes column names/dtypes to
-    ``[age, sex, year, incidence]`` (matching the ``art_coverage`` style).
+    Reads ``<location>/hiv_incidence.csv`` (long ``Age, Year, Sex, Incidence``;
+    Incidence = per-year HIV acquisition rate among susceptibles) and
+    normalizes column names/dtypes to ``[age, sex, year, incidence]`` (matching
+    the ``art_coverage`` style).
     """
-    df = pd.read_csv(_HIV_DATADIR / 'hiv_incidence_rwanda.csv')
+    df = pd.read_csv(_HIV_DATADIR / location / 'hiv_incidence.csv')
     df = df.rename(columns={
         'Age': 'age', 'Year': 'year', 'Sex': 'sex', 'Incidence': 'incidence',
     })
@@ -79,16 +82,17 @@ def _incidence(location):  # noqa: ARG001  (single-location for now)
     return df[['age', 'sex', 'year', 'incidence']].reset_index(drop=True)
 
 
-def _art_coverage(location):  # noqa: ARG001  (single-location for now)
+def _art_coverage(location):
     """ART coverage by age/sex/year as a tidy long DataFrame.
 
-    Reads the two wide by-age CSVs (``age, 2004, ..., 2030``), one per sex,
-    and melts them into ``[age, sex, year, coverage]``.
+    Reads the two wide by-age CSVs (``age, <year>, ...``), one per sex
+    (``art_coverage_by_age_females.csv`` / ``_males.csv``), and melts them
+    into ``[age, sex, year, coverage]``.
     """
     frames = []
-    for sex, fname in (('f', 'rwanda_art_coverage_by_age_females.csv'),
-                       ('m', 'rwanda_art_coverage_by_age_males.csv')):
-        wide = pd.read_csv(_HIV_DATADIR / fname)
+    for sex, fname in (('f', 'art_coverage_by_age_females.csv'),
+                       ('m', 'art_coverage_by_age_males.csv')):
+        wide = pd.read_csv(_HIV_DATADIR / location / fname)
         long = wide.melt(id_vars='age', var_name='year', value_name='coverage')
         long['sex'] = sex
         long['year'] = long['year'].astype(int)
@@ -98,23 +102,21 @@ def _art_coverage(location):  # noqa: ARG001  (single-location for now)
     return pd.concat(frames, ignore_index=True)
 
 
-def _init_prev(location):  # noqa: ARG001  (single-location for now)
+def _init_prev(location):
     """Initial HIV prevalence seed at the v3 start year (1990).
 
-    DERIVATION / CAVEAT: There is no HIV-prevalence-by-age data source for
-    Rwanda, and the cached v2.3.0 baseline does NOT expose a
-    ``hiv_prevalence_by_age`` result (its timeseries only carries
-    cancer-incidence-by-HIV-status metrics). So we fall back to the documented
-    interim seed: the aggregate national ``hiv_prevalence`` at the start year
-    (1990) from ``rwanda_hiv_prevalence.csv``, applied as a flat adult
-    prevalence. ``sti.HIV.init_prev_data`` accepts this scalar and parses it
-    into an ``ss.bernoulli`` over the population. This is an INTERIM seed to be
-    refined during calibration (T12); the by-age/by-sex shape is deferred.
+    DERIVATION / CAVEAT: where there is no HIV-prevalence-by-age data source, we
+    fall back to a documented interim seed: the aggregate national
+    ``hiv_prevalence`` at the start year from ``<location>/hiv_prevalence.csv``,
+    applied as a flat adult prevalence. ``sti.HIV.init_prev_data`` accepts this
+    scalar and parses it into an ``ss.bernoulli`` over the population. This is an
+    INTERIM seed; the by-age/by-sex shape is deferred to calibration.
     """
-    df = pd.read_csv(_HIV_DATADIR / 'rwanda_hiv_prevalence.csv')
+    fpath = _HIV_DATADIR / location / 'hiv_prevalence.csv'
+    df = pd.read_csv(fpath)
     row = df.loc[df['year'] == _START_YEAR]
     if row.empty:
         raise ValueError(
-            f"rwanda_hiv_prevalence.csv has no row for start year {_START_YEAR}."
+            f"{fpath.name} for {location!r} has no row for start year {_START_YEAR}."
         )
     return float(np.asarray(row['total'])[0])

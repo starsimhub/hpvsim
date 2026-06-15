@@ -3,7 +3,7 @@ HIV→HPV effects ported (by value) from v2's HIVsim.
 
 Three components:
   - ``HIV`` (``sti.HIV`` subclass): continuous-CD4 transmission-based HIV,
-    re-targeted onto ``hpv.SexualNetwork`` and seeded from a Rwanda init-prev curve.
+    re-targeted onto ``hpv.SexualNetwork`` and seeded from a per-location init-prev curve.
   - ``hpv_hiv_connector`` (``ss.Connector``): bins CD4 into discrete strata and
     applies v2's rel_sus / rel_sev / rel_imm effects to every HPV module.
   - ``HIVStratifiedResults`` (``ss.Analyzer``): HPV/cancer outcomes by HIV status.
@@ -30,10 +30,9 @@ __all__ = ['HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector',
 # applying gt200 there (as an earlier draft did) over-amplifies HIV+ cancer ~10x.
 #
 # These are the generic HIVsim class defaults. A *location calibration* may
-# override them: e.g. v2's Rwanda calibration (results/rwanda_pars.obj) tuned
-# rel_sus to {lt200: 4.75, gt200: 2.75} and rel_sev to {lt200: 2.5, gt200: 3.5}
-# (rel_imm unchanged). Pass such overrides via ``hpv_hiv_connector(effects=...)``;
-# see ``tests/regression/rwanda_calib.py`` for the Rwanda values in use.
+# override them with its own per-stratum values (same
+# ``{effect: {'lt200':.., 'gt200':..}}`` shape) by passing them via
+# ``hpv_hiv_connector(effects=...)``.
 _HIV_EFFECTS = {
     'rel_sus': {'lt200': 2.2, 'gt200': 2.2},   # increased HPV acquisition
     'rel_sev': {'lt200': 1.5, 'gt200': 1.2},   # faster/worse CIN->cancer progression
@@ -49,7 +48,8 @@ class HIV(sti.HIV):
     Thin subclass of ``sti.HIV``: inherits continuous CD4, ART reconstitution,
     and CD4-based mortality unchanged. Adds (1) HPVsim-friendly directional
     beta targeting ``hpv.SexualNetwork`` (whose p1=female, p2=male, unlike
-    STIsim's ``structuredsexual``), and (2) a Rwanda init-prevalence curve.
+    STIsim's ``structuredsexual``), and (2) a per-location init-prevalence seed
+    (via ``from_location``).
 
     Note: ``beta_m2f`` / ``rel_beta_f2m`` are taken as constructor arguments and
     applied directly to ``pars.beta`` in ``init_pre``. STIsim's same-named
@@ -77,7 +77,8 @@ class HIV(sti.HIV):
         intervention's job.
 
         Args:
-            location (str): country name (only ``'rwanda'`` supported now).
+            location (str): country name with bundled HIV data (see
+                ``hpv.data.load_hiv``; currently ``'rwanda'``).
             beta_m2f (float): male->female per-act transmission rate
                 (placeholder, uncalibrated).
             **kwargs: forwarded to ``hpv.HIV.__init__``.
@@ -122,8 +123,8 @@ class hiv_incidence_import(ss.Intervention):
 
     The incidence DataFrame has columns ``[age, sex, year, incidence]`` (sex
     'f'/'m'; ``incidence`` = the per-year HIV acquisition rate among
-    susceptibles). Use ``hiv_incidence_import.from_location('rwanda')`` for the
-    bundled Rwanda curve, or pass a frame of that shape via ``incidence``.
+    susceptibles). Use ``hiv_incidence_import.from_location(location)`` for a
+    bundled curve, or pass a frame of that shape via ``incidence``.
 
     Pass explicitly via ``interventions=[...]``; it is NOT auto-wired. If no HIV
     module is present in the sim, ``init_pre`` raises a clear ValueError (the
@@ -160,7 +161,8 @@ class hiv_incidence_import(ss.Intervention):
         """Build an importer from a country's bundled HIV incidence curve.
 
         Args:
-            location (str): country name (only ``'rwanda'`` supported now).
+            location (str): country name with bundled HIV data (see
+                ``hpv.data.load_hiv``; currently ``'rwanda'``).
             **kwargs: forwarded to ``hiv_incidence_import.__init__``.
         """
         from . import data as _data
@@ -201,8 +203,8 @@ class hiv_incidence_import(ss.Intervention):
         are nearest-year clamped to the data range; ages are clamped to the data
         age range; integer-floored age indexes the per-single-year curve.
         """
-        # Nearest-year clamp: years before the curve start -> first year (which
-        # is 0 incidence in the Rwanda data); after the end -> last year.
+        # Nearest-year clamp: years before the curve start -> first year (often
+        # 0 incidence at the curve start); after the end -> last year.
         y = int(np.clip(int(np.floor(year)), int(self._years[0]), int(self._years[-1])))
         yi = self._year_index[y]
         # Clamp/floor ages into the per-single-year curve index space.
@@ -237,7 +239,7 @@ class hiv_incidence_import(ss.Intervention):
 
 
 def _reshape_art_coverage(df):
-    """Reshape the tidy Rwanda ART-coverage frame into STIsim's stratified format.
+    """Reshape a tidy ART-coverage frame into STIsim's stratified format.
 
     ``hpv.data.load_hiv(location)['art_coverage']`` is a long frame with columns
     ``[age, sex, year, coverage]`` (single year of age; sex 'f'/'m'; coverage a
@@ -247,8 +249,8 @@ def _reshape_art_coverage(df):
     read as a proportion 'p', not absolute counts). Single years of age map to
     unit bins ``[age, age+1)``.
 
-    Coverage is clamped to ``[0, 1]``: the bundled Rwanda curve has a few values
-    at 1.0001 (rounding), and STIsim infers proportion-vs-count from whether the
+    Coverage is clamped to ``[0, 1]``: a bundled curve may carry a few values
+    slightly above 1.0 (rounding), and STIsim infers proportion-vs-count from whether the
     max value is <= 1.0 — an un-clamped 1.0001 would flip the whole frame to
     'absolute counts' and treat ~nobody. Clamping keeps it a proportion.
     """
@@ -261,24 +263,24 @@ def _reshape_art_coverage(df):
 class hiv_art(sti.ART):
     """Coverage-based ART shortcut for the HPV–HIV co-infection model.
 
-    v2/Rwanda has no HIV testing cascade: ART is assigned directly to hit an
-    age/sex/year coverage curve. Stock ``sti.ART`` only treats agents that are
-    already ``diagnosed`` (it expects a ``sti.HIVTest`` upstream), and no
-    testing-coverage data exists for Rwanda — adding ``HIVTest`` would diverge
-    from v2. Instead, this thin ``sti.ART`` subclass marks every living HIV+
+    The co-infection model has no HIV testing cascade: ART is assigned directly
+    to hit an age/sex/year coverage curve. Stock ``sti.ART`` only treats agents
+    that are already ``diagnosed`` (it expects a ``sti.HIVTest`` upstream), and
+    no testing-coverage data is used.
+    Instead, this thin ``sti.ART`` subclass marks every living HIV+
     agent ``diagnosed`` at the start of each step, then defers to ``sti.ART`` to
     do the actual treatment bookkeeping and CD4 reconstitution.
 
     With all HIV+ agents diagnosed, ``sti.ART``'s diagnosed pool equals the full
     HIV+ pool, so its ``art_coverage_correction`` drives the on-ART fraction
     *among HIV+ agents* to the supplied age/sex/year curve (no double-discount).
-    The Rwanda coverage curve is per-single-year-of-age, fed in as STIsim's
+    The coverage curve is per-single-year-of-age, fed in as STIsim's
     native stratified-DataFrame coverage (see ``_reshape_art_coverage``); STIsim
     interpolates it to the sim's timestep grid and applies it per (age, sex).
 
     Pass explicitly via ``interventions=[...]``; it is NOT auto-wired, because
-    ART coverage is scenario-specific. Use ``hiv_art.from_location('rwanda')``
-    for the bundled curve, or pass any coverage form ``sti.ART`` accepts via the
+    ART coverage is scenario-specific. Use ``hiv_art.from_location(location)``
+    for a bundled curve, or pass any coverage form ``sti.ART`` accepts via the
     ``coverage`` kwarg.
     """
 
@@ -287,7 +289,8 @@ class hiv_art(sti.ART):
         """Build an ``hiv_art`` from a country's bundled ART-coverage curve.
 
         Args:
-            location (str): country name (only ``'rwanda'`` supported now).
+            location (str): country name with bundled HIV data (see
+                ``hpv.data.load_hiv``; currently ``'rwanda'``).
             **kwargs: forwarded to ``sti.ART`` (e.g. ``art_initiation``).
         """
         from . import data as _data
@@ -337,7 +340,7 @@ class hpv_hiv_connector(ss.Connector):
         super().__init__(**kwargs)
         # CD4-stratified effect multipliers; defaults to the generic HIVsim
         # values (_HIV_EFFECTS). A location calibration passes its own dict
-        # (same {effect: {'lt200':.., 'gt200':..}} shape) — e.g. the Rwanda
+        # (same {effect: {'lt200':.., 'gt200':..}} shape) — e.g. a location's
         # rel_sus/rel_sev overrides. Validated for the required keys here so a
         # malformed override fails at construction, not mid-run.
         if effects is None:
