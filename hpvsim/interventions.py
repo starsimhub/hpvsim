@@ -353,13 +353,13 @@ class treat_num(BaseTreatment, ss.treat_num):
                 self.cancer_treated[treat_uids] = True
                 self.cancer_treatments[treat_uids] += 1
                 self.ti_cancer_treated[treat_uids] = self.sim.ti
-                self.results['new_cancer_treated'][self.sim.ti] += len(new)
+                self.results['new_cancer_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
             else:
                 new = treat_uids[~self.cin_treated[treat_uids]]
                 self.cin_treated[treat_uids] = True
                 self.cin_treatments[treat_uids] += 1
                 self.ti_cin_treated[treat_uids] = self.sim.ti
-                self.results['new_cin_treated'][self.sim.ti] += len(new)
+                self.results['new_cin_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
         return treat_uids
 
 
@@ -401,13 +401,13 @@ class treat_delay(BaseTreatment):
                 self.cancer_treated[treat_uids] = True
                 self.cancer_treatments[treat_uids] += 1
                 self.ti_cancer_treated[treat_uids] = self.sim.ti
-                self.results['new_cancer_treated'][self.sim.ti] += len(new)
+                self.results['new_cancer_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
             else:
                 new = treat_uids[~self.cin_treated[treat_uids]]
                 self.cin_treated[treat_uids] = True
                 self.cin_treatments[treat_uids] += 1
                 self.ti_cin_treated[treat_uids] = self.sim.ti
-                self.results['new_cin_treated'][self.sim.ti] += len(new)
+                self.results['new_cin_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
         return treat_uids
 
 

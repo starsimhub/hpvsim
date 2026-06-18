@@ -160,3 +160,59 @@ def test_multigenotype_split_keeps_modules_consistent():
     assert len(g16.cancerous.raw) == len(g18.cancerous.raw) == n
     both = np.asarray(g16.cancerous.raw) & np.asarray(g18.cancerous.raw)
     assert both.sum() == 0, 'no agent may have invasive cancer in two genotypes'
+
+
+def test_treatment_tally_is_scale_weighted():
+    """new_cin_treated sums people.scale for treated agents, not raw count.
+
+    Fine agents have scale=1/ratio, so under multiscale ms_agent_ratio>1 the
+    sum of scales for treated fine agents is less than their raw count. The
+    old len(new) code would over-count; the fix uses scale[new].sum().
+
+    Strategy: run matching ratio=1 and ratio=10 sims with same n_agents and
+    aggressive treatment.  Both sims represent the same underlying population
+    (pop_scale=1, same n_agents), so they should produce near-identical
+    scale-weighted treatment tallies (within ~5% stochastic noise).
+
+    Under the OLD len(new) code, fine agents (scale=0.1 in the ratio=10 sim)
+    each count as 1 treatment instead of 0.1, inflating the ratio=10 tally by
+    approximately N_fine_treated * 0.9 ~= 681 extra (a ~18% over-count above
+    the ratio=1 baseline of ~3758).  The test uses a <10% tolerance so this
+    inflation would cause a clear FAIL on old code.
+    """
+    cfg = dict(location='nigeria', genotypes=['hpv16'], start=1990, stop=2010,
+               dt=0.25, verbose=0, rand_seed=42)
+
+    def make_intvs():
+        return [
+            hpv.routine_screening(product='via', prob=0.9, start_year=1995,
+                                  age_range=[25, 55], name='screen'),
+            hpv.treat_num(name='cin_rx', product='excision', prob=1.0),
+        ]
+
+    sim1 = hpv.Sim(n_agents=3000, ms_agent_ratio=1,  interventions=make_intvs(), **cfg)
+    sim1.run()
+
+    sim10 = hpv.Sim(n_agents=3000, ms_agent_ratio=10, interventions=make_intvs(), **cfg)
+    sim10.run()
+
+    iv1  = sim1.interventions['cin_rx']
+    iv10 = sim10.interventions['cin_rx']
+
+    total1  = float(np.asarray(iv1.results['new_cin_treated']).sum())
+    total10 = float(np.asarray(iv10.results['new_cin_treated']).sum())
+
+    assert total1 > 0, 'no CIN treatments in ratio=1 sim — test is vacuous'
+    assert total10 > 0, 'no CIN treatments in ratio=10 sim — test is vacuous'
+
+    # Require fine agents to be present (test is vacuous without them)
+    fine_uids = sim10.diseases.hpv16.multiscale_fine.uids
+    assert len(fine_uids) > 0, 'no fine agents in ratio=10 sim — test is vacuous'
+
+    # Scale-weighted totals should match within 10% (both sims: same pop, same seed).
+    # Under OLD len(new) code: fine-agent treatments inflate total10 by ~18%,
+    # causing this assertion to FAIL.  Under NEW scale[new].sum() code: PASSES.
+    assert abs(total10 - total1) <= 0.10 * total1, (
+        f'scale-weighting broken: ratio=10 tally={total10:.1f} diverges >10% from '
+        f'ratio=1 tally={total1:.1f}; old len(new) code over-counts fine agents by ~18%'
+    )
