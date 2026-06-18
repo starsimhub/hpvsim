@@ -205,3 +205,64 @@ def test_treatment_tally_is_scale_weighted():
         f'scale-weighting broken: ratio=10 tally={total10:.1f} diverges >10% from '
         f'ratio=1 tally={total1:.1f}; old len(new) code over-counts fine agents by ~18%'
     )
+
+
+def test_screening_tally_is_scale_weighted():
+    """n_screened/n_dx sum people.scale, not raw agent count.
+
+    Fine agents have scale=1/ratio.  Under the OLD ss.BaseScreening.step
+    (len(accept_uids) / len(outcomes['positive'])) a fine agent counts as
+    1 screened/diagnosed instead of 1/ratio — inflating the ratio=10 tallies
+    relative to ratio=1.
+
+    Strategy: run matching ratio=1 and ratio=10 sims with same n_agents and
+    aggressive screening coverage.  Both sims represent the same underlying
+    population, so scale-weighted n_screened / n_dx totals should agree within
+    ~10% stochastic noise.  Under OLD len() code the ratio=10 tallies are
+    inflated by ~(ratio-1)*n_fine_screened — easily >10% of the ratio=1
+    baseline — causing a clear FAIL.  Under the NEW scale-weighted override
+    the test PASSES.
+    """
+    cfg = dict(location='nigeria', genotypes=['hpv16'], start=1990, stop=2010,
+               dt=0.25, verbose=0, rand_seed=42)
+
+    def make_intvs():
+        return [
+            hpv.routine_screening(product='via', prob=0.9, start_year=1995,
+                                  age_range=[25, 55], name='screen'),
+        ]
+
+    sim1 = hpv.Sim(n_agents=3000, ms_agent_ratio=1,  interventions=make_intvs(), **cfg)
+    sim1.run()
+
+    sim10 = hpv.Sim(n_agents=3000, ms_agent_ratio=10, interventions=make_intvs(), **cfg)
+    sim10.run()
+
+    sc1  = sim1.interventions['screen']
+    sc10 = sim10.interventions['screen']
+
+    total_screened1  = float(np.asarray(sc1.results['n_screened']).sum())
+    total_screened10 = float(np.asarray(sc10.results['n_screened']).sum())
+    total_dx1        = float(np.asarray(sc1.results['n_dx']).sum())
+    total_dx10       = float(np.asarray(sc10.results['n_dx']).sum())
+
+    assert total_screened1  > 0, 'no screenings in ratio=1 sim — test is vacuous'
+    assert total_screened10 > 0, 'no screenings in ratio=10 sim — test is vacuous'
+
+    # Require fine agents to be present (test is vacuous without them)
+    fine_uids = sim10.diseases.hpv16.multiscale_fine.uids
+    assert len(fine_uids) > 0, 'no fine agents in ratio=10 sim — test is vacuous'
+
+    # Scale-weighted n_screened should match ratio=1 within 10%.
+    # Under OLD len(accept_uids) code: fine-agent screens inflate total_screened10.
+    assert abs(total_screened10 - total_screened1) <= 0.10 * total_screened1, (
+        f'n_screened scale-weighting broken: ratio=10 tally={total_screened10:.1f} '
+        f'diverges >10% from ratio=1 tally={total_screened1:.1f}'
+    )
+
+    # Scale-weighted n_dx should match ratio=1 within 10%.
+    if total_dx1 > 0:
+        assert abs(total_dx10 - total_dx1) <= 0.10 * total_dx1, (
+            f'n_dx scale-weighting broken: ratio=10 tally={total_dx10:.1f} '
+            f'diverges >10% from ratio=1 tally={total_dx1:.1f}'
+        )

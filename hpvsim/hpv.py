@@ -158,10 +158,17 @@ class HPV(ss.Infection):
             # multi-genotype test (plan Task 5).
             ss.BoolArr('multiscale_fine', default=False),
         )
+        # Dedicated ss.random dist for the multiscale-split gate draws (CIN
+        # gate and cancer gate in _multiscale_split). Using ss.random rather
+        # than np.random.random ties reproducibility to Starsim's seeded RNG
+        # stream rather than the global NumPy seed, which is more robust if a
+        # future Starsim version stops reseeding np.random. One dist drawn
+        # twice per step is fine — ss dists auto-jump between calls.
+        self._ms_gate = ss.random()
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
         # use site (placeholder p values below). _cin_bern / _cancer_bern serve
         # the core set_prognoses path ONLY; the multiscale split path draws its
-        # own (CRN-free) gates via np.random and does not use these.
+        # own (CRN-free) gates via _ms_gate and does not use these.
         self._cin_bern = ss.bernoulli(p=0.5)
         self._cancer_bern = ss.bernoulli(p=0.5)
         self._sero_bern = ss.bernoulli(p=0.5)
@@ -551,12 +558,12 @@ class HPV(ss.Infection):
 
         # The other ratio-1 sub-resolutions: draw trajectories directly as SIZE
         # arrays (no CRN constraint -> no need to grow placeholders for fresh
-        # slots), then grow ONLY the cancer successes. The gate draws below use
-        # np.random (not the module's ss.bernoulli dists): these are pure size-
-        # draws with no UID/CRN coupling, and reproducibility is preserved
-        # because ss.Sim.init resets np.random.seed(rand_seed). (If a future
-        # starsim stops seeding the global RNG, route these through a module-
-        # registered ss.random size-draw instead.)
+        # slots), then grow ONLY the cancer successes. Gate draws use
+        # self._ms_gate (a module-registered ss.random dist), which ties
+        # reproducibility to Starsim's seeded RNG stream rather than the global
+        # NumPy seed — more robust against future Starsim versions that stop
+        # reseeding np.random. One dist drawn twice per step is fine: ss dists
+        # auto-jump between calls.
         m = ratio - 1
         n_block = len(coarse_uids) * m
         src = ss.uids(np.repeat(np.asarray(coarse_uids), m))
@@ -572,7 +579,7 @@ class HPV(ss.Infection):
         dur_precin_block = np.asarray(p.dur_precin.rvs(n_block)) * (1.0 - sev_imm_block)
         p_cin_block = compute_severity(dur_precin_block * dt_yr,
                                        rel_sev=rel_sev_block, pars=p.cin_fn)
-        cin_pass = np.random.random(n_block) < p_cin_block
+        cin_pass = np.asarray(self._ms_gate.rvs(n_block)) < p_cin_block
         # dur_precin.rvs returns a duration in TIMESTEPS; match the core path:
         # ti_cin = ti + round(dur_precin) (sc.randround is floor + Bernoulli).
         ti_cin_block = src_ti_cin.astype(float).copy()
@@ -584,7 +591,7 @@ class HPV(ss.Infection):
         dur_cin_block = np.asarray(p.dur_cin.rvs(n_block)) * age_mod_block
         p_cancer_block = compute_severity(dur_cin_block * dt_yr,
                                           rel_sev=rel_sev_block, pars=p.cancer_fn)
-        cancer_block = np.random.random(n_block) < p_cancer_block
+        cancer_block = np.asarray(self._ms_gate.rvs(n_block)) < p_cancer_block
         if not cancer_block.any():
             return
 

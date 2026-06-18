@@ -226,8 +226,26 @@ class BaseTest(ss.BaseTest):
 
 
 class BaseScreening(BaseTest, ss.BaseScreening):
-    """HPV-specific BaseScreening — composes HPV eligibility with Starsim's screening step."""
-    pass
+    """HPV-specific BaseScreening — composes HPV eligibility with Starsim's screening step.
+
+    Overrides ss.BaseScreening.step to scale-weight n_screened/n_dx so that
+    fine (multiscale) agents count by people.scale, not by raw agent count.
+    Without this override a fine agent (scale=1/ratio) was tallied as 1
+    person screened/diagnosed instead of 1/ratio — the screening twin of the
+    treatment-tally bug fixed in BaseTreatment.
+    """
+
+    def step(self):
+        accept_uids = super().step()
+        sim = self.sim
+        if len(accept_uids):
+            self.results['n_screened'][sim.ti] = float(
+                np.asarray(sim.people.scale[accept_uids]).sum()
+            )
+            self.results['n_dx'][sim.ti] = float(
+                np.asarray(sim.people.scale[self.outcomes['positive']]).sum()
+            )
+        return accept_uids
 
 
 class BaseTriage(BaseTest, ss.BaseTriage):
