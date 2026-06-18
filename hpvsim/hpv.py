@@ -159,7 +159,9 @@ class HPV(ss.Infection):
             ss.BoolArr('multiscale_fine', default=False),
         )
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
-        # use site (placeholder p values below).
+        # use site (placeholder p values below). _cin_bern / _cancer_bern serve
+        # the core set_prognoses path ONLY; the multiscale split path draws its
+        # own (CRN-free) gates via np.random and does not use these.
         self._cin_bern = ss.bernoulli(p=0.5)
         self._cancer_bern = ss.bernoulli(p=0.5)
         self._sero_bern = ss.bernoulli(p=0.5)
@@ -549,7 +551,12 @@ class HPV(ss.Infection):
 
         # The other ratio-1 sub-resolutions: draw trajectories directly as SIZE
         # arrays (no CRN constraint -> no need to grow placeholders for fresh
-        # slots), then grow ONLY the cancer successes.
+        # slots), then grow ONLY the cancer successes. The gate draws below use
+        # np.random (not the module's ss.bernoulli dists): these are pure size-
+        # draws with no UID/CRN coupling, and reproducibility is preserved
+        # because ss.Sim.init resets np.random.seed(rand_seed). (If a future
+        # starsim stops seeding the global RNG, route these through a module-
+        # registered ss.random size-draw instead.)
         m = ratio - 1
         n_block = len(coarse_uids) * m
         src = ss.uids(np.repeat(np.asarray(coarse_uids), m))
