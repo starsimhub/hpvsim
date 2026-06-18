@@ -81,6 +81,6 @@ def test_multiscale_matches_single_scale_partial_intervention():
     seeds = (0, 1, 2, 3)
     one  = np.mean([_cancers_partial(1,  sd) for sd in seeds])
     many = np.mean([_cancers_partial(12, sd) for sd in seeds])
-    assert one > 5, f'partial-arm baseline too low to discriminate: one={one:.1f}'
+    assert one > 15, f'partial-arm baseline too low to discriminate: one={one:.1f}'
     assert abs(many - one) <= 0.20 * one, (
         f'diverges at partial coverage: ratio1={one:.2f} ratio12={many:.2f}')

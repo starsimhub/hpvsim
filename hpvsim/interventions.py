@@ -479,8 +479,10 @@ class BaseTxVx(BaseTreatment):
             self.tx_vaccinated[accept_uids] = True
             self.txvx_doses[accept_uids] += 1
             self.ti_tx_vaccinated[accept_uids] = self.sim.ti
-            self.results['new_tx_vaccinated'][self.sim.ti] += len(new)
-            self.results['new_txvx_doses'][self.sim.ti] += len(accept_uids)
+            # Scale-weighted: fine agents (scale 1/ratio) count by scale, not raw
+            # count, so these scale=True results aren't inflated under multiscale.
+            self.results['new_tx_vaccinated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
+            self.results['new_txvx_doses'][self.sim.ti] += float(np.asarray(self.sim.people.scale[accept_uids]).sum())
         return accept_uids
 
     def step(self):
