@@ -24,6 +24,7 @@ identity matrix on the Connector.
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 
 from .parameters import genotype_aliases, get_genotype_pars
@@ -497,9 +498,10 @@ class HPV(ss.Infection):
             from v2: we do NOT re-roll the precin->CIN gate — these are
             sub-resolutions of an agent that already reached CIN, so re-gating
             (v2's ``extra_cin_bools``) only drops a fraction and biases cancer
-            counts low. Departure 2: only the cancer successes are grown (v2
-            draws in numpy arrays and grows successes; we grow placeholders to
-            sample on fresh CRN slots, then drop the non-cancer ones).
+            counts low. Departure 2: only the cancer successes are grown as
+            actual agents (CRN no longer required; trajectories are drawn as
+            plain numpy size-arrays, then only cancer-outcome agents are passed
+            to ``ppl.grow()``).
 
         Causal-infection age is SHARED with the source (same infection event ->
         same ``ti_infected``); it is transmission-limited and not tightened by
@@ -545,88 +547,67 @@ class HPV(ss.Infection):
         if len(cancer_orig_uids) > 0:
             ppl.scale[cancer_orig_uids] = coarse_scale[coarse_cancer] / ratio
 
-        # The other ratio-1 sub-resolutions: grow placeholders on fresh slots
-        # (CRN-independent draws), copy demographic + shared infection context.
-        n_block = len(coarse_uids) * (ratio - 1)
-        block = ss.uids(ppl.grow(n_block))
-        src = ss.uids(np.repeat(np.asarray(coarse_uids), ratio - 1))
+        # The other ratio-1 sub-resolutions: draw trajectories directly as SIZE
+        # arrays (no CRN constraint -> no need to grow placeholders for fresh
+        # slots), then grow ONLY the cancer successes.
+        m = ratio - 1
+        n_block = len(coarse_uids) * m
+        src = ss.uids(np.repeat(np.asarray(coarse_uids), m))
+        rel_sev_block = np.repeat(np.asarray(rel_sev_cin)[coarse], m)
+        age_mod_block = np.repeat(np.asarray(age_mod)[coarse], m)
+        scale_block = np.repeat(coarse_scale, m)
+        sev_imm_block = np.asarray(self.sev_imm[src])
+        src_ti_cin = np.asarray(self.ti_cin[src])
 
-        ppl.age[block] = ppl.age[src]
-        ppl.female[block] = ppl.female[src]
-        # Shared infection context (same individual as the source). ti_cin is
-        # COPIED from the source as the FALLBACK CIN timing; it is overwritten
-        # below for the sub-resolutions whose own (CIN-conditional) precin draw
-        # fires, so the kept cancer extras carry independent CIN2+ ages.
-        for state in ('ti_infected', 'ti_first_infection', 'ti_cin', 'rel_sus',
-                      'rel_trans', 'sev_imm', 'nab_imm', 'cell_imm',
-                      'vax_imm', 'txvx_imm'):
-            getattr(self, state)[block] = getattr(self, state)[src]
-        self.infected[block] = True
-        self.susceptible[block] = False
-        self.precin[block] = True
-        self.cin[block] = False
-        self.multiscale_fine[block] = True  # network-excluded; never re-split
-
-        rel_sev_block = np.repeat(np.asarray(rel_sev_cin)[coarse], ratio - 1)
-        age_mod_block = np.repeat(np.asarray(age_mod)[coarse], ratio - 1)
-
-        # Diversify CIN-onset timing so the CIN2+-age distribution gains
-        # independent samples (tightens its error bars) WITHOUT the over-
-        # survival bias an unconditional precin would cause. A CIN-reacher's
-        # dur_precin is length-biased (P(CIN) rises with dur_precin); resampling
-        # it unconditionally gives too-short precin -> too-early onset -> less
-        # truncation -> over-fire (measured ~+33%). So draw a fresh dur_precin
-        # AND a CIN gate at f_cin(dur_precin): sub-resolutions that pass the gate
-        # take this CIN-conditional (length-biased) onset; the rest fall back to
-        # the source's CIN timing (also CIN-conditional). Either branch is
-        # CIN-conditional, so cancer-onset truncation matches single-scale; the
-        # gate-passers contribute the independent CIN2+ ages.
-        sev_imm_block = np.asarray(self.sev_imm[block])
-        dur_precin_block = np.asarray(p.dur_precin.rvs(block)) * (1.0 - sev_imm_block)
+        # CIN-conditional precin (length-biased): fresh dur_precin + CIN gate;
+        # passers take the independent CIN2+ onset, the rest fall back to the
+        # source's (also CIN-conditional) ti_cin. ss dist size-draws.
+        dur_precin_block = np.asarray(p.dur_precin.rvs(n_block)) * (1.0 - sev_imm_block)
         p_cin_block = compute_severity(dur_precin_block * dt_yr,
                                        rel_sev=rel_sev_block, pars=p.cin_fn)
-        self._cin_bern.set(p=p_cin_block)
-        cin_pass = np.asarray(self._cin_bern.rvs(block))
-        if cin_pass.any():
-            passers = block[cin_pass]
-            self.ti_cin[passers] = ti + self._randround(
-                dur_precin_block[cin_pass], passers, self._round_cin_bern)
+        cin_pass = np.random.random(n_block) < p_cin_block
+        # dur_precin.rvs returns a duration in TIMESTEPS; match the core path:
+        # ti_cin = ti + round(dur_precin) (sc.randround is floor + Bernoulli).
+        ti_cin_block = src_ti_cin.astype(float).copy()
+        ti_cin_block[cin_pass] = ti + sc.randround(dur_precin_block[cin_pass])
 
-        # CIN -> cancer: resample each sub-resolution's own dur_cin and draw
-        # cancer at f(dur_cin); keeping only successes makes the kept dur_cin
-        # length-biased (correct, diversified cancer-onset-age distribution).
-        dur_cin_block = np.asarray(p.dur_cin.rvs(block)) * age_mod_block
+        # CIN -> cancer: resample dur_cin, draw cancer at f(dur_cin); keeping
+        # only successes makes the kept dur_cin length-biased (correct,
+        # diversified cancer-onset-age distribution).
+        dur_cin_block = np.asarray(p.dur_cin.rvs(n_block)) * age_mod_block
         p_cancer_block = compute_severity(dur_cin_block * dt_yr,
                                           rel_sev=rel_sev_block, pars=p.cancer_fn)
-        self._cancer_bern.set(p=p_cancer_block)
-        cancer_block = np.asarray(self._cancer_bern.rvs(block))
+        cancer_block = np.random.random(n_block) < p_cancer_block
+        if not cancer_block.any():
+            return
 
-        # Keep the cancer successes as fine agents at source_scale/ratio.
-        new = block[cancer_block]
-        if len(new) > 0:
-            scale_block = np.repeat(coarse_scale, ratio - 1)
-            ppl.scale[new] = scale_block[cancer_block] / ratio
-            new_dur_cin = dur_cin_block[cancer_block]
-            self.ti_cancerous[new] = self.ti_cin[new] + self._randround(
-                new_dur_cin, new, self._round_cancer_bern)
-            dur_cancer_new = p.dur_cancer.rvs(new)
-            self.ti_dead_cancer[new] = self.ti_cancerous[new] + self._randround(
-                dur_cancer_new, new, self._round_dead_bern)
-
-        # Drop the non-cancer placeholders (transient; only needed for CRN-
-        # independent draws on fresh slots). request_removal defers to step_die.
-        drop = block[~cancer_block]
-        if len(drop) > 0:
-            ppl.scale[drop] = 0.0
-            self.infected[drop] = False
-            self.susceptible[drop] = False
-            self.precin[drop] = False
-            self.cin[drop] = False
-            self.ti_clearance[drop] = np.nan
-            self.ti_cin[drop] = np.nan
-            self.ti_cancerous[drop] = np.nan
-            self.ti_dead_cancer[drop] = np.nan
-            ppl.request_removal(drop)
+        # Grow ONLY the cancer successes as fine agents at source_scale/ratio.
+        n_new = int(cancer_block.sum())
+        new = ss.uids(ppl.grow(n_new))
+        new_src = src[cancer_block]
+        ppl.age[new] = ppl.age[new_src]
+        ppl.female[new] = ppl.female[new_src]
+        for state in ('ti_infected', 'ti_first_infection', 'rel_sus', 'rel_trans',
+                      'sev_imm', 'nab_imm', 'cell_imm', 'vax_imm', 'txvx_imm'):
+            getattr(self, state)[new] = getattr(self, state)[new_src]
+        self.infected[new] = True
+        self.susceptible[new] = False
+        # Start in precin state (not cin): step_state will promote non-passer
+        # extras (ti_cin <= ti) to cin this same step, matching the old code's
+        # precin=True initial state for extras. Passer extras stay in precin
+        # until their scheduled ti_cin fires. This preserves the correct
+        # screening-detection state for each extra (15% precin vs 75% cin).
+        self.precin[new] = True
+        self.cin[new] = False
+        self.multiscale_fine[new] = True  # network-excluded; never re-split
+        ppl.scale[new] = scale_block[cancer_block] / ratio
+        self.ti_cin[new] = ti_cin_block[cancer_block]
+        new_dur_cin = dur_cin_block[cancer_block]
+        # ti_cancerous is scheduled from ti_cin (not from ti): when precin->cin
+        # fires, ti_cancerous is already set so step_state step 3 will fire it.
+        self.ti_cancerous[new] = self.ti_cin[new] + sc.randround(new_dur_cin)
+        dur_cancer_new = np.asarray(p.dur_cancer.rvs(n_new))
+        self.ti_dead_cancer[new] = self.ti_cancerous[new] + sc.randround(dur_cancer_new)
         return
 
     def _cancel_other_genotype_progression_for(self, uids):

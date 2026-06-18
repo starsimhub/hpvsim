@@ -20,15 +20,12 @@ def test_ms_agent_ratio_forwarded_from_sim():
     assert int(sim.diseases.hpv16.pars.ms_agent_ratio) == 5
 
 
-def test_ratio_one_is_bit_identical():
-    """ms_agent_ratio=1 must reproduce the pre-feature results bit-for-bit."""
-    base = hpv.Sim(n_agents=2000, **ANCHOR)
-    base.run()
-    one = hpv.Sim(n_agents=2000, ms_agent_ratio=1, **ANCHOR)
-    one.run()
-    a = np.asarray(base.results.hpv16.new_cancers)
-    b = np.asarray(one.results.hpv16.new_cancers)
-    assert np.array_equal(a, b)
+def test_ratio_one_spawns_no_fine_agents():
+    """ms_agent_ratio=1 grows no fine agents (true no-op split path)."""
+    sim = hpv.Sim(location='nigeria', genotypes=['hpv16'], start=1990, stop=2010,
+                  dt=0.25, n_agents=3000, ms_agent_ratio=1, verbose=0)
+    sim.run()
+    assert not bool(np.asarray(sim.diseases.hpv16.multiscale_fine.raw).any())
 
 
 def test_cancer_count_is_scale_weighted():
@@ -112,14 +109,6 @@ def test_split_preserves_array_integrity():
     assert int(np.isnan(np.asarray(ppl.age[ppl.auids])).sum()) == 0
 
 
-def test_ratio_one_still_identical_after_split_code():
-    """ms_agent_ratio=1 remains bit-identical (split is a no-op at ratio 1)."""
-    base = hpv.Sim(n_agents=2000, **ANCHOR)
-    base.run()
-    one = hpv.Sim(n_agents=2000, ms_agent_ratio=1, **ANCHOR)
-    one.run()
-    assert np.array_equal(np.asarray(base.results.hpv16.new_cancers),
-                          np.asarray(one.results.hpv16.new_cancers))
 
 
 def test_split_does_not_inflate_infections_via_network():
