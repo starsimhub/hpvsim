@@ -43,7 +43,7 @@ def multiscale_fine_for(sim, uids):
     fine = np.zeros(len(uids), dtype=bool)
     for m in sim.diseases.values():
         if hasattr(m, 'multiscale_fine'):
-            fine |= np.asarray(m.multiscale_fine[uids])
+            fine |= m.multiscale_fine[uids]
     return fine
 
 
@@ -280,24 +280,23 @@ class HPV(ss.Infection):
         ti = self.ti
         ppl = self.sim.people
         auids = ppl.auids
-        fine = np.asarray(self.multiscale_fine[auids])
+        fine = self.multiscale_fine[auids]
         if not fine.any():
             return  # no multiscale agents -> base raw counts are correct
         res = self.results
-        scale = np.asarray(ppl.scale[auids])
+        scale = ppl.scale[auids]
         # new_infections: fine agents are not new transmission events.
-        newly = np.round(np.asarray(self.ti_infected[auids])) == ti
-        res.new_infections[ti] -= float(np.count_nonzero(newly & fine))
-        # Every per-state body count (n_susceptible/n_infected/n_precin/n_cin/
-        # n_cancerous) is a RAW count in the base; a fine agent (scale 1/ratio)
-        # is counted as a full body, grossly inflating the compartments fine
-        # agents occupy (measured n_cancerous +1009%, n_cin +630% at ratio=12).
-        # Recompute each as the scale-weighted (people-space) sum. The cross-
-        # genotype HPVTotal aggregator is already scale-weighted and unaffected.
+        newly = np.round(self.ti_infected[auids]) == ti
+        res.new_infections[ti] -= float((newly & fine).sum())
+        # Per-state body counts (n_susceptible/.../n_cancerous) are RAW in the
+        # base, which counts a fine agent (scale 1/ratio) as a full body and
+        # inflates the compartments fine agents occupy. Recompute each as the
+        # scale-weighted (people-space) sum; the HPVTotal aggregator is already
+        # scale-weighted and unaffected.
         for state in ('susceptible', 'infected', 'precin', 'cin', 'cancerous'):
             key = 'n_' + state
             if key in res:
-                vals = np.asarray(getattr(self, state)[auids])
+                vals = getattr(self, state)[auids]
                 res[key][ti] = float((scale * vals).sum())
         alive_scale = float(scale.sum())
         res.prevalence[ti] = (res.n_infected[ti] / alive_scale) if alive_scale > 0 else 0.0
@@ -694,8 +693,8 @@ class HPV(ss.Infection):
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
             self.ti_clearance[to_cancerous] = np.nan  # cancer supersedes clearance
-            scale = np.asarray(self.sim.people.scale[to_cancerous])
-            ages_at_cancer = np.asarray(self.sim.people.age[to_cancerous])
+            scale = self.sim.people.scale[to_cancerous]
+            ages_at_cancer = self.sim.people.age[to_cancerous]
             self.results.new_cancers[ti] = float(scale.sum())
             self.results.sum_age_at_cancer[ti] = float((ages_at_cancer * scale).sum())
             self._cancel_other_genotype_progression_for(to_cancerous)
@@ -713,8 +712,8 @@ class HPV(ss.Infection):
             # Revert by removing the +dt_yr if the underlying step-ordering
             # convention is harmonised in a future Starsim version.
             dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
-            scale_d = np.asarray(self.sim.people.scale[to_dead])
-            ages_at_death = np.asarray(self.sim.people.age[to_dead]) + dt_yr
+            scale_d = self.sim.people.scale[to_dead]
+            ages_at_death = self.sim.people.age[to_dead] + dt_yr
             self.results.new_cancer_deaths[ti] = float(scale_d.sum())
             self.results.sum_age_at_cancer_death[ti] = float((ages_at_death * scale_d).sum())
             self.sim.people.request_death(to_dead)
