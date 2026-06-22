@@ -57,7 +57,7 @@ class Level0Deaths(ss.Deaths):
         self._p_death.set(p=p_death)
         death_uids = self._p_death.filter()
         self.sim.people.request_death(death_uids)
-        self.n_deaths = (float(np.asarray(self.sim.people.scale[death_uids]).sum())
+        self.n_deaths = (float(self.sim.people.scale[death_uids].sum())
                          if len(death_uids) else 0.0)
         return self.n_deaths
 
@@ -68,8 +68,8 @@ class Level0People(ss.People):
     ``People.update_results`` records ``n_alive``, ``new_deaths``,
     ``new_emigrants`` and ``cum_deaths`` as RAW agent counts; multiscale fine
     agents (scale ``1/ratio``) are then counted as whole bodies, inflating these
-    sim-level results (measured ~+15% n_alive, ~+25% new_deaths at ratio=12).
-    Recompute them in people-space (scale-weighted). Cancer-specific deaths
+    sim-level results. Recompute them in people-space (scale-weighted).
+    Cancer-specific deaths
     (``HPV.new_cancer_deaths``) and the per-genotype epidemiology are corrected
     elsewhere; this covers the all-cause demographic counters.
 
@@ -79,15 +79,15 @@ class Level0People(ss.People):
 
     def update_results(self):
         super().update_results()
-        scale = np.asarray(self.scale)  # .values, aligned to auids
+        scale = self.scale.values  # auids-aligned
         if (scale == 1.0).all():
             return  # no multiscale agents -> base raw counts are correct
         ti = self.sim.ti
         res = self.sim.results
-        res.n_alive[ti] = float((scale * np.asarray(self.alive)).sum())
-        res.new_deaths[ti] = float((scale * (np.asarray(self.ti_dead) == ti)).sum())
-        res.new_emigrants[ti] = float((scale * (np.asarray(self.ti_removed) == ti)).sum())
-        res.cum_deaths[ti] = float(np.sum(res.new_deaths[:ti]))
+        res.n_alive[ti] = float((scale * self.alive.values).sum())
+        res.new_deaths[ti] = float((scale * (self.ti_dead.values == ti)).sum())
+        res.new_emigrants[ti] = float((scale * (self.ti_removed.values == ti)).sum())
+        res.cum_deaths[ti] = float(res.new_deaths[:ti].sum())
         return
 
 
