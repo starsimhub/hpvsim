@@ -239,12 +239,8 @@ class BaseScreening(BaseTest, ss.BaseScreening):
         accept_uids = super().step()
         sim = self.sim
         if len(accept_uids):
-            self.results['n_screened'][sim.ti] = float(
-                np.asarray(sim.people.scale[accept_uids]).sum()
-            )
-            self.results['n_dx'][sim.ti] = float(
-                np.asarray(sim.people.scale[self.outcomes['positive']]).sum()
-            )
+            self.results['n_screened'][sim.ti] = float(sim.people.scale[accept_uids].sum())
+            self.results['n_dx'][sim.ti] = float(sim.people.scale[self.outcomes['positive']].sum())
         return accept_uids
 
 
@@ -371,13 +367,13 @@ class treat_num(BaseTreatment, ss.treat_num):
                 self.cancer_treated[treat_uids] = True
                 self.cancer_treatments[treat_uids] += 1
                 self.ti_cancer_treated[treat_uids] = self.sim.ti
-                self.results['new_cancer_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
+                self.results['new_cancer_treated'][self.sim.ti] += float(self.sim.people.scale[new].sum())
             else:
                 new = treat_uids[~self.cin_treated[treat_uids]]
                 self.cin_treated[treat_uids] = True
                 self.cin_treatments[treat_uids] += 1
                 self.ti_cin_treated[treat_uids] = self.sim.ti
-                self.results['new_cin_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
+                self.results['new_cin_treated'][self.sim.ti] += float(self.sim.people.scale[new].sum())
         return treat_uids
 
 
@@ -419,13 +415,13 @@ class treat_delay(BaseTreatment):
                 self.cancer_treated[treat_uids] = True
                 self.cancer_treatments[treat_uids] += 1
                 self.ti_cancer_treated[treat_uids] = self.sim.ti
-                self.results['new_cancer_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
+                self.results['new_cancer_treated'][self.sim.ti] += float(self.sim.people.scale[new].sum())
             else:
                 new = treat_uids[~self.cin_treated[treat_uids]]
                 self.cin_treated[treat_uids] = True
                 self.cin_treatments[treat_uids] += 1
                 self.ti_cin_treated[treat_uids] = self.sim.ti
-                self.results['new_cin_treated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
+                self.results['new_cin_treated'][self.sim.ti] += float(self.sim.people.scale[new].sum())
         return treat_uids
 
 
@@ -499,8 +495,8 @@ class BaseTxVx(BaseTreatment):
             self.ti_tx_vaccinated[accept_uids] = self.sim.ti
             # Scale-weighted: fine agents (scale 1/ratio) count by scale, not raw
             # count, so these scale=True results aren't inflated under multiscale.
-            self.results['new_tx_vaccinated'][self.sim.ti] += float(np.asarray(self.sim.people.scale[new]).sum())
-            self.results['new_txvx_doses'][self.sim.ti] += float(np.asarray(self.sim.people.scale[accept_uids]).sum())
+            self.results['new_tx_vaccinated'][self.sim.ti] += float(self.sim.people.scale[new].sum())
+            self.results['new_txvx_doses'][self.sim.ti] += float(self.sim.people.scale[accept_uids].sum())
         return accept_uids
 
     def step(self):
