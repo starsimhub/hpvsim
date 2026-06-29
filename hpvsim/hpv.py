@@ -267,6 +267,14 @@ class HPV(ss.Infection):
         We call ``super().update_results()`` first so the starsim pipeline
         runs normally (prevalence, new_infections, etc.), then overwrite
         each stock slot with ``people.scale_flows(uids_in_state)``.
+
+        After the stock overwrite, ``prevalence`` is re-derived from the
+        corrected scale-weighted ``n_infected`` divided by the
+        scale-weighted alive-agent total. ``Infection.update_results``
+        (called via super) computed ``prevalence`` from the stale plain-count
+        ``n_infected``, so at ``ms_agent_ratio>1`` it would be inflated by
+        roughly the ratio. Re-deriving here is a no-op at ratio==1 (where
+        ``scale_flows == len``).
         """
         super().update_results()
         ti = self.ti
@@ -281,6 +289,15 @@ class HPV(ss.Infection):
             uids_in = auids[mask]
             self.results[key][ti] = (
                 ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
+            )
+
+        # Re-derive per-genotype prevalence from the now-correct scale-weighted
+        # n_infected (super computed it from the stale plain-count n_infected).
+        if 'prevalence' in self.results and 'n_infected' in self.results:
+            n_alive_sw = ppl.scale_flows(auids)
+            self.results['prevalence'][ti] = (
+                self.results['n_infected'][ti] / n_alive_sw
+                if n_alive_sw > 0 else 0.0
             )
 
     def finalize_results(self):

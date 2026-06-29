@@ -246,3 +246,108 @@ def test_stock_prevalence_scale_weighted():
         f'hpvtotal.n_infected at ti={ti_last}: stored={stored_hpvt_inf:.4f}, '
         f'scale_flows={expected_hpvt_inf:.4f}'
     )
+
+
+def test_per_genotype_prevalence_scale_weighted():
+    """Per-genotype prevalence must be re-derived from the scale-weighted n_infected.
+
+    At ms_agent_ratio=10, fine agents (scale=1/10) are grown for cancer-bound
+    trajectories. Before the fix, Infection.update_results computed:
+        prevalence = plain_count_n_infected / n_alive_sw
+    where plain_count_n_infected treats every fine agent as 1 (not 1/ratio),
+    inflating prevalence when many fine agents are infected.
+
+    After the fix, HPV.update_results re-derives prevalence from the already
+    scale-weighted n_infected divided by scale_flows(alive_uids), so the
+    back-calculated numerator (stored_prev * n_alive_sw) should be close to
+    n_infected_sw — not the plain count.
+
+    Key invariant tested: back_calc_n_infected ≈ n_infected_sw (within 5%
+    for population-turnover drift), AND significantly less than plain_n_infected.
+    Both checks must be non-vacuous (fine agents actually infected).
+    """
+    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
+                  ms_agent_ratio=10, rand_seed=7)
+    sim.run()
+
+    ppl = sim.people
+    auids = ppl.auids
+    fine_uids = auids[np.asarray(ppl.fine[auids], dtype=bool)]
+    assert len(fine_uids) > 0, 'no fine agents grown — test is vacuous'
+
+    ti_last = sim.ti
+    n_alive_sw = ppl.scale_flows(auids)
+    assert n_alive_sw > 0
+
+    for dis in sim.diseases.values():
+        if not isinstance(dis, hpv.HPV):
+            continue
+        r = dis.results
+        assert 'prevalence' in r, f'{dis.name}: prevalence result missing'
+
+        stored_prev = float(r['prevalence'].values[ti_last])
+        n_infected_sw = float(r['n_infected'].values[ti_last])
+
+        # Back-calculate the numerator from stored prevalence and post-run
+        # alive count. Small drift (<2%) is expected because n_alive_sw
+        # changes by one step's deaths/births between update_results and here.
+        back_calc_numerator = stored_prev * n_alive_sw
+        assert np.isclose(back_calc_numerator, n_infected_sw, rtol=0.05), (
+            f'{dis.name}.prevalence back-calc numerator mismatch at ti={ti_last}: '
+            f'stored_prev*n_alive_sw={back_calc_numerator:.4f}, '
+            f'n_infected_sw={n_infected_sw:.4f} (rtol=5%)'
+        )
+
+        # Verify the fix is non-vacuous: fine agents must be infected so
+        # pre-fix behavior would have inflated prevalence by ~ratio.
+        infected_arr = dis.infected
+        plain_n_infected = float(np.asarray(infected_arr[auids], dtype=bool).sum())
+        infected_fine = int(np.asarray(infected_arr[fine_uids], dtype=bool).sum())
+        assert infected_fine > 0, (
+            f'{dis.name}: no fine agents are infected — '
+            f'pre-fix inflation cannot be demonstrated (test is vacuous)'
+        )
+
+        # Pre-fix behavior: prevalence = plain_n_infected / n_alive_sw.
+        # Since fine agents are infected (counted as 1 each pre-fix, but should
+        # be 1/ratio), the pre-fix value is significantly larger.
+        plain_prev = plain_n_infected / n_alive_sw
+        assert stored_prev < plain_prev * 0.95, (
+            f'{dis.name}: stored_prev={stored_prev:.6f} is NOT significantly '
+            f'below plain_prev={plain_prev:.6f} — fix may not have taken effect. '
+            f'infected_fine={infected_fine}'
+        )
+
+
+def test_per_genotype_prevalence_ratio1_unchanged():
+    """At ms_agent_ratio==1 the prevalence re-derive is a no-op.
+
+    At ratio=1 all agents have scale=1.0, so scale_flows == plain count and
+    n_infected_sw == n_infected. The back-calculated numerator from stored
+    prevalence must match n_infected_sw closely (within 5% for population drift).
+    """
+    sim = hpv.Sim(location='nigeria', n_agents=4000, start=1990, stop=2020,
+                  ms_agent_ratio=1, rand_seed=1)
+    sim.run()
+
+    ppl = sim.people
+    assert not ppl.fine.values.any(), 'unexpected fine agents at ratio==1'
+
+    ti_last = sim.ti
+    auids = ppl.auids
+    n_alive_sw = ppl.scale_flows(auids)
+    assert n_alive_sw > 0
+
+    for dis in sim.diseases.values():
+        if not isinstance(dis, hpv.HPV):
+            continue
+        r = dis.results
+        stored_prev = float(r['prevalence'].values[ti_last])
+        n_infected_sw = float(r['n_infected'].values[ti_last])
+        # Back-calculate: stored_prev * n_alive_sw should ≈ n_infected_sw.
+        back_calc_numerator = stored_prev * n_alive_sw
+        assert np.isclose(back_calc_numerator, n_infected_sw, rtol=0.05), (
+            f'{dis.name}.prevalence ratio==1 back-calc mismatch at ti={ti_last}: '
+            f'stored_prev*n_alive_sw={back_calc_numerator:.4f}, '
+            f'n_infected_sw={n_infected_sw:.4f}'
+        )
