@@ -98,3 +98,40 @@ def test_intervention_equivalence_across_ratio():
         f'averted fraction disagrees across ratios: ratio1={av1:.3f}  ratio10={av10:.3f}  '
         f'|diff|={abs(av10-av1):.3f}'
     )
+
+
+def _mean_age_at_cancer(ratio, seed, n_agents=6000):
+    """Run a baseline sim and return mean age at cancer (summed across genotypes)."""
+    sim = hpv.Sim(location='nigeria', n_agents=n_agents, start=1970, stop=2030,
+                  ms_agent_ratio=ratio, rand_seed=seed)
+    sim.run()
+    s_age = 0.0
+    n = 0.0
+    for dis in sim.diseases.values():
+        if isinstance(dis, hpv.HPV):
+            s_age += float(dis.results.sum_age_at_cancer.values.sum())
+            n += float(dis.results.new_cancers.values.sum())
+    return s_age / n if n else np.nan
+
+
+def test_event_age_variance_shrinks_with_ratio():
+    """Higher ms_agent_ratio grows more fine cancer agents → tighter mean-age estimator.
+
+    At ratio=1 each coarse agent produces ~1 cancer event; at ratio=10 each coarse
+    agent spawns ~10 fine agents so the mean-age-at-cancer estimator is based on ~10x
+    more resolved events per seed → cross-seed variance should be lower.
+
+    Asserts: var(ratio=10) < var(ratio=1).
+    Reports var values so they can be inspected even if the test fails.
+    """
+    seeds = range(12)
+    ages1  = [_mean_age_at_cancer(1,  s) for s in seeds]
+    ages10 = [_mean_age_at_cancer(10, s) for s in seeds]
+    var1  = float(np.var(ages1))
+    var10 = float(np.var(ages10))
+    mean1  = float(np.nanmean(ages1))
+    mean10 = float(np.nanmean(ages10))
+    assert var10 < var1, (
+        f'variance did NOT shrink: var(ratio=1)={var1:.4f}  var(ratio=10)={var10:.4f}  '
+        f'mean_age(ratio=1)={mean1:.2f}  mean_age(ratio=10)={mean10:.2f}'
+    )
