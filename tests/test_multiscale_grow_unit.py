@@ -33,3 +33,24 @@ def test_results_are_float_and_scale_weighted_noop_at_ratio1():
             assert np.allclose(nc, np.round(nc))
     assert not sim.people.fine.values.any()
     assert np.allclose(sim.people.scale.values, 1.0)
+
+def test_clone_agents_copies_people_and_module_state():
+    import numpy as np
+    from hpvsim.hpv import _clone_agents
+    sim = hpv.Sim(location='nigeria', n_agents=400, start=2000, stop=2001,
+                  genotypes=[16, 18], ms_agent_ratio=1, rand_seed=2)
+    sim.init()
+    ppl = sim.people
+    src = ppl.auids[:5]
+    # mark distinct source values we can check after cloning
+    ppl.age[src] = np.array([11., 22., 33., 44., 55.])
+    new = ppl.grow(len(src))
+    _clone_agents(sim, src, new)
+    assert np.allclose(ppl.age[new], ppl.age[src])
+    # uid must NOT be overwritten by the clone
+    assert not np.array_equal(np.asarray(ppl.uid[new]), np.asarray(ppl.uid[src]))
+    # module states copied for every genotype
+    for dis in sim.diseases.values():
+        if isinstance(dis, hpv.HPV):
+            assert np.array_equal(np.asarray(dis.susceptible[new]),
+                                  np.asarray(dis.susceptible[src]))

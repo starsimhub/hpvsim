@@ -33,6 +33,29 @@ from .utils import compute_severity
 
 _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
+# Per-agent Arrs that must NOT be cloned (identity, not biology).
+_NO_CLONE_STATES = {'uid', 'slot'}
+
+
+def _clone_agents(sim, src_uids, new_uids):
+    """Copy every per-agent Arr from src_uids to new_uids (v2 states_to_set).
+
+    Covers People states (except identity keys) plus every disease and
+    connector module's per-agent states. Network/demographics states are
+    omitted: fine agents are excluded from those subsystems, so their values
+    are inert. src_uids and new_uids must align element-wise and be equal
+    length.
+    """
+    ppl = sim.people
+    for key, arr in ppl.states.items():
+        if key in _NO_CLONE_STATES:
+            continue
+        arr[new_uids] = arr[src_uids]
+    for mod in list(sim.diseases.values()) + list(sim.connectors.values()):
+        for st in mod.state_list:
+            st[new_uids] = st[src_uids]
+    return
+
 
 def _normalize_genotype(key):
     """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
