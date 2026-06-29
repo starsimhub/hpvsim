@@ -160,10 +160,17 @@ class AgeMigration(ss.Demographics):
         ages_data = pat_year['age'].values.astype(int)
 
         people = sim.people
-        # Snapshot alive UIDs and their attributes at the start of the step.
+        # Snapshot alive UIDs at the start of the step, EXCLUDING fine
+        # multiscale agents: they are high-resolution cancer stand-ins, not
+        # real bodies, so they neither count toward the age x sex pyramid
+        # target nor are eligible to emigrate (v2 used alive_level0).
         # This ensures the boolean masks remain aligned with the UID list even
         # as immigrants are added during the loop.
-        snap_uids = people.auids.copy()
+        all_alive = people.auids.copy()
+        if 'fine' in people.states:
+            snap_uids = all_alive[~people.fine[all_alive]]
+        else:
+            snap_uids = all_alive
         # age is float32 — cast to int for integer-bin lookup; female is already bool.
         ages = people.age[snap_uids].astype(int)
         female = people.female[snap_uids]

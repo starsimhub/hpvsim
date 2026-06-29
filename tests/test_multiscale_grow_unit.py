@@ -96,6 +96,63 @@ def test_fine_agents_excluded_from_network():
     p2 = set(np.asarray(edges.p2).tolist())
     assert fine_set.isdisjoint(p1) and fine_set.isdisjoint(p2)
 
+def test_fine_agents_not_emigrated():
+    """White-box behavioral test: AgeMigration._emigrate never receives a fine uid.
+
+    Approach: monkeypatch _emigrate to capture, at call-time, which of the
+    candidate band_uids are fine.  After the run, assert (a) fine agents existed
+    (non-vacuous) and (b) none of the uids passed to _emigrate were fine at that
+    moment.
+
+    Why non-vacuous: with the OLD ``snap_uids = people.auids.copy()`` line, fine
+    agents are counted in the pyramid and their uids appear in band_uids, so when
+    a band is over-target they CAN be passed to _emigrate.  This test captures
+    fine-ness AT CALL TIME (before request_removal), so it genuinely fails RED if
+    the exclusion filter is removed.
+    """
+    from hpvsim.demographics import AgeMigration
+    import numpy as np
+
+    # Each entry is True if any uid in that _emigrate call was fine at call-time.
+    any_fine_emigrated = []
+    fine_existed = []          # Track whether fine agents existed when _emigrate fired
+
+    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
+                  ms_agent_ratio=10, rand_seed=6)
+    sim.init()
+
+    # Find the AgeMigration instance so we can wrap its _emigrate method.
+    mig = [d for d in sim.demographics.values()
+           if isinstance(d, AgeMigration)][0]
+    ppl = sim.people
+    orig_emigrate = mig._emigrate
+
+    def recording_emigrate(band_uids, n):
+        # Query fine state AT THIS MOMENT (before request_removal removes agents).
+        if len(band_uids) > 0 and 'fine' in ppl.states:
+            fine_flags = np.asarray(ppl.fine[band_uids])
+            any_fine_emigrated.append(fine_flags.any())
+            # Also record whether any fine agents exist right now (non-vacuous guard).
+            all_alive = ppl.auids
+            fine_existed.append(np.asarray(ppl.fine[all_alive]).any())
+        return orig_emigrate(band_uids, n)
+
+    mig._emigrate = recording_emigrate
+    sim.run()
+
+    # Non-vacuous guard: _emigrate must have fired at least once while fine agents
+    # existed, proving the scenario was actually exercised.
+    assert any(fine_existed), (
+        '_emigrate never fired while fine agents existed — test is vacuous'
+    )
+
+    # Core behavioral assertion: none of the band_uids passed to _emigrate were
+    # fine at call-time.
+    assert not any(any_fine_emigrated), (
+        'AgeMigration emigrated at least one fine agent (snapshot filter missing)'
+    )
+
+
 def test_fine_agents_do_not_drive_births():
     from hpvsim.demographics import Births
     # A fine parent dropped from birth_uids == excluded from the pool, because
