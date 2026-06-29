@@ -127,6 +127,14 @@ def test_event_age_variance_shrinks_with_ratio():
     seeds = range(12)
     ages1  = [_mean_age_at_cancer(1,  s) for s in seeds]
     ages10 = [_mean_age_at_cancer(10, s) for s in seeds]
+    # Guard: a seed with zero cancers yields nan (see _mean_age_at_cancer). At
+    # n_agents=6000 every seed has hundreds of cancers so this never triggers,
+    # but a smaller-n run could — fail with a clear message rather than a vacuous
+    # "nan < x is False".
+    assert not (np.isnan(ages1).any() or np.isnan(ages10).any()), (
+        f'zero-cancer seed produced nan mean-age (raise n_agents): '
+        f'nans r1={int(np.isnan(ages1).sum())} r10={int(np.isnan(ages10).sum())}'
+    )
     var1  = float(np.var(ages1))
     var10 = float(np.var(ages10))
     mean1  = float(np.nanmean(ages1))
