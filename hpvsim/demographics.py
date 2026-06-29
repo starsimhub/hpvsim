@@ -27,7 +27,7 @@ import pandas as pd
 import starsim as ss
 
 
-__all__ = ['AgeMigration', 'AnnualBirths']
+__all__ = ['AgeMigration', 'Births', 'AnnualBirths']
 
 
 class AgeMigration(ss.Demographics):
@@ -251,7 +251,24 @@ class AgeMigration(ss.Demographics):
         return
 
 
-class AnnualBirths(ss.Births):
+class Births(ss.Births):
+    """ss.Births that excludes fine multiscale agents from reproducing.
+
+    Births are an independent per-agent Bernoulli, so dropping fine agents
+    from the drawn birth_uids is statistically identical to excluding them
+    from the eligible pool — matching v2's add_births, which counts only
+    level0 agents (n_alive_level0).
+    """
+
+    def get_births(self):
+        birth_uids = super().get_births()
+        ppl = self.sim.people
+        if 'fine' in ppl.states:
+            birth_uids = birth_uids[~ppl.fine[birth_uids]]
+        return birth_uids
+
+
+class AnnualBirths(Births):
     """Annual-pulse births matching v2's ``add_births`` convention.
 
     Standard ``ss.Births`` distributes births evenly across all steps. This

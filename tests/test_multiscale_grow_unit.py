@@ -95,3 +95,21 @@ def test_fine_agents_excluded_from_network():
     p1 = set(np.asarray(edges.p1).tolist())
     p2 = set(np.asarray(edges.p2).tolist())
     assert fine_set.isdisjoint(p1) and fine_set.isdisjoint(p2)
+
+def test_fine_agents_do_not_drive_births():
+    from hpvsim.demographics import Births
+    # A fine parent dropped from birth_uids == excluded from the pool, because
+    # births are an independent per-agent Bernoulli.
+    sim = hpv.Sim(location='nigeria', n_agents=3000, start=2000, stop=2002,
+                  ms_agent_ratio=10, rand_seed=5)
+    sim.init()
+    births = [d for d in sim.demographics.values() if isinstance(d, Births)]
+    assert births, 'default births class should be hpv.Births'
+    ppl = sim.people
+    # Force a couple of agents fine, then confirm get_births never returns them.
+    some = ppl.auids[:50]
+    ppl.fine[some] = True
+    b = births[0]
+    for _ in range(20):
+        uids = b.get_births()
+        assert not np.asarray(ppl.fine[uids]).any()
