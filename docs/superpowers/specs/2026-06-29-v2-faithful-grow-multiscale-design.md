@@ -153,8 +153,18 @@ exactly:
   `AnnualBirths`) computes the birth count from the **non-fine** alive count
   (v2's `n_alive_level0`, `people.py:782`). Newborns are `fine=False`,
   `scale=1.0`. Wire it into `sim.py`'s default demographics stack.
-- **Emigration.** `AgeMigration` emigration selection excludes fine agents
-  (they are not real bodies eligible to emigrate).
+- **Emigration.** Fine agents are excluded from the `AgeMigration` pyramid
+  **count/target** (counting them as whole bodies over-fills cancer-age bands and
+  causes catastrophic over-emigration), BUT they must still face the **same
+  per-capita emigration rate** as real bodies in their band, or they over-realize
+  cancer relative to single scale (the coarse source can emigrate before its
+  cancer fires, but its fine peers otherwise cannot → incidence inflates with
+  `ms_agent_ratio` and horizon, +12% at ratio=10). `AgeMigration` therefore
+  applies an **independent per-band Bernoulli hazard** (`_emigrate_fine`,
+  `p = band emigrants / band count`) to fine agents, removing pending
+  (not-yet-cancerous) successes. (Root-caused during Task 9; the original
+  "exclude fine from emigration entirely" was the bug. v2's bias test never
+  exposed this — it runs `total_pop==n_agents` with minimal migration.)
 - **Background death.** **No change** to `ss.Deaths` — it already applies
   age/sex mortality to all alive agents, so fine agents face it, matching v2
   `apply_death_rates` (which runs over everyone alive with no `level` filter,
