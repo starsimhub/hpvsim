@@ -40,11 +40,16 @@ _NO_CLONE_STATES = {'uid', 'slot'}
 def _clone_agents(sim, src_uids, new_uids):
     """Copy every per-agent Arr from src_uids to new_uids (v2 states_to_set).
 
-    Covers People states (except identity keys) plus every disease and
-    connector module's per-agent states. Network/demographics states are
-    omitted: fine agents are excluded from those subsystems, so their values
-    are inert. src_uids and new_uids must align element-wise and be equal
-    length.
+    starsim registers every module's per-agent states into ``people.states``
+    under combined names, so the first loop over ``ppl.states`` already clones
+    ALL per-agent state (People, network, demographics, disease, connector) —
+    except the identity keys in ``_NO_CLONE_STATES``. The second loop over
+    disease + connector ``state_list`` is therefore a redundant belt-and-
+    suspenders re-copy (idempotent — same source values written twice); it is
+    kept so the clone stays correct even if a starsim version stops flattening
+    module states into ``people.states``. Cloning network/demographics state is
+    harmless: fine agents are excluded from those subsystems, so those values
+    are inert. src_uids and new_uids must align element-wise and be equal length.
     """
     ppl = sim.people
     for key, arr in ppl.states.items():
