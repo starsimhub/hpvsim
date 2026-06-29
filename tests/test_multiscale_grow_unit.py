@@ -96,19 +96,20 @@ def test_fine_agents_excluded_from_network():
     p2 = set(np.asarray(edges.p2).tolist())
     assert fine_set.isdisjoint(p1) and fine_set.isdisjoint(p2)
 
-def test_fine_agents_not_emigrated():
-    """White-box behavioral test: AgeMigration._emigrate never receives a fine uid.
+def test_fine_agents_excluded_from_pyramid_emigration():
+    """Fine agents are excluded from the pyramid-target emigration path.
 
-    Approach: monkeypatch _emigrate to capture, at call-time, which of the
-    candidate band_uids are fine.  After the run, assert (a) fine agents existed
-    (non-vacuous) and (b) none of the uids passed to _emigrate were fine at that
-    moment.
+    AgeMigration._emigrate is the pyramid-TARGET path (removes excess real bodies
+    to hit the age x sex target). Fine agents must NOT go through it — counting
+    them as whole bodies over-fills cancer-age bands and causes catastrophic
+    over-emigration. They instead face an INDEPENDENT per-band hazard via
+    _emigrate_fine (see test_fine_agents_face_emigration_hazard), so this test
+    asserts only that the pyramid-target path never receives a fine uid.
 
-    Why non-vacuous: with the OLD ``snap_uids = people.auids.copy()`` line, fine
-    agents are counted in the pyramid and their uids appear in band_uids, so when
-    a band is over-target they CAN be passed to _emigrate.  This test captures
-    fine-ness AT CALL TIME (before request_removal), so it genuinely fails RED if
-    the exclusion filter is removed.
+    White-box: monkeypatch _emigrate to capture, at call-time, which of the
+    candidate band_uids are fine. Non-vacuous: with the snapshot filter removed
+    (``snap_uids = people.auids.copy()``), fine uids appear in band_uids and this
+    fails RED.
     """
     from hpvsim.demographics import AgeMigration
     import numpy as np
@@ -150,6 +151,50 @@ def test_fine_agents_not_emigrated():
     # fine at call-time.
     assert not any(any_fine_emigrated), (
         'AgeMigration emigrated at least one fine agent (snapshot filter missing)'
+    )
+
+
+def test_fine_agents_face_emigration_hazard():
+    """Fine agents DO face an independent per-band emigration hazard.
+
+    Task 9 fix: fine agents are excluded from the pyramid target, but if they
+    were excluded from emigration entirely they would over-realize cancer vs
+    single scale (the coarse source can emigrate before its cancer fires, but
+    its fine peers otherwise cannot). AgeMigration._emigrate_fine applies a
+    per-band Bernoulli hazard to fine agents. This test wraps it to confirm it
+    fires and removes fine agents at ms_agent_ratio>1.
+
+    White-box: wrap _emigrate_fine to count removals. Non-vacuous: asserts fine
+    agents existed AND at least one was emigrated via the hazard over the run.
+    """
+    from hpvsim.demographics import AgeMigration
+    import numpy as np
+
+    removed_fine = []
+    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1970, stop=2030,
+                  ms_agent_ratio=10, rand_seed=6)
+    sim.init()
+    mig = [d for d in sim.demographics.values()
+           if isinstance(d, AgeMigration)][0]
+    ppl = sim.people
+    orig = mig._emigrate_fine
+
+    def recording(fine_band_uids, p):
+        before = len(ppl.auids)
+        orig(fine_band_uids, p)
+        # count fine uids newly marked for removal this call
+        if len(fine_band_uids):
+            ti = sim.ti
+            just = fine_band_uids[np.asarray(ppl.ti_removed[fine_band_uids]) == ti]
+            removed_fine.append(len(just))
+
+    mig._emigrate_fine = recording
+    sim.run()
+
+    assert ppl.fine.values.any() or len(removed_fine) > 0, 'no fine agents grown'
+    assert sum(removed_fine) > 0, (
+        'no fine agent was emigrated via the per-band hazard — fine agents are '
+        'not facing emigration competing-risk (Task 9 incidence inflation returns)'
     )
 
 
