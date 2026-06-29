@@ -92,8 +92,14 @@ class HPV(ss.Infection):
             # Per-genotype beta scaler and serology probability (multi-genotype).
             rel_beta=gpars.rel_beta,
             sero_prob=gpars.sero_prob,
+            # Multiscale: number of agents each cancer-capable agent represents.
+            # 1 = single scale (bit-identical no-op). >1 grows real fine cancer
+            # agents at scale 1/ms_agent_ratio. See
+            # docs/superpowers/specs/2026-06-29-v2-faithful-grow-multiscale-design.md
+            ms_agent_ratio=1,
         )
         self.update_pars(pars=pars, **kwargs)
+        self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
         # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
         # ti_infected. We add the natural-history states below.
         self.define_states(

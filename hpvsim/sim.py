@@ -75,14 +75,15 @@ class Sim(ss.Sim):
     def __init__(self, location='nigeria', genotypes=None, genotype_pars=None,
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
-                 total_pop=None, pars=None, v2_compat_demographics=False,
+                 total_pop=None, ms_agent_ratio=1, pars=None, v2_compat_demographics=False,
                  **kwargs):
         # Pass start year so the age pyramid matches sim.start (loader
         # defaults to year 2000 with a materially different distribution).
         country = load_country(location, year=int(start))
         people = kwargs.pop('people', None)
         if people is None:
-            people = ss.People(n_agents, age_data=country['age_data'])
+            people = ss.People(n_agents, age_data=country['age_data'],
+                               extra_states=[ss.BoolArr('fine', default=False)])
 
         diseases = kwargs.pop('diseases', None)
         user_connectors = kwargs.pop('connectors', None) or []
@@ -120,7 +121,8 @@ class Sim(ss.Sim):
                         f'resolved genotype keys {sorted(sim_keys)}'
                     )
 
-            diseases = [HPV(genotype=k, **gpars_overrides.get(k, {})) for k in keys]
+            diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
+                            **gpars_overrides.get(k, {})) for k in keys]
             if init_seeding == 'exclusive':
                 # 'exclusive': one Bernoulli per agent for any HPV, then one
                 # genotype per infected agent via the seeder's per-genotype callback.
