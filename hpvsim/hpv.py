@@ -212,6 +212,11 @@ class HPV(ss.Infection):
                 return c
         return None
 
+    # BoolState names whose auto n_* results must be promoted to float and
+    # scale-weighted (fine agents carry scale 1/ratio, not 1).
+    _STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin',
+                     'cancerous', 'latent')
+
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
 
@@ -219,8 +224,22 @@ class HPV(ss.Infection):
         (the cin -> cancerous and cancerous -> dead transitions);
         ``cum_*`` are populated as cumulative sums in ``finalize_results``.
         ``sum_age_at_*`` are per-step accumulators; mean age = ``sum / count``.
+
+        Starsim auto-generates ``n_<state>`` results as ``dtype=int`` for every
+        ``BoolState``. We promote each stock result to ``dtype=float`` here so
+        that ``update_results`` can write scale-weighted values (fine agents
+        carry ``scale=1/ratio`` and must count as 1/ratio, not 1).
         """
         super().init_results()
+        # Promote auto n_* results to float64 so scale-weighted writes don't
+        # silently truncate. Must happen after super() creates them.
+        for state_name in self._STOCK_STATES:
+            key = f'n_{state_name}'
+            if key in self.results:
+                res = self.results[key]
+                res.dtype = float
+                if res.values is not None:
+                    res.values = res.values.astype(np.float64)
         self.define_results(
             ss.Result('new_cancers', dtype=float, scale=True,
                       label='New cancers'),
@@ -236,6 +255,33 @@ class HPV(ss.Infection):
                       label='Sum of ages at cancer death'),
         )
         return
+
+    def update_results(self):
+        """Recompute per-step stock counts as scale-weighted floats.
+
+        Starsim's ``Module.update_results`` writes ``n_<state>[ti] =
+        state.sum()`` — a plain boolean count that treats every agent as one
+        body regardless of its ``scale``. Fine agents carry ``scale =
+        1/ms_agent_ratio``, so they must count as ``1/ratio``, not 1.
+
+        We call ``super().update_results()`` first so the starsim pipeline
+        runs normally (prevalence, new_infections, etc.), then overwrite
+        each stock slot with ``people.scale_flows(uids_in_state)``.
+        """
+        super().update_results()
+        ti = self.ti
+        ppl = self.sim.people
+        auids = ppl.auids
+        for state_name in self._STOCK_STATES:
+            key = f'n_{state_name}'
+            if key not in self.results:
+                continue
+            state_arr = getattr(self, state_name)
+            mask = np.asarray(state_arr[auids], dtype=bool)
+            uids_in = auids[mask]
+            self.results[key][ti] = (
+                ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
+            )
 
     def finalize_results(self):
         super().finalize_results()

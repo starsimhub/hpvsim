@@ -170,3 +170,79 @@ def test_fine_agents_do_not_drive_births():
     for _ in range(20):
         uids = b.get_births()
         assert not np.asarray(ppl.fine[uids]).any()
+
+
+def test_stock_prevalence_scale_weighted():
+    """Fine agents (scale=1/ratio) must count as 1/ratio in n_* stock results.
+
+    Checks dtype==float AND that scale_flows-recomputed values match the stored
+    result at the final time step, for every stock that had fine agents in it.
+    Also checks HPVTotal union-based stocks are similarly scale-weighted.
+    Ratio==1 is covered by the regression gate tests (scale_flows==count).
+    """
+    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
+                  ms_agent_ratio=10, rand_seed=7)
+    sim.run()
+
+    ppl = sim.people
+    # Must have grown some fine agents for the test to be non-vacuous.
+    fine_uids = ppl.auids[np.asarray(ppl.fine[ppl.auids], dtype=bool)]
+    assert len(fine_uids) > 0, 'no fine agents grown — test is vacuous'
+
+    # sim.ti after run() is the index of the last completed step (npts - 1).
+    ti_last = sim.ti
+
+    # ---- Per-genotype HPV module stocks ----
+    for dis in sim.diseases.values():
+        if not isinstance(dis, hpv.HPV):
+            continue
+        r = dis.results
+        for state_name in ('susceptible', 'infected', 'precin', 'cin',
+                           'cancerous', 'latent'):
+            key = f'n_{state_name}'
+            assert key in r, f'{dis.name}: expected result {key}'
+            # dtype must be float (not int)
+            assert r[key].dtype == float, (
+                f'{dis.name}.{key}: dtype={r[key].dtype}, expected float'
+            )
+            assert r[key].values.dtype == np.float64, (
+                f'{dis.name}.{key}: values.dtype={r[key].values.dtype}, expected float64'
+            )
+            # Value must match scale_flows-weighted recompute at final step.
+            # Post-run people state matches what was stored at sim.ti (last step).
+            state_arr = getattr(dis, state_name)
+            uids_in = ppl.auids[np.asarray(state_arr[ppl.auids], dtype=bool)]
+            expected = ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
+            stored = float(r[key].values[ti_last])
+            assert np.isclose(stored, expected, rtol=1e-6), (
+                f'{dis.name}.{key} at ti={ti_last}: stored={stored:.4f}, '
+                f'scale_flows={expected:.4f}'
+            )
+
+    # ---- HPVTotal union-based stocks ----
+    hpvt = sim.results.get('hpvtotal', None)
+    assert hpvt is not None, 'HPVTotal analyzer result block missing'
+    for key in ('n_infected', 'n_precin', 'n_cin', 'n_cancerous'):
+        assert hpvt[key].dtype == float, (
+            f'hpvtotal.{key}: dtype={hpvt[key].dtype}, expected float'
+        )
+        assert hpvt[key].values.dtype == np.float64, (
+            f'hpvtotal.{key}: values.dtype={hpvt[key].values.dtype}, expected float64'
+        )
+    # Verify the union n_infected in HPVTotal matches scale_flows across modules.
+    # Use auids + starsim accessors (not alive.values array) to avoid UID/index
+    # confusion when ppl.grow() has grown agents beyond initial n_agents slots.
+    auids = ppl.auids
+    alive_mask = np.asarray(ppl.alive[auids], dtype=bool)
+    any_infected = np.zeros(len(auids), dtype=bool)
+    for dis in sim.diseases.values():
+        if isinstance(dis, hpv.HPV):
+            any_infected |= np.asarray(dis.infected[auids], dtype=bool)
+    any_infected &= alive_mask
+    inf_uids = auids[any_infected]
+    expected_hpvt_inf = ppl.scale_flows(inf_uids) if len(inf_uids) > 0 else 0.0
+    stored_hpvt_inf = float(hpvt['n_infected'].values[ti_last])
+    assert np.isclose(stored_hpvt_inf, expected_hpvt_inf, rtol=1e-6), (
+        f'hpvtotal.n_infected at ti={ti_last}: stored={stored_hpvt_inf:.4f}, '
+        f'scale_flows={expected_hpvt_inf:.4f}'
+    )
