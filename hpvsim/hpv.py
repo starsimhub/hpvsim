@@ -392,20 +392,142 @@ class HPV(ss.Infection):
             )
         )
 
-        # 5b. Progression to cancer.
-        if len(cancer_uids) == 0:
+        # 5b. Progression to cancer. Guard is local to the base scheduling only;
+        # the grow in step 6 must still run over all cin_uids even when no base
+        # agent drew cancer this call.
+        if len(cancer_uids):
+            self.ti_cancerous[cancer_uids] = (
+                self.ti_cin[cancer_uids] + self._randround(
+                    dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+                )
+            )
+            dur_cancer = p.dur_cancer.rvs(cancer_uids)
+            self.ti_dead_cancer[cancer_uids] = (
+                self.ti_cancerous[cancer_uids] + self._randround(
+                    dur_cancer, cancer_uids, self._round_dead_bern,
+                )
+            )
+
+        # 6. Multiscale: grow real fine cancer agents (v2 set_severity port).
+        self._grow_fine_agents(cin_uids, cancer_uids, dur_cin, age_mod,
+                               rel_sev_cin, sev_imm_uids[cin_mask], dt_yr)
+
+    def _grow_fine_agents(self, cin_uids, cancer_uids, dur_cin, age_mod,
+                          rel_sev_cin, sev_imm_cin, dt_yr):
+        """Grow ratio-1 extra real fine cancer agents per CIN agent (v2-faithful).
+
+        Mirrors hpvsim_v23_frozen@fix-multiscale-cin-regate set_severity: the
+        transforming base agents are shrunk to scale 1/ratio; for every CIN
+        reacher, ratio-1 extra trajectories are drawn (age_risk-modified
+        dur_cin; CIN-conditional rejection-sampled dur_precin), cancer is drawn
+        for each extra, and one real fine agent is grown per extra-cancer
+        success (full cross-genotype clone of the source, then this genotype's
+        cancer-bound trajectory written). No-op at ms_agent_ratio<=1.
+
+        Units: ``_ln`` returns YEARS (it reads the dist's year-parameterized
+        mean/std), so ``compute_severity`` receives YEARS directly. Scheduling
+        via ``_randround`` needs STEPS, so durations are divided by ``dt_yr``
+        first. ``p.dur_cancer.rvs`` returns STEPS already, so it is passed to
+        ``_randround`` unscaled (matches the base agent path in set_prognoses).
+        """
+        ratio = int(self.pars.ms_agent_ratio)
+        n = len(cin_uids)
+        if ratio <= 1 or n == 0:
             return
-        self.ti_cancerous[cancer_uids] = (
-            self.ti_cin[cancer_uids] + self._randround(
-                dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
-            )
-        )
-        dur_cancer = p.dur_cancer.rvs(cancer_uids)
-        self.ti_dead_cancer[cancer_uids] = (
-            self.ti_cancerous[cancer_uids] + self._randround(
-                dur_cancer, cancer_uids, self._round_dead_bern,
-            )
-        )
+        p = self.pars
+        ppl = self.sim.people
+        ti = self.ti
+        cancer_scale = 1.0 / ratio
+
+        # Shrink base agents that drew their own cancer.
+        if len(cancer_uids):
+            ppl.scale[cancer_uids] = cancer_scale
+
+        # Side RNG (CRN not required). Seed from rand_seed/ti/genotype.
+        import zlib
+        seed = ((int(self.sim.pars.rand_seed or 0) * 2654435761
+                 + int(ti) * 40503 + zlib.crc32(self.genotype.encode()))
+                & 0x7FFFFFFF)
+        rng = np.random.default_rng(seed)
+
+        def _ln(dist, size):  # lognormal years on the side RNG (ex->im inline)
+            mean = float(dist.pars['mean']); std = float(dist.pars['std'])
+            sig2 = np.log(1.0 + (std / mean) ** 2)
+            return rng.lognormal(np.log(mean) - 0.5 * sig2, np.sqrt(sig2), size)
+
+        m = ratio - 1
+        size = (n, m)
+        amod = np.asarray(age_mod, dtype=float)[:, None]
+        rel = np.asarray(rel_sev_cin, dtype=float)[:, None] * np.ones(size)
+        sevimm = np.asarray(sev_imm_cin, dtype=float)[:, None] * np.ones(size)
+
+        # age_risk-modified extra dur_cin (years).
+        extra_dur_cin = _ln(p.dur_cin, size) * amod
+        # CIN-conditional (length-biased) extra dur_precin: rejection-sample.
+        extra_dur_precin = _ln(p.dur_precin, size) * (1.0 - sevimm)
+        pending = np.ones(size, dtype=bool)
+        for _ in range(64):
+            if not pending.any():
+                break
+            cinp = compute_severity(extra_dur_precin, rel_sev=rel, pars=p.cin_fn)
+            passed = (rng.random(size) < cinp) & pending
+            pending &= ~passed
+            if pending.any():
+                redraw = _ln(p.dur_precin, int(pending.sum())) \
+                    * (1.0 - sevimm[pending])
+                extra_dur_precin[pending] = redraw
+
+        # CIN -> cancer for every extra (all are CIN now).
+        pcanc = compute_severity(extra_dur_cin, rel_sev=rel, pars=p.cancer_fn)
+        extra_cancer = rng.random(size) < pcanc
+        # Existing fine agents never spawn more fine agents (v2 level0 guard).
+        not_fine = ~np.asarray(ppl.fine[cin_uids], dtype=bool)
+        extra_cancer &= not_fine[:, None]
+        counts = extra_cancer.sum(axis=1)
+        n_new = int(counts.sum())
+        if n_new == 0:
+            return
+
+        # Broadcast source uids per success and grow.
+        src_uids = ss.uids(np.repeat(np.asarray(cin_uids), counts))
+        new_dur_precin = extra_dur_precin[extra_cancer]   # years
+        new_dur_cin = extra_dur_cin[extra_cancer]         # years
+        new_uids = ppl.grow(n_new)
+
+        # Full cross-genotype clone of the source individuals.
+        _clone_agents(self.sim, src_uids, new_uids)
+
+        # Reset lifecycle-timing states the clone copied from the source so a
+        # fine agent never inherits the source's death/removal schedule
+        # (people.grow initializes these to nan; alive stays True).
+        ppl.ti_dead[new_uids] = np.nan
+        ppl.ti_removed[new_uids] = np.nan
+        ppl.alive[new_uids] = True
+
+        # Fine-agent identity.
+        ppl.fine[new_uids] = True
+        ppl.scale[new_uids] = cancer_scale
+
+        # This genotype's fresh cancer-bound trajectory (overwrites cloned).
+        self.susceptible[new_uids] = False
+        self.infected[new_uids] = True
+        self.precin[new_uids] = True
+        self.cin[new_uids] = False
+        self.cancerous[new_uids] = False
+        self.ti_infected[new_uids] = ti
+        self.ti_first_infection[new_uids] = ti
+        self.ti_clearance[new_uids] = np.nan
+        # durations are in YEARS; convert to steps via /dt_yr before rounding.
+        ti_cin = ti + self._randround(new_dur_precin / dt_yr, new_uids,
+                                      self._round_cin_bern)
+        self.ti_cin[new_uids] = ti_cin
+        ti_canc = ti_cin + self._randround(new_dur_cin / dt_yr, new_uids,
+                                           self._round_cancer_bern)
+        self.ti_cancerous[new_uids] = ti_canc
+        dur_cancer = p.dur_cancer.rvs(new_uids)  # steps (module dist)
+        self.ti_dead_cancer[new_uids] = ti_canc + self._randround(
+            dur_cancer, new_uids, self._round_dead_bern)
+        return
 
     def _cancel_other_genotype_progression_for(self, uids):
         """Mirror v2's check_cancer cross-genotype cancellation.

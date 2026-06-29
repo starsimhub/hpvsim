@@ -7,13 +7,17 @@ import numpy as np
 
 def test_ratio_param_and_fine_state_exist():
     assert hpv.__file__.startswith(WT), f'wrong hpvsim loaded: {hpv.__file__}'
+    # fine state exists on People and defaults all-False. Checked at ratio==1
+    # (grow is a no-op) so no fine agents are spawned during init seeding.
+    sim1 = hpv.Sim(location='nigeria', n_agents=500, start=2000, stop=2002,
+                   ms_agent_ratio=1)
+    sim1.init()
+    assert 'fine' in sim1.people.states
+    assert not sim1.people.fine.values.any()
+    # ratio propagated to every genotype HPV module
     sim = hpv.Sim(location='nigeria', n_agents=500, start=2000, stop=2002,
                   ms_agent_ratio=10)
     sim.init()
-    # fine state exists on People, defaults all-False
-    assert 'fine' in sim.people.states
-    assert not sim.people.fine.values.any()
-    # ratio propagated to every genotype HPV module
     for dis in sim.diseases.values():
         if isinstance(dis, hpv.HPV):
             assert int(dis.pars.ms_agent_ratio) == 10
@@ -54,3 +58,24 @@ def test_clone_agents_copies_people_and_module_state():
         if isinstance(dis, hpv.HPV):
             assert np.array_equal(np.asarray(dis.susceptible[new]),
                                   np.asarray(dis.susceptible[src]))
+
+def test_grow_creates_fine_cancer_agents_at_ratio():
+    import numpy as np
+    n0 = 6000
+    sim = hpv.Sim(location='nigeria', n_agents=n0, start=1980, stop=2025,
+                  ms_agent_ratio=10, rand_seed=3)
+    sim.run()
+    ppl = sim.people
+    # multiscale grew real fine agents...
+    assert ppl.fine.values.any(), 'no fine agents were grown'
+    # ...all fine agents carry scale 1/ratio
+    fine_uids = ppl.auids[ppl.fine[ppl.auids]]
+    assert np.allclose(ppl.scale[fine_uids], 1.0/10)
+    # ...and every fine agent is cancer-bound in exactly the genotype that grew
+    # it (cancerous now, or scheduled): at least one HPV module flags them.
+    flagged = np.zeros(len(fine_uids), dtype=bool)
+    for dis in sim.diseases.values():
+        if isinstance(dis, hpv.HPV):
+            sched = ~np.isnan(np.asarray(dis.ti_cancerous[fine_uids]))
+            flagged |= (np.asarray(dis.cancerous[fine_uids]) | sched)
+    assert flagged.all()
