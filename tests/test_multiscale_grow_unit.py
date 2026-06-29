@@ -79,3 +79,19 @@ def test_grow_creates_fine_cancer_agents_at_ratio():
             sched = ~np.isnan(np.asarray(dis.ti_cancerous[fine_uids]))
             flagged |= (np.asarray(dis.cancerous[fine_uids]) | sched)
     assert flagged.all()
+
+def test_fine_agents_excluded_from_network():
+    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
+                  ms_agent_ratio=10, rand_seed=4)
+    sim.run()
+    ppl = sim.people
+    fine_uids = ppl.auids[ppl.fine[ppl.auids]]
+    assert len(fine_uids) > 0
+    # No edge in any sexual-network layer touches a fine agent.
+    net = [n for n in sim.networks.values()
+           if isinstance(n, hpv.SexualNetwork)][0]
+    edges = net.edges
+    fine_set = set(np.asarray(fine_uids).tolist())
+    p1 = set(np.asarray(edges.p1).tolist())
+    p2 = set(np.asarray(edges.p2).tolist())
+    assert fine_set.isdisjoint(p1) and fine_set.isdisjoint(p2)

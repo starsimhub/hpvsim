@@ -62,6 +62,15 @@ class SexualNetwork(ss.SexualNetwork):
     it as a per-act probability multiplier.
     """
 
+    def active(self, people):
+        """Network participation requires a non-fine (level0) agent.
+
+        Fine multiscale agents (people.fine) are high-resolution cancer
+        stand-ins excluded from transmission, mirroring v2's is_active
+        requirement that participants be level0.
+        """
+        return super().active(people) & ~people.fine
+
     def net_beta(self, disease_beta=None, inds=None, disease=None):
         if inds is None:
             inds = Ellipsis
