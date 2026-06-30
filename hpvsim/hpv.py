@@ -36,6 +36,12 @@ _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 # Per-agent Arrs that must NOT be cloned (identity, not biology).
 _NO_CLONE_STATES = {'uid', 'slot'}
 
+# Per-agent lifecycle states that are cloned-then-reset: a clone is a fresh
+# agent (people.grow defaults), not a continuation of its source's death/removal
+# schedule. Mapped to the value a freshly grown agent should hold. Applied after
+# the copy loops so the caller never has to "clone then undo".
+_RESET_ON_CLONE = {'ti_dead': np.nan, 'ti_removed': np.nan, 'alive': True}
+
 
 def _clone_agents(sim, src_uids, new_uids):
     """Copy every per-agent Arr from src_uids to new_uids (v2 states_to_set).
@@ -49,7 +55,14 @@ def _clone_agents(sim, src_uids, new_uids):
     kept so the clone stays correct even if a starsim version stops flattening
     module states into ``people.states``. Cloning network/demographics state is
     harmless: fine agents are excluded from those subsystems, so those values
-    are inert. src_uids and new_uids must align element-wise and be equal length.
+    are inert.
+
+    Lifecycle states in ``_RESET_ON_CLONE`` (``ti_dead``/``ti_removed``/``alive``)
+    are then reset to fresh-agent defaults so a clone never inherits its source's
+    death/removal schedule. This is centralized here (rather than in the caller)
+    so every caller of ``_clone_agents`` is correct without a separate reset step.
+
+    src_uids and new_uids must align element-wise and be equal length.
     """
     ppl = sim.people
     for key, arr in ppl.states.items():
@@ -59,6 +72,9 @@ def _clone_agents(sim, src_uids, new_uids):
     for mod in list(sim.diseases.values()) + list(sim.connectors.values()):
         for st in mod.state_list:
             st[new_uids] = st[src_uids]
+    for name, val in _RESET_ON_CLONE.items():
+        if name in ppl.states:
+            ppl.states[name][new_uids] = val
     return
 
 
@@ -562,15 +578,11 @@ class HPV(ss.Infection):
         new_dur_cin = extra_dur_cin[extra_cancer]         # years
         new_uids = ppl.grow(n_new)
 
-        # Full cross-genotype clone of the source individuals.
+        # Full cross-genotype clone of the source individuals. _clone_agents
+        # also resets the lifecycle states in _RESET_ON_CLONE (ti_dead/
+        # ti_removed/alive) so the fine agent never inherits the source's
+        # death/removal schedule.
         _clone_agents(self.sim, src_uids, new_uids)
-
-        # Reset lifecycle-timing states the clone copied from the source so a
-        # fine agent never inherits the source's death/removal schedule
-        # (people.grow initializes these to nan; alive stays True).
-        ppl.ti_dead[new_uids] = np.nan
-        ppl.ti_removed[new_uids] = np.nan
-        ppl.alive[new_uids] = True
 
         # Fine-agent identity.
         ppl.fine[new_uids] = True
