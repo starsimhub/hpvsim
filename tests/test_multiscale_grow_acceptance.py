@@ -100,6 +100,41 @@ def test_intervention_equivalence_across_ratio():
     )
 
 
+def test_interventions_act_on_fine_agents():
+    """Fine multiscale agents must actually RECEIVE interventions, not just be
+    consistent in aggregate.
+
+    The equivalence gate above shows the population-level averted fraction
+    matches across ratios, but that could in principle hold even if fine agents
+    were skipped and coarse agents over-treated. This asserts the mechanism
+    directly: at ratio=10, a real (non-zero) count of FINE agents is screened,
+    triaged, AND CIN-treated. Interventions carry no ~fine guard — fine agents
+    inherit female/alive/age/cancer state from their source clone, so they are
+    eligible natively. (Validated scope: probability-based coverage `prob=`;
+    fixed-capacity `max_capacity` is scale-sensitive and out of scope — see the
+    design spec §8 coverage-type caveat.)
+    """
+    sim = hpv.Sim(location='nigeria', n_agents=8000, start=1970, stop=2040,
+                  ms_agent_ratio=10, rand_seed=1,
+                  interventions=_intervention_factory())
+    sim.run()
+    ppl = sim.people
+    fine = np.asarray(ppl.fine[ppl.auids], dtype=bool)
+    assert fine.any(), 'no fine agents were grown — cannot test intervention coverage'
+
+    def n_fine_flagged(intervention_name, flag):
+        iv = sim.interventions[intervention_name]
+        vals = np.asarray(getattr(iv, flag)[ppl.auids], dtype=bool)
+        return int((vals & fine).sum())
+
+    n_screened = n_fine_flagged('primary', 'screened')
+    n_triaged  = n_fine_flagged('colpo',   'screened')
+    n_treated  = n_fine_flagged('excision_rx', 'cin_treated')
+    assert n_screened > 0, f'no fine agent was screened (fine_screened={n_screened})'
+    assert n_triaged  > 0, f'no fine agent was triaged (fine_triaged={n_triaged})'
+    assert n_treated  > 0, f'no fine agent was CIN-treated (fine_treated={n_treated})'
+
+
 def _mean_age_at_cancer(ratio, seed, n_agents=6000):
     """Run a baseline sim and return mean age at cancer (summed across genotypes)."""
     sim = hpv.Sim(location='nigeria', n_agents=n_agents, start=1970, stop=2030,

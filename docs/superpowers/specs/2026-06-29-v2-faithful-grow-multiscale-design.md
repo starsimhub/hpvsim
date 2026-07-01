@@ -220,7 +220,22 @@ above are bit-identical to the current `len()`-based tallies.
    screen+treat (and txvx) program, cancers averted at `ratio>1` match `ratio=1`
    within tolerance — because fine agents are REAL and are screened/treated
    natively. This is the property the ledger structurally could not deliver and
-   is the main reason to grow real agents.
+   is the main reason to grow real agents. Interventions carry **no `~fine`
+   guard** — `check_eligibility` (screening/triage/treatment/txvx) selects on
+   `female`/`alive`/`age_range`/cancer-status, all of which fine agents inherit
+   from their source clone, so fine agents are eligible automatically. Verified
+   empirically (ratio=10, M06 cascade): fine agents are screened, triaged, and
+   CIN-treated in proportion to their presence in the cancer-pathway pool.
+
+   **Coverage-type caveat (validated scope).** Equivalence is established for
+   **probability-based** coverage (`prob=`), which is a per-agent Bernoulli and
+   therefore scale-invariant. **Fixed-capacity** coverage (`treat_num` with
+   `max_capacity=N`, or a campaign delivering a fixed number of doses) is NOT
+   validated equivalent and is expected to be scale-sensitive: it selects `N`
+   agents from an eligible pool inflated by sub-scaled fine agents, and its
+   `new_*_treated` counters use a plain `len()` that counts a fine agent as a
+   whole body. A scale-aware capacity (draw against `scale_flows`, or weight the
+   count) would be required before using fixed-capacity programs under `ratio>1`.
 4. **Variance reduction.** Cancer event-age error bars shrink as `ratio`
    increases (the original methods-Fig-5 motivation), at fixed base agents.
 5. **v2.3.1 numerical tracking.** Cancer totals / incidence track the
