@@ -204,6 +204,28 @@ class HPV(ss.Infection):
         self._round_clear_cin_bern = ss.bernoulli(p=0.5)
         self._round_cancer_bern = ss.bernoulli(p=0.5)
         self._round_dead_bern = ss.bernoulli(p=0.5)
+        # Multiscale grow: dedicated dists for the extra fine-agent trajectories
+        # (_grow_fine_agents). These are SEPARATE RNG streams from the live
+        # natural-history dists (dur_precin/dur_cin above), so growing fine
+        # agents never consumes randomness the REAL agents draw from — that
+        # isolation is what keeps ms_agent_ratio==1 bit-identical and cancer
+        # incidence flat across ratios (the base agents get identical draws
+        # regardless of how many fine agents are grown). They are drawn by size
+        # (non-CRN); cross-scenario CRN is out of scope for multiscale. Built
+        # unitless from the live dists' (mean, std) in YEARS so .rvs() returns
+        # years directly (matching what compute_severity expects); ss.lognorm_ex
+        # applies the same external->internal parameterization _grow_fine_agents
+        # previously hand-coded.
+        self._extra_dur_precin = ss.lognorm_ex(
+            mean=float(self.pars.dur_precin.pars['mean']),
+            std=float(self.pars.dur_precin.pars['std']),
+        )
+        self._extra_dur_cin = ss.lognorm_ex(
+            mean=float(self.pars.dur_cin.pars['mean']),
+            std=float(self.pars.dur_cin.pars['std']),
+        )
+        self._extra_cin_unif = ss.random()
+        self._extra_cancer_unif = ss.random()
         return
 
     def init_post(self):
@@ -508,11 +530,18 @@ class HPV(ss.Infection):
         success (full cross-genotype clone of the source, then this genotype's
         cancer-bound trajectory written). No-op at ms_agent_ratio<=1.
 
-        Units: ``_ln`` returns YEARS (it reads the dist's year-parameterized
-        mean/std), so ``compute_severity`` receives YEARS directly. Scheduling
-        via ``_randround`` needs STEPS, so durations are divided by ``dt_yr``
-        first. ``p.dur_cancer.rvs`` returns STEPS already, so it is passed to
-        ``_randround`` unscaled (matches the base agent path in set_prognoses).
+        Units: the extra-trajectory dists (``_extra_dur_precin``/``_extra_dur_cin``)
+        are built unitless from the live dists' year-parameterized mean/std, so
+        ``.rvs`` returns YEARS and ``compute_severity`` receives YEARS directly.
+        Scheduling via ``_randround`` needs STEPS, so durations are divided by
+        ``dt_yr`` first. ``p.dur_cancer.rvs`` returns STEPS already, so it is
+        passed to ``_randround`` unscaled (matches the base path in set_prognoses).
+
+        RNG: the extra draws come from dedicated dists registered in __init__ —
+        SEPARATE streams from the live natural-history dists, so growing fine
+        agents never perturbs the real agents' draws (keeps ratio==1 bit-identical
+        and incidence flat across ratios). Drawn by size (non-CRN; cross-scenario
+        CRN is out of scope for multiscale).
         """
         ratio = int(self.pars.ms_agent_ratio)
         n = len(cin_uids)
@@ -527,18 +556,6 @@ class HPV(ss.Infection):
         if len(cancer_uids):
             ppl.scale[cancer_uids] = cancer_scale
 
-        # Side RNG (CRN not required). Seed from rand_seed/ti/genotype.
-        import zlib
-        seed = ((int(self.sim.pars.rand_seed or 0) * 2654435761
-                 + int(ti) * 40503 + zlib.crc32(self.genotype.encode()))
-                & 0x7FFFFFFF)
-        rng = np.random.default_rng(seed)
-
-        def _ln(dist, size):  # lognormal years on the side RNG (ex->im inline)
-            mean = float(dist.pars['mean']); std = float(dist.pars['std'])
-            sig2 = np.log(1.0 + (std / mean) ** 2)
-            return rng.lognormal(np.log(mean) - 0.5 * sig2, np.sqrt(sig2), size)
-
         m = ratio - 1
         size = (n, m)
         amod = np.asarray(age_mod, dtype=float)[:, None]
@@ -546,24 +563,24 @@ class HPV(ss.Infection):
         sevimm = np.asarray(sev_imm_cin, dtype=float)[:, None] * np.ones(size)
 
         # age_risk-modified extra dur_cin (years).
-        extra_dur_cin = _ln(p.dur_cin, size) * amod
+        extra_dur_cin = self._extra_dur_cin.rvs(size) * amod
         # CIN-conditional (length-biased) extra dur_precin: rejection-sample.
-        extra_dur_precin = _ln(p.dur_precin, size) * (1.0 - sevimm)
+        extra_dur_precin = self._extra_dur_precin.rvs(size) * (1.0 - sevimm)
         pending = np.ones(size, dtype=bool)
         for _ in range(64):
             if not pending.any():
                 break
             cinp = compute_severity(extra_dur_precin, rel_sev=rel, pars=p.cin_fn)
-            passed = (rng.random(size) < cinp) & pending
+            passed = (self._extra_cin_unif.rvs(size) < cinp) & pending
             pending &= ~passed
             if pending.any():
-                redraw = _ln(p.dur_precin, int(pending.sum())) \
+                redraw = self._extra_dur_precin.rvs(int(pending.sum())) \
                     * (1.0 - sevimm[pending])
                 extra_dur_precin[pending] = redraw
 
         # CIN -> cancer for every extra (all are CIN now).
         pcanc = compute_severity(extra_dur_cin, rel_sev=rel, pars=p.cancer_fn)
-        extra_cancer = rng.random(size) < pcanc
+        extra_cancer = self._extra_cancer_unif.rvs(size) < pcanc
         # Existing fine agents never spawn more fine agents (v2 level0 guard).
         not_fine = ~np.asarray(ppl.fine[cin_uids], dtype=bool)
         extra_cancer &= not_fine[:, None]
