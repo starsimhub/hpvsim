@@ -10,6 +10,54 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
+## Deltas from the as-written plan (what actually shipped)
+
+The task code blocks below are the plan *as written*; they are preserved for
+provenance. The final implementation diverges from them in these material ways
+(each verified against the source and the acceptance gates):
+
+1. **Environment (Global Constraints).** The venv is **`.venv-msgrow`** (Python
+   3.14) with starsim editable from **`C:/Users/ryanhu/PycharmProjects/starsim-mainclean`**
+   (detached at `origin/main`, CLEAN — no `fine`/`epi_weight`/`split`), NOT the
+   `.venv` the constraints name. The plain `.venv` resolves starsim to the local
+   checkout on the `feat/multiscale-spawn-fine` branch (HAS native multiscale),
+   which masks bugs and collides with hpvsim's own `fine`. Frozen v2.3 runs use
+   `PYTHONPATH=<frozen> .venv-msgrow/python`.
+
+2. **Task 3 `_clone_agents` — lifecycle reset added.** The final helper adds
+   `_RESET_ON_CLONE = {'ti_dead': np.nan, 'ti_removed': np.nan, 'alive': True}`
+   and a third loop that resets those states on the new uids, so a clone is a
+   fresh agent rather than a continuation of its source's death/removal schedule.
+   (Task 3/4 review MUST-DO; centralized in `_clone_agents` in the final refactor
+   `6c41808c` so callers need no separate reset.) The `state_list` loop is
+   confirmed redundant belt-and-suspenders (starsim flattens module states into
+   `people.states`).
+
+3. **Task 7 emigration — count-exclusion is necessary but NOT sufficient.** The
+   snap_uids filter shown in Task 7 shipped, but Task 9 root-caused a
+   multiscale×emigration competing-risk bug: coarse cancer-bound agents emigrate
+   before their cancer fires while excluded fine peers cannot, inflating incidence
+   +7% at ratio=10, growing with horizon. **Fix that shipped:** fine agents stay
+   OUT of the pyramid target but face an **independent per-band emigration
+   Bernoulli hazard** (`AgeMigration._emigrate_fine`, `p = band emigrants / band
+   count`, pending/not-yet-cancerous removal only). Tests were renamed:
+   `test_fine_agents_not_emigrated` → `test_fine_agents_excluded_from_pyramid_emigration`
+   plus a new `test_fine_agents_face_emigration_hazard`. Spec §6 already reflects
+   this.
+
+4. **Task 8 stocks/prevalence — broader than the sketch.** Stock states are a
+   class constant `HPV._STOCK_STATES = ('susceptible','infected','precin','cin',
+   'cancerous','latent')`; dtype promotion to float happens in `init_results`
+   (loop over auto `n_*` results), and `update_results` scale-weights each stock
+   AND re-derives per-genotype `prevalence` from the corrected scale-weighted
+   `n_infected / scale_flows(auids)` (the `8749192e` fix — super() had computed it
+   from the stale plain count, ~ratio× inflated). The `HPVTotal` analyzer
+   (`cross_genotype.py`) gets the same treatment for its union stocks + derived
+   prevalence. `cum_cancers`/`cum_cancer_deaths` are populated via cumsum in
+   `finalize_results`, not written per-step.
+
+All four are no-ops at `ms_agent_ratio==1` (the gating invariant holds).
+
 **Goal:** Port HPVsim v2.3.1's `ms_agent_ratio` grow-real-agents multiscale onto the v3.0-dev (starsim) engine, implemented entirely in hpvsim, growing real `fine` cancer agents weighted at `1/ratio`.
 
 **Architecture:** At the CIN→cancer decision in `HPV.set_prognoses`, shrink each transforming base agent's `people.scale` to `1/ratio` and grow `ratio-1` extra real fine cancer agents per CIN agent (full cross-genotype clone of the source). Fine agents are excluded from the sexual network, births, and emigration, but face background death (v2-faithful). All population-count results are scale-weighted via `people.scale_flows` and stored as float. At `ratio==1` the entire path is a gated bit-identical no-op.
@@ -26,7 +74,8 @@
 - **Scale convention:** `cancer_scale = 1.0 / ratio` (per-agent `people.scale` units; the scalar `pop_scale` is applied separately at `finalize_results`). NOT `pop_scale/ratio`.
 - **Int-truncation gotcha:** every scale-weighted result MUST be `dtype=float`. A `1/ratio` write into an `ss.Result(dtype=int)` truncates to 0 each step.
 - **ratio==1 bit-identical:** every engine change MUST keep `ms_agent_ratio==1` byte-for-byte identical to the pre-feature single-scale engine (no `fine`/`scale` writes, `scale_flows==len`, no grow). This is the gating invariant for Tasks 2–8.
-- **venv python:** `C:/Users/ryanhu/PycharmProjects/hpvsim_claudecontrol/.venv/Scripts/python.exe`.
+- **venv python:** as-written this said `.venv/Scripts/python.exe`, but the actual
+  environment used is **`.venv-msgrow`** with a clean starsim — see Deltas #1 above.
 
 ---
 

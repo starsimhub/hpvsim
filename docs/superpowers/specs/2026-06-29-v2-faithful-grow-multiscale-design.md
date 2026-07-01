@@ -122,7 +122,10 @@ Mirrors `set_severity` (reference lines 288–378):
      cancerous, all `ti_*`, all `dur_*`, nab_imm/cell_imm/rel_trans, …),
    - the CrossImmunity connector's per-agent states (`rel_sev`, sev_imm inputs).
    A shared helper enumerates clonable per-agent Arrs across People + modules +
-   connectors so the clone stays exhaustive as states evolve.
+   connectors so the clone stays exhaustive as states evolve. The helper also
+   **resets lifecycle states** (`ti_dead`, `ti_removed`, `alive`) on the new uids
+   to fresh-agent defaults, so a clone never inherits its source's death/removal
+   schedule (a clone is a new agent, not a continuation).
 4. **Override the fine agents' identity + this-genotype trajectory.** After the
    clone: `fine=True`, `scale=1/ratio`; then set THIS module's fresh cancer-bound
    schedule from the extra draws (`ti_infected=ti`, `precin=True`,
