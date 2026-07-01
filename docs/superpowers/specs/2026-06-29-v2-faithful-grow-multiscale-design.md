@@ -143,10 +143,18 @@ cancerous for that uid (mirrors v2 `check_cancer`). The `level0` guard in step 2
 prevents fine agents from spawning further fine agents.
 
 **Rounding / RNG.** Reuse `_randround` for schedule rounding (CRN-safe rounding
-is harmless and already present); the extra-trajectory draws use a plain numpy
-`default_rng` seeded from `rand_seed`/`ti`/genotype (CRN not required). Inline
-the lognormal ex→im conversion exactly as the ledger does, so side-draws match
-the dist parameterization without mutating the live dists.
+is harmless and already present); the extra-trajectory draws come from **dedicated
+`ss.Dist` streams registered on the module in `__init__`** (`_extra_dur_precin`
+and `_extra_dur_cin` as unitless-years `ss.lognorm_ex` mirroring the live
+duration dists; `_extra_cin_unif` and `_extra_cancer_unif` as `ss.random`). These
+are separate RNG streams from the live natural-history dists, so growing fine
+agents never consumes randomness the real agents draw from — that isolation is
+what keeps `ratio==1` bit-identical and incidence flat across ratios. They are
+drawn by size (non-CRN; cross-scenario CRN is out of scope) and reuse
+`ss.lognorm_ex`'s external→internal parameterization. (An earlier iteration
+hand-rolled this with a `crc32`/magic-constant seed feeding `np.random.default_rng`
+plus an inline lognormal ex→im conversion; that was replaced by the dedicated
+dists to drop the bespoke seed hash and the duplicated distribution math.)
 
 ## 6. Faithful exclusions
 
