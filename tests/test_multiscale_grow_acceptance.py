@@ -3,7 +3,15 @@ import sys, os
 WT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, WT)
 import numpy as np
+import pytest
 import hpvsim as hpv
+
+# The three statistical gates below run ~72 full sims (many seeds/ratios) and
+# take ~14 min — far over CI's 5-min timeout. They are marked ``slow`` so CI's
+# ``pytest -m "not slow"`` run skips them; run them manually before opening a PR
+# (or in a nightly job) with ``pytest -m slow tests/test_multiscale_grow_acceptance.py``.
+# ``test_interventions_act_on_fine_agents`` below is deliberately NOT slow (one
+# ~24s run) so the intervention-coverage mechanism stays covered on every PR.
 
 def _total_cancers(ratio, seed, n_agents=8000):
     sim = hpv.Sim(location='nigeria', n_agents=n_agents, start=1970, stop=2030,
@@ -15,6 +23,7 @@ def _total_cancers(ratio, seed, n_agents=8000):
             tot += float(dis.results.new_cancers.values.sum())
     return tot
 
+@pytest.mark.slow
 def test_cancer_incidence_flat_across_ratio():
     seeds = range(8)
     base = np.mean([_total_cancers(1, s) for s in seeds])
@@ -77,6 +86,7 @@ def _averted_fraction(ratio, seed, n_agents=8000):
     return (b - t) / b
 
 
+@pytest.mark.slow
 def test_intervention_equivalence_across_ratio():
     """CENTERPIECE gate: averted cancer fraction must match at ratio=1 vs ratio=10.
 
@@ -149,6 +159,7 @@ def _mean_age_at_cancer(ratio, seed, n_agents=6000):
     return s_age / n if n else np.nan
 
 
+@pytest.mark.slow
 def test_event_age_variance_shrinks_with_ratio():
     """Higher ms_agent_ratio grows more fine cancer agents → tighter mean-age estimator.
 
