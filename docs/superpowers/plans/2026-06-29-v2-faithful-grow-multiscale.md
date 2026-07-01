@@ -1,6 +1,14 @@
 # v2-faithful grow-real-agents multiscale — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: COMPLETE (2026-07-01).** All 12 tasks implemented and committed on
+> branch `m07-multiscale-v2-grow`; all acceptance gates pass (ratio==1
+> bit-identical; incidence flat rel 0.99/1.01 across {1,5,10}; intervention
+> equivalence; 6.4× event-age variance reduction, unbiased; v2.3.1 numerical
+> tracking ratio 1.009). Whole-branch review clean — READY TO MERGE (not yet
+> PR'd; standalone comparison branch, multiscale is Unscheduled in
+> `MIGRATION_PLAN.md`). Task-by-task outcomes: `.superpowers/sdd/progress.md`.
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Port HPVsim v2.3.1's `ms_agent_ratio` grow-real-agents multiscale onto the v3.0-dev (starsim) engine, implemented entirely in hpvsim, growing real `fine` cancer agents weighted at `1/ratio`.
 
@@ -32,7 +40,7 @@
 **Interfaces:**
 - Produces: `HPV.pars.ms_agent_ratio` (int, default 1); `sim.people.fine` (`ss.BoolArr`, default False); `hpv.Sim(ms_agent_ratio=N)` kwarg sets it on every genotype module.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_multiscale_grow_unit.py
@@ -56,12 +64,12 @@ def test_ratio_param_and_fine_state_exist():
             assert int(dis.pars.ms_agent_ratio) == 10
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_ratio_param_and_fine_state_exist -v`
 Expected: FAIL (`ms_agent_ratio` is not a valid kwarg / `fine` not in states).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `hpvsim/hpv.py` `HPV.define_pars(...)`, add to the pars dict:
 ```python
@@ -88,12 +96,12 @@ and inject the ratio into every genotype module at creation (line ~123):
                             **gpars_overrides.get(k, {})) for k in keys]
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_ratio_param_and_fine_state_exist -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add hpvsim/hpv.py hpvsim/sim.py tests/test_multiscale_grow_unit.py
@@ -112,7 +120,7 @@ git commit -m "feat(multiscale): add ms_agent_ratio param + fine People state"
 - Consumes: `sim.people.scale_flows(uids)`, `sim.people.scale`.
 - Produces: `results.new_cancers`/`new_cancer_deaths`/`cum_cancers`/`cum_cancer_deaths` are `dtype=float`, scale-weighted; `sum_age_at_cancer*` scale-weighted.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_results_are_float_and_scale_weighted_noop_at_ratio1():
@@ -133,12 +141,12 @@ def test_results_are_float_and_scale_weighted_noop_at_ratio1():
     assert np.allclose(sim.people.scale.values, 1.0)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_results_are_float_and_scale_weighted_noop_at_ratio1 -v`
 Expected: FAIL (`new_cancers` dtype is int).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `hpvsim/hpv.py` `init_results`, change the four count results from `dtype=int` to `dtype=float`:
 ```python
@@ -171,12 +179,12 @@ and the cancer-death tally block (~line 510-515):
             self.sim.people.request_death(to_dead)
 ```
 
-- [ ] **Step 4: Run test + the full existing suite (ratio==1 regression gate)**
+- [x] **Step 4: Run test + the full existing suite (ratio==1 regression gate)**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_results_are_float_and_scale_weighted_noop_at_ratio1 tests/test_natural_history.py tests/test_hpv.py -v`
 Expected: PASS (all). The natural-history/hpv tests confirm ratio==1 is bit-identical.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add hpvsim/hpv.py tests/test_multiscale_grow_unit.py
@@ -194,7 +202,7 @@ git commit -m "feat(multiscale): scale-weighted float cancer/age results (ratio=
 **Interfaces:**
 - Produces: `_clone_agents(sim, src_uids, new_uids)` — copies every per-agent Arr (People states except `uid`/`slot`, plus every disease and connector module's `state_list`) from `src_uids` to `new_uids` (element-wise aligned, equal length).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_clone_agents_copies_people_and_module_state():
@@ -219,12 +227,12 @@ def test_clone_agents_copies_people_and_module_state():
                                   np.asarray(dis.susceptible[src]))
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_clone_agents_copies_people_and_module_state -v`
 Expected: FAIL (`cannot import name _clone_agents`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `hpvsim/hpv.py` (module level, near the top after imports):
 ```python
@@ -251,12 +259,12 @@ def _clone_agents(sim, src_uids, new_uids):
     return
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_clone_agents_copies_people_and_module_state -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add hpvsim/hpv.py tests/test_multiscale_grow_unit.py
@@ -275,7 +283,7 @@ git commit -m "feat(multiscale): per-agent Arr clone helper (v2 states_to_set an
 - Consumes: `_clone_agents`, `self.pars.ms_agent_ratio`, `compute_severity`, `self._randround`, `people.grow`, `people.scale`, `people.fine`.
 - Produces: side effects on `people` (grown fine agents, shrunk base scale). No return value used by callers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_grow_creates_fine_cancer_agents_at_ratio():
@@ -300,12 +308,12 @@ def test_grow_creates_fine_cancer_agents_at_ratio():
     assert flagged.all()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_grow_creates_fine_cancer_agents_at_ratio -v`
 Expected: FAIL (no fine agents grown).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `set_prognoses`, replace the early `if len(cancer_uids) == 0: return` / scheduling block (step 5b) so it always reaches the grow call. After scheduling the base `cancer_uids`' `ti_cancerous`/`ti_dead_cancer` (existing lines), add at the end of `set_prognoses`:
 ```python
@@ -424,17 +432,17 @@ Add the method (mirrors reference `set_severity` lines 288–409):
 
 NOTE: confirm whether `p.dur_cin.rvs` returns years or steps in this engine; the base path multiplies `dur_cin * dt_yr` before `compute_severity`, implying `rvs` returns STEPS. The `_ln` side-draw returns YEARS (its `mean`/`std` are the dist's year-parameterization), so `compute_severity` gets years directly (correct) and the `/dt_yr` in scheduling converts years→steps (correct). Verify against a single-scale base agent's scheduling in Step 4’s incidence check (Task 9).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_grow_creates_fine_cancer_agents_at_ratio -v`
 Expected: PASS
 
-- [ ] **Step 5: Run ratio==1 regression gate**
+- [x] **Step 5: Run ratio==1 regression gate**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_natural_history.py tests/test_hpv.py -v`
 Expected: PASS (grow is gated off at ratio==1).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add hpvsim/hpv.py tests/test_multiscale_grow_unit.py
@@ -453,7 +461,7 @@ git commit -m "feat(multiscale): grow real fine cancer agents in set_prognoses"
 - Consumes: `people.fine`.
 - Produces: `SexualNetwork.active(people)` returns active & ~fine.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_fine_agents_excluded_from_network():
@@ -474,12 +482,12 @@ def test_fine_agents_excluded_from_network():
     assert fine_set.isdisjoint(p1) and fine_set.isdisjoint(p2)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_fine_agents_excluded_from_network -v`
 Expected: FAIL (fine agents appear in edges).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `hpvsim/network.py`, add to `class SexualNetwork`:
 ```python
@@ -493,17 +501,17 @@ In `hpvsim/network.py`, add to `class SexualNetwork`:
         return super().active(people) & ~people.fine
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_fine_agents_excluded_from_network -v`
 Expected: PASS
 
-- [ ] **Step 5: Run ratio==1 regression gate**
+- [x] **Step 5: Run ratio==1 regression gate**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_natural_history.py tests/test_demographics.py -v`
 Expected: PASS (at ratio==1 no agent is fine, so `~people.fine` is all-True — identical eligibility).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add hpvsim/network.py tests/test_multiscale_grow_unit.py
@@ -523,7 +531,7 @@ git commit -m "feat(multiscale): exclude fine agents from the sexual network"
 - Consumes: `super().get_births()` (returns `birth_uids`), `people.fine`.
 - Produces: `hpv.Births` whose `get_births` drops fine "parents"; used as the default births class.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_fine_agents_do_not_drive_births():
@@ -546,12 +554,12 @@ def test_fine_agents_do_not_drive_births():
         assert not np.asarray(ppl.fine[uids]).any()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_fine_agents_do_not_drive_births -v`
 Expected: FAIL (`cannot import name Births` / default is `ss.Births`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `hpvsim/demographics.py` add (above `AnnualBirths`):
 ```python
@@ -577,17 +585,17 @@ In `hpvsim/sim.py`, update the import line `from .demographics import AgeMigrati
             births_cls = AnnualBirths if v2_compat_demographics else Births
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_fine_agents_do_not_drive_births -v`
 Expected: PASS
 
-- [ ] **Step 5: Run ratio==1 regression gate**
+- [x] **Step 5: Run ratio==1 regression gate**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_demographics.py -v`
 Expected: PASS (at ratio==1 no fine agents → birth_uids unchanged).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add hpvsim/demographics.py hpvsim/sim.py tests/test_multiscale_grow_unit.py
@@ -606,7 +614,7 @@ git commit -m "feat(multiscale): exclude fine agents from driving births"
 - Consumes: `people.fine`.
 - Produces: `AgeMigration` ignores fine agents for both the pyramid count and emigration selection.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_fine_agents_not_emigrated():
@@ -629,12 +637,12 @@ def test_fine_agents_not_emigrated():
 
 NOTE: `emigrated` may not exist as a People state in v3 (it was a vestigial v2 state). If absent, the test's final assertion is vacuously true; the real protection is the snapshot filter below plus the count-exclusion. Keep the assertion guarded as written.
 
-- [ ] **Step 2: Run test to verify it fails (or passes vacuously — then strengthen)**
+- [x] **Step 2: Run test to verify it fails (or passes vacuously — then strengthen)**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_fine_agents_not_emigrated -v`
 Expected: initially may pass vacuously; the implementation below is still required for correctness of the pyramid count. If it passes vacuously, that is acceptable — the count-exclusion is verified indirectly by Task 9 (incidence flat) and Task 12 (v2 tracking).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `hpvsim/demographics.py` `AgeMigration.step`, change the snapshot (line ~163) to exclude fine agents:
 ```python
@@ -650,12 +658,12 @@ In `hpvsim/demographics.py` `AgeMigration.step`, change the snapshot (line ~163)
             snap_uids = all_alive
 ```
 
-- [ ] **Step 4: Run test + ratio==1 regression gate**
+- [x] **Step 4: Run test + ratio==1 regression gate**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_fine_agents_not_emigrated tests/test_demographics.py -v`
 Expected: PASS (at ratio==1 `snap_uids == all_alive`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add hpvsim/demographics.py tests/test_multiscale_grow_unit.py
@@ -674,12 +682,12 @@ git commit -m "feat(multiscale): exclude fine agents from AgeMigration"
 - Consumes: `people.scale_flows`.
 - Produces: any per-step stock count of agents (`n_precin`/`n_cin`/`n_cancerous`/`n_infected` and analyzer prevalence denominators) is scale-weighted and `dtype=float`.
 
-- [ ] **Step 1: Audit which stocks exist and how they're tallied**
+- [x] **Step 1: Audit which stocks exist and how they're tallied**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -c "import sys; sys.path.insert(0,'.'); import hpvsim as hpv; s=hpv.Sim(location='nigeria', n_agents=300, start=2000, stop=2001, ms_agent_ratio=1); s.run(); [print(k, s.results[k].dtype if hasattr(s.results[k],'dtype') else type(s.results[k])) for k in s.results.keys()]"`
 Identify every result that is a population count of agents (stocks `n_*`, analyzer prevalence). For each, note whether it uses `.count()`/`len()` (plain) vs scale-weighted.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```python
 def test_stock_prevalence_scale_weighted():
@@ -702,12 +710,12 @@ def test_stock_prevalence_scale_weighted():
 
 NOTE: adjust the stock name (`n_cin`) to whatever the audit in Step 1 reveals. If the auto stock is named differently or owned by `HPVTotal`, target that result. If NO `n_*` stock exists for the disease module, the test instead asserts the analyzer prevalence denominator is scale-weighted; write it against the actual result key found in Step 1.
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_stock_prevalence_scale_weighted -v`
 Expected: FAIL (stock is plain count, fine counted as whole body).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Add an `update_results` override to `HPV` (or extend the existing results step) that recomputes each agent-count stock as a scale-weighted float. Example for `n_cin` (replicate for every stock identified in Step 1):
 ```python
@@ -724,12 +732,12 @@ Add an `update_results` override to `HPV` (or extend the existing results step) 
 ```
 Ensure each such result is declared `dtype=float` in `init_results` (add explicit float `n_*` results there if starsim auto-created them as int; if so, declare them in `define_results` to control dtype).
 
-- [ ] **Step 5: Run test to verify it passes + ratio==1 regression gate**
+- [x] **Step 5: Run test to verify it passes + ratio==1 regression gate**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_unit.py::test_stock_prevalence_scale_weighted tests/test_natural_history.py tests/test_age_results.py -v`
 Expected: PASS (at ratio==1 `scale_flows == count`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add hpvsim/hpv.py tests/test_multiscale_grow_unit.py
@@ -746,7 +754,7 @@ git commit -m "feat(multiscale): scale-weight stock prevalence results"
 **Interfaces:**
 - Consumes: the full feature (Tasks 1–8).
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 # tests/test_multiscale_grow_acceptance.py
@@ -775,12 +783,12 @@ def test_cancer_incidence_flat_across_ratio():
         assert 0.90 <= rel <= 1.10, f'ratio={ratio}: {rel:.3f} (base={base:.0f})'
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_acceptance.py::test_cancer_incidence_flat_across_ratio -v`
 Expected: PASS. If it fails LOW at high ratio, suspect the years/steps duration bug flagged in Task 4 Step 3 (compute_severity must receive years; scheduling must receive steps). If it fails HIGH, suspect a missing `~fine` guard or double-count. Debug with `superpowers:systematic-debugging`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_multiscale_grow_acceptance.py
@@ -797,12 +805,12 @@ git commit -m "test(multiscale): cancer incidence flat across ms_agent_ratio"
 **Interfaces:**
 - Consumes: full feature + an hpvsim screen+treat intervention.
 
-- [ ] **Step 1: Find the canonical screen+treat construction**
+- [x] **Step 1: Find the canonical screen+treat construction**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -c "import sys; sys.path.insert(0,'.'); import hpvsim as hpv; print([x for x in dir(hpv) if 'creen' in x or 'reat' in x or 'herap' in x])"`
 Inspect `tests/test_m06_*` for the exact screen+treat intervention API (products, eligibility, coverage) and copy that construction verbatim into the test.
 
-- [ ] **Step 2: Write the test**
+- [x] **Step 2: Write the test**
 
 ```python
 def _averted_fraction(ratio, seed, intervention_factory, n_agents=8000):
@@ -831,12 +839,12 @@ def test_intervention_equivalence_across_ratio():
     assert av1 > 0.05, 'intervention should avert a non-trivial cancer fraction'
 ```
 
-- [ ] **Step 3: Run the test**
+- [x] **Step 3: Run the test**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_acceptance.py::test_intervention_equivalence_across_ratio -v`
 Expected: PASS — fine agents are REAL and get screened/treated natively, so averted fraction matches across ratios (the property the ledger could not deliver).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/test_multiscale_grow_acceptance.py
@@ -850,7 +858,7 @@ git commit -m "test(multiscale): intervention equivalence across ratio (centerpi
 **Files:**
 - Test: `tests/test_multiscale_grow_acceptance.py`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 def _mean_age_at_cancer(ratio, seed, n_agents=6000):
@@ -871,12 +879,12 @@ def test_event_age_variance_shrinks_with_ratio():
     assert var10 < var1, f'var ratio1={var1:.3f} ratio10={var10:.3f}'
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `PYTHONPATH=<worktree> <venv-python> -m pytest tests/test_multiscale_grow_acceptance.py::test_event_age_variance_shrinks_with_ratio -v`
 Expected: PASS (more cancer events at higher ratio → tighter mean-age estimator; the original Fig-5 motivation).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_multiscale_grow_acceptance.py
@@ -893,7 +901,7 @@ git commit -m "test(multiscale): cancer event-age variance reduction with ratio"
 **Interfaces:**
 - Compares v3 grow-multiscale cancer totals to `hpvsim_v23_frozen` @ `fix-multiscale-cin-regate`.
 
-- [ ] **Step 1: Write the comparison script**
+- [x] **Step 1: Write the comparison script**
 
 ```python
 # tests/regression/validate_v2_grow_multiscale.py
@@ -917,12 +925,12 @@ import sys, argparse
 #     PYTHONPATH) — they cannot coexist in one interpreter.
 ```
 
-- [ ] **Step 2: Run both engines and record the ratio**
+- [x] **Step 2: Run both engines and record the ratio**
 
 Run the two commands in the docstring; record the v3/v2 cancer-total ratio in the script header as the validated figure.
 Expected: ratio within the documented engine-difference band. If materially outside, debug with `superpowers:systematic-debugging` before declaring the port faithful.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/regression/validate_v2_grow_multiscale.py

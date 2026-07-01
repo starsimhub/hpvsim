@@ -210,11 +210,11 @@ PARS = dict(
     verbose=0,
     pop_scale=1,            # Disable real-world scaling (match v3)
     total_pop=10000,        # Match n_agents so pop_scale stays 1
-    ms_agent_ratio=1,       # Disable multiscale dynamic agent spawning. v3
-                            # has no multiscale; v2's default ms_agent_ratio=10
-                            # spawns level1 sub-agents on cancer events that
-                            # otherwise inflate alive-agent slots and
-                            # contaminate the comparison.
+    ms_agent_ratio=1,       # Disable multiscale dynamic agent spawning to
+                            # match v3's single-scale default (ms_agent_ratio=1).
+                            # v2's default ms_agent_ratio=10 spawns level1
+                            # sub-agents on cancer events that otherwise inflate
+                            # alive-agent slots and contaminate the comparison.
 )
 ```
 

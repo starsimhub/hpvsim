@@ -2,7 +2,13 @@
 
 **Date:** 2026-06-29
 **Branch:** `m07-multiscale-v2-grow` (off `v3.0-dev`)
-**Status:** design approved; implementation plan pending
+**Status:** IMPLEMENTED — all 12 plan tasks complete; all acceptance gates pass
+(ratio==1 bit-identical; incidence flat rel 0.99/1.01 across {1,5,10};
+intervention equivalence; 6.4× event-age variance reduction, unbiased;
+v2.3.1 numerical tracking ratio 1.009). See
+`docs/superpowers/plans/2026-06-29-v2-faithful-grow-multiscale.md` and
+`.superpowers/sdd/progress.md`. Not yet PR'd (standalone comparison branch;
+multiscale is Unscheduled in `MIGRATION_PLAN.md`).
 
 ## 1. Goal
 
