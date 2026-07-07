@@ -81,12 +81,25 @@ _TP_SCALE = 0.102       # x cancer_fn.transform_prob (all genotypes) -- cancer L
 _CIN_K_SCALE = 0.380    # x cin_fn.k (all genotypes; cancer_fn.k synced) -- age SHAPE
 _DUR_CIN_SCALE = 1.043  # x dur_cin (mean & std, all genotypes)
 
-# CD4-stratified HIV->HPV effects. rel_sus / rel_sev are the v3 calibration best
-# fit (they drive the HIV+/HIV- cancer RR; replace v2's 4.75/2.75 and 2.5/3.5);
-# rel_imm retains the v2 Rwanda value (rwanda_pars.obj hiv_pars).
+# CD4-stratified HIV->HPV effects. rel_sus / rel_sev drive the HIV+/HIV- cancer
+# RR (replace v2's 4.75/2.75 and 2.5/3.5); rel_imm retains the v2 Rwanda value
+# (rwanda_pars.obj hiv_pars).
+#
+# RE-FIT ON THE GROW ENGINE (2026-07-07). The original 7-param ledger fit was
+# run at ms_agent_ratio=1, where HIV+ cancer is severely under-resolved (sparse
+# events, fit partly to noise). On the v2-faithful GROW multiscale engine
+# (branch m08-rwanda-on-grow) the HPV natural-history scalars above transferred
+# cleanly (HIV- flat/on-target), but HIV+ cancer over-predicted ~2x. A scoped
+# re-fit of ONLY the 4 rel_sus/rel_sev params at ms_agent_ratio=5 (where fine
+# agents resolve HIV+/cancer rare events) -- calibrate_rwanda_hiv_grow.py,
+# results/rwanda_calib_hiv_grow/ -- restored the fit (honest gof 1.42 @ 20 seeds
+# vs the ledger's ~2.05). rel_sus was ~unidentified (cancer responds to severity,
+# not acquisition, by the 2010-19 window) and barely moved; the fix was almost
+# entirely rel_sev_gt200 (3.25 -> 1.98): the CD4 200-500 band (bulk of the
+# on-ART HIV+ population) had too-aggressive severity on the grow engine.
 RWANDA_HIV_EFFECTS = {
-    'rel_sus': {'lt200': 3.58, 'gt200': 1.88},
-    'rel_sev': {'lt200': 5.12, 'gt200': 3.25},
+    'rel_sus': {'lt200': 3.60, 'gt200': 1.96},
+    'rel_sev': {'lt200': 5.23, 'gt200': 1.98},
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76},
 }
 
@@ -197,13 +210,18 @@ def make_rwanda_network():
 
 
 def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,
-                     incidence_driven=True, beta_m2f=0.0):
+                     incidence_driven=True, beta_m2f=0.0, ms_agent_ratio=5):
     """Rwanda HPV–HIV co-infection sim with the published v2.3 calibration.
 
     Args:
         incidence_driven: if True (default, v2-faithful), HIV transmission is
             off and the epidemic is imposed by ``hpv.hiv_incidence_import``;
             otherwise HIV transmits at ``beta_m2f`` over the sexual network.
+        ms_agent_ratio: grow-multiscale ratio. Defaults to 5 -- the ratio the
+            HIV rel_sus/rel_sev effects were re-fit at, where fine agents
+            resolve the sparse HIV+/cancer events (see RWANDA_HIV_EFFECTS).
+            ratio=1 is unbiased in expectation but leaves HIV+ by-age cancer
+            very noisy (needs many seeds).
     """
     connectors = [
         CrossImmunity(rel_sev_loc=REL_SEV_LOC),
@@ -226,6 +244,7 @@ def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,
         start=start,
         stop=stop,
         dt=dt,
+        ms_agent_ratio=ms_agent_ratio,
         genotypes=GENOTYPES,
         genotype_pars=rwanda_genotype_pars(),
         init_hpv_dist=RWANDA_INIT_HPV_DIST,
