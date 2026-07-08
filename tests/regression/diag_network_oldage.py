@@ -54,7 +54,13 @@ class _Probe(ss.Analyzer):
     def step(self):
         ti = self.sim.ti; ppl = self.sim.people
         auids = np.asarray(ppl.auids)
-        fem = ppl.female.values & ppl.alive.values
+        # Exclude fine multiscale agents: they are grown at the cancer decision
+        # and excluded from the sexual network by design, so they contribute 0
+        # to participation/acquisition but would inflate the alive denominator
+        # in the cancer-age bands this diagnostic studies (ratio=5 default).
+        fine = (ppl.fine.values if 'fine' in ppl.states
+                else np.zeros(ppl.female.values.shape, bool))
+        fem = ppl.female.values & ppl.alive.values & ~fine
         age = ppl.age.values
         e = self.sim.networks['sexualnetwork'].edges
         lid = np.asarray(e.layer_id); p1 = np.asarray(e.p1); p2 = np.asarray(e.p2)

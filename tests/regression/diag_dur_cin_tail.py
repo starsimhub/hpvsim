@@ -50,6 +50,10 @@ class _AgeAtCancer(ss.Analyzer):
         newc = np.zeros(fem.shape, bool)
         for m in self.hpv:
             newc |= (m.cancerous.values & (m.ti_cancerous.values == ti))
+        # This is a DISTRIBUTION of ages-at-cancer, not a rate, so no scale-
+        # weighting is needed at ms_agent_ratio=5 (build_rwanda_sim default):
+        # fine multiscale cancer agents are unbiased extra draws from the same
+        # age-at-cancer distribution, so pooling them just lowers variance.
         self.age_neg.extend(age[newc & fem & ~pos].tolist())
         self.age_pos.extend(age[newc & fem & pos].tolist())
 

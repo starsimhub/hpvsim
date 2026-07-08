@@ -39,23 +39,26 @@ class _Probe(ss.Analyzer):
     def step(self):
         ti = self.sim.ti
         ppl = self.sim.people
+        # Scale-weight counts: fine multiscale agents carry scale=1/ratio
+        # (build_rwanda_sim defaults ms_agent_ratio=5); w=1.0 at ratio=1.
+        w = ppl.scale.values
         alive = ppl.alive.values
         female = ppl.female.values
         age = ppl.age.values
         pos = self.hiv_module.infected.values
         f_pos = alive & female & pos
         f_neg = alive & female & ~pos
-        self.n_f_pos[ti] = f_pos.sum(); self.n_f_neg[ti] = f_neg.sum()
+        self.n_f_pos[ti] = (w * f_pos).sum(); self.n_f_neg[ti] = (w * f_neg).sum()
         any_hpv = np.zeros(alive.shape, dtype=bool)
         new_cancer = np.zeros(alive.shape, dtype=bool)
         for m in self.hpv_modules:
             any_hpv |= m.infected.values
             new_cancer |= (m.cancerous.values & (m.ti_cancerous.values == ti))
-        self.canc_f_pos[ti] = (new_cancer & f_pos).sum()
-        self.canc_f_neg[ti] = (new_cancer & f_neg).sum()
+        self.canc_f_pos[ti] = (w * (new_cancer & f_pos)).sum()
+        self.canc_f_neg[ti] = (w * (new_cancer & f_neg)).sum()
         adult_f = alive & female & (age >= 15) & (age < 50)
-        self.adult_f[ti] = adult_f.sum()
-        self.adult_f_hpv[ti] = (adult_f & any_hpv).sum()
+        self.adult_f[ti] = (w * adult_f).sum()
+        self.adult_f_hpv[ti] = (w * (adult_f & any_hpv)).sum()
 
 
 def _per_year(arr, years, reduce):

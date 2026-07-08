@@ -63,6 +63,10 @@ class CalibProbe(ss.Analyzer):
     def step(self):
         ti = self.sim.ti
         ppl = self.sim.people
+        # Scale-weight every count: multiscale fine agents carry scale=1/ratio
+        # (build_rwanda_sim defaults ms_agent_ratio=5), so a raw .sum() would
+        # over-count fine cancer agents ~5x. w=1.0 everywhere at ratio=1.
+        w = ppl.scale.values
         alive = ppl.alive.values
         fem = ppl.female.values & alive
         age = ppl.age.values
@@ -75,24 +79,24 @@ class CalibProbe(ss.Analyzer):
             newc |= (m.cancerous.values & (m.ti_cancerous.values == ti))
             anyhpv |= m.infected.values
         # aggregate (all-age female)
-        self.canc['pos'][ti] = (newc & fpos).sum(); self.canc['neg'][ti] = (newc & fneg).sum()
-        self.nf['pos'][ti] = fpos.sum(); self.nf['neg'][ti] = fneg.sum()
+        self.canc['pos'][ti] = (w * (newc & fpos)).sum(); self.canc['neg'][ti] = (w * (newc & fneg)).sum()
+        self.nf['pos'][ti] = (w * fpos).sum(); self.nf['neg'][ti] = (w * fneg).sum()
         # by age bin
         for bi, (lo, hi) in enumerate(zip(_AGE_EDGES[:-1], _AGE_EDGES[1:])):
             ab = (age >= lo) & (age < hi)
-            self.canc_age['pos'][bi, ti] = (newc & fpos & ab).sum()
-            self.canc_age['neg'][bi, ti] = (newc & fneg & ab).sum()
-            self.nf_age['pos'][bi, ti] = (fpos & ab).sum()
-            self.nf_age['neg'][bi, ti] = (fneg & ab).sum()
+            self.canc_age['pos'][bi, ti] = (w * (newc & fpos & ab)).sum()
+            self.canc_age['neg'][bi, ti] = (w * (newc & fneg & ab)).sum()
+            self.nf_age['pos'][bi, ti] = (w * (fpos & ab)).sum()
+            self.nf_age['neg'][bi, ti] = (w * (fneg & ab)).sum()
         # HIV epidemic (adult 15-49)
         ad = (age >= 15) & (age < 50)
-        self.n_hiv_1549[ti] = (alive & ad & pos).sum(); self.n_1549[ti] = (alive & ad).sum()
+        self.n_hiv_1549[ti] = (w * (alive & ad & pos)).sum(); self.n_1549[ti] = (w * (alive & ad)).sum()
         on_art = self.hiv.on_art.values if hasattr(self.hiv, 'on_art') else np.zeros(alive.shape, bool)
-        self.n_art[ti] = (alive & pos & on_art).sum(); self.n_hiv[ti] = (alive & pos).sum()
+        self.n_art[ti] = (w * (alive & pos & on_art)).sum(); self.n_hiv[ti] = (w * (alive & pos)).sum()
         # HPV prevalence among adult women by HIV status
         adf = fem & ad
-        self.hpv_pos[ti] = (adf & pos & anyhpv).sum(); self.hpv_neg[ti] = (adf & ~pos & anyhpv).sum()
-        self.nf_adult['pos'][ti] = (adf & pos).sum(); self.nf_adult['neg'][ti] = (adf & ~pos).sum()
+        self.hpv_pos[ti] = (w * (adf & pos & anyhpv)).sum(); self.hpv_neg[ti] = (w * (adf & ~pos & anyhpv)).sum()
+        self.nf_adult['pos'][ti] = (w * (adf & pos)).sum(); self.nf_adult['neg'][ti] = (w * (adf & ~pos)).sum()
 
 
 def _years(sim, n):
