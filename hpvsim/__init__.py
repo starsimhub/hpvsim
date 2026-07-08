@@ -25,7 +25,7 @@ from .seeding import _ExclusiveSeeder
 from .sim import Sim
 from .demographics import AgeMigration, AnnualBirths, Births
 from .cross_genotype import CrossImmunity, HPVTotal
-from .analyzers import AgeResults
+from .analyzers import AgeResults, snapshot, age_pyramid, age_causal_infection, dalys, results_by_genotype
 from .calibration import Calibration
 from . import calibration
 from .products import vx, dx, tx, txvx, radiation
