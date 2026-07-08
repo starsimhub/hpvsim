@@ -384,7 +384,7 @@ class snapshot(ss.Analyzer):
 
         snap = hpv.snapshot(timepoints=['2015', 2020])
         sim = hpv.Sim(analyzers=[snap]); sim.run()
-        people_2020 = sim.analyzers[0].get(2020)
+        people_2020 = sim.analyzers['snapshot'].get(2020)
     """
 
     def __init__(self, timepoints=None, die=True, **kwargs):
@@ -676,8 +676,17 @@ class dalys(ss.Analyzer):
                            & np.asarray(m.cancerous.raw) & alive)[0]
             if not len(new):
                 continue
-            cancer_age = age_raw[new]
+            # Defensive isfinite guard (symmetric with age_causal_infection):
+            # a gated agent always has finite ti_dead_cancer today, but a future
+            # non-fatal-cancer or reschedule path could leave it NaN — without
+            # this filter a single NaN death_age would poison the whole onset
+            # year's YLL/YLD sum.
             ti_dead = np.asarray(m.ti_dead_cancer.raw)[new]
+            ok = np.isfinite(ti_dead)
+            new, ti_dead = new[ok], ti_dead[ok]
+            if not len(new):
+                continue
+            cancer_age = age_raw[new]
             death_age = cancer_age + (ti_dead - ti) * dt
             w = scale_raw[new] if scale_raw is not None else np.ones(len(new))
             self._accumulate(year, cancer_age, death_age, w)
