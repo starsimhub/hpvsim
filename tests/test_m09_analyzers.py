@@ -162,18 +162,33 @@ def test_age_causal_infection_single_scale():
 
 
 def test_age_causal_infection_grow_unbiased():
-    """Mean ages at ratio>1 (grown fine agents) overlap ratio==1 (base agents)."""
-    def run(ratio):
+    """Grow's fine agents don't bias mean age-at-cancer vs ratio==1 base agents.
+
+    A SINGLE-seed comparison is too fragile here: the whole natural-history age
+    distribution reshuffles across RNG streams (e.g. between starsim versions),
+    so at n_agents=3000 one seed's ratio=1-vs-ratio=3 mean-age gap swings up to
+    ~2.5yr on noise alone. We therefore compare the SEED-AVERAGED mean age,
+    matching the multi-seed methodology of the slow acceptance gate
+    (test_multiscale_grow_acceptance), which validates the rigorous
+    ratio-independence properties (incidence-flat, variance-shrinks, ratio==1
+    bit-identical). This is the fast unit-level guard on the mean only.
+    """
+    def run(ratio, seed):
         aci = hpv.age_causal_infection(start=2000)
         sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
-                      n_agents=3000, rand_seed=2, ms_agent_ratio=ratio, analyzers=[aci])
+                      n_agents=3000, rand_seed=seed, ms_agent_ratio=ratio, analyzers=[aci])
         sim.run()
         a = sim.analyzers['age_causal_infection']
         return np.nanmean(a.age_cancer), len(a.age_cancer)
-    mean1, n1 = run(1)
-    mean3, n3 = run(3)
-    assert n3 > n1                      # grow yields ~ratio x more raw samples
-    assert abs(mean3 - mean1) < 2.0     # mean age at cancer within 2 years
+    seeds = range(6)
+    res1 = [run(1, s) for s in seeds]
+    res3 = [run(3, s) for s in seeds]
+    ages1 = [m for m, _ in res1]
+    ages3 = [m for m, _ in res3]
+    # grow yields ~ratio x more resolved samples every seed
+    assert all(n3 > n1 for (_, n1), (_, n3) in zip(res1, res3))
+    # seed-averaged mean age at cancer agrees within 2 years
+    assert abs(np.mean(ages3) - np.mean(ages1)) < 2.0
 
 
 def test_dalys_basic_and_av_disutility():
