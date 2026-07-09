@@ -64,7 +64,13 @@ def test_age_results_cancers_by_age_basic():
 def test_age_results_multi_year_snapshot():
     """Two years requested -> two snapshots stored, both non-empty schemas."""
     edges = np.array([0., 30., 60., 100.])
-    sim = hpv.Sim(n_agents=2000, start=1990, stop=2021, dt=1.0,
+    # n_agents must be large enough that the two snapshot years hold a
+    # meaningfully DIFFERENT cancer-by-age profile: at n=2000 there is ~1
+    # prevalent cancer, so 2010 and 2020 can coincidentally match (a false
+    # "identical" trip) — which is exactly what a distribution reshuffle (e.g.
+    # the starsim 3.5.0 upgrade) exposed. At n=15000 each year has ~10-16
+    # cancers with a clear age-profile shift, so the guard is robust.
+    sim = hpv.Sim(n_agents=15000, start=1990, stop=2021, dt=1.0,
                   rand_seed=0, analyzers=[hpv.AgeResults(
                       result_args=sc.objdict(
                           cancers=sc.objdict(years=[2010, 2020], edges=edges),
@@ -75,8 +81,9 @@ def test_age_results_multi_year_snapshot():
     df = ar.to_dataframe(key='cancers')
     assert list(df.index) == [2010.0, 2020.0]
     assert df.shape == (2, len(edges) - 1)
-    # 2010 and 2020 snapshots should differ — burden grows over the 30-year burn-in.
-    # If they were identical, step() might be overwriting the same slot.
+    # 2010 and 2020 snapshots should differ — the cancer age-profile shifts over
+    # the 30-year burn-in. If they were identical, step() might be overwriting
+    # the same slot.
     assert not np.array_equal(df.loc[2010.0].values, df.loc[2020.0].values)
 
 

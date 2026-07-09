@@ -12,8 +12,12 @@ import hpvsim as hpv
 # If you change any cascade-related RNG creation, this WILL fail and
 # you must investigate (intentional change -> re-pin; accidental
 # change -> fix the leaking dist).
-PINNED_TOTAL_INFECTIONS = 10191.0
-PINNED_TOTAL_CANCERS    = 13.0
+# Updated 2026-07-08 (10191.0 -> 10855.0, 13.0 -> 18.0): starsim 3.5.0 upgrade
+# reshuffled distribution RNG streams (see hpvsim/parameters.py ss.beta_dist
+# fix). Model behaviour is unchanged — grow acceptance gates + full suite pass
+# on 3.5.0; this is a single-seed CRN re-pin, not a model change.
+PINNED_TOTAL_INFECTIONS = 10855.0
+PINNED_TOTAL_CANCERS    = 18.0
 
 
 def _build_sim():
