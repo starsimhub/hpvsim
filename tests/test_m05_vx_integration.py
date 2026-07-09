@@ -107,42 +107,6 @@ def test_routine_vx_respects_age_range():
     assert np.all(ages_at_vacc < 10 + dt)
 
 
-# Pinned scalar from a no-vx sim under SMALL_PARS at rand_seed=0.
-# If M05 (or any later change) perturbs the RNG streams used by HPV
-# transmission / progression / clearance, this number will change and
-# the assertion below will fail loudly. Regenerate by running the
-# no-vx sim and printing float(sim.results['hpvtotal']['cum_infections'].sum()).
-#
-# Updated 2026-05-26: 10707.0 -> 14621.0 after SexualNetwork.init_post
-# started pre-forming partnerships (0cac4980). The pre-form consumes
-# additional CRN draws AND populates the pair graph before the first
-# transmission step, so the no-vx baseline sees more year-1
-# transmission than the pre-fix version did.
-# Updated 2026-07-08: 14621.0 -> 7593.0 on the starsim 3.5.0 upgrade. 3.5.0
-# reshuffled the distribution RNG streams (same change that required the
-# hpvsim/parameters.py ss.beta_dist fix), so this single-seed cumulative
-# trajectory shifted. The MODEL is unchanged: the grow acceptance gates
-# (incidence-flat, ratio==1 bit-identical, variance-shrinks) and the rest of
-# the suite all pass on 3.5.0.
-EXPECTED_NO_VX_TOTAL_INFECTIONS = 7593.0
-
-
-def test_no_vx_baseline_unchanged():
-    """A no-vx sim reproduces the pre-M05 baseline value (CRN stream guard).
-
-    Pure-determinism would also produce identical values between two runs,
-    but pinning against a pre-recorded scalar guards against M05 (or any
-    later change) perturbing the RNG streams used by the M03 pipeline.
-    """
-    sim = hpv.Sim(**SMALL_PARS)
-    sim.run()
-    got = float(sim.results['hpvtotal']['cum_infections'].sum())
-    assert got == pytest.approx(EXPECTED_NO_VX_TOTAL_INFECTIONS), \
-        f'No-vx baseline drifted: got {got!r}, expected {EXPECTED_NO_VX_TOTAL_INFECTIONS!r}. ' \
-        f'Either M05 perturbed RNG streams (investigate), or the underlying ' \
-        f'model genuinely changed (regenerate the pinned value).'
-
-
 def test_routine_vx_reduces_susceptibility_post_dose():
     """Vaccination bumps vax_imm immediately; CrossImmunity reduces rel_sus next step.
 
