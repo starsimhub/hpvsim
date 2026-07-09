@@ -106,13 +106,25 @@ class _ExclusiveSeeder(ss.Connector):
 
         Returns 1.0 for uids assigned to this genotype, 0.0 otherwise.
         The first invocation triggers the shared lazy compute.
+
+        The callback resolves the LIVE seeder from ``sim.connectors`` rather
+        than capturing ``self``. A deep-copy (``sc.dcp`` / ``ss.Calibration`` /
+        ``MultiSim`` / parallel) copies the connector-registered seeder and the
+        closure-captured seeder as SEPARATE objects; only the connector copy
+        goes through ``init_dists``, so a callback bound to the captured copy
+        would ``force``-reinit ``seed_bern``/``seed_choice`` onto a different
+        (and, on starsim >=3.5, platform-dependent) seed -> non-deterministic,
+        non-portable seeding. Resolving the connector instance keeps a single
+        properly-initialised source of truth, making seeding copy-stable and
+        platform-stable.
         """
         gen_idx = self.keys.index(key)
 
         def callback(module, sim, uids):
-            if self._assigned_uids is None:
-                self._compute(sim)
-            return np.isin(uids, self._assigned_uids[gen_idx]).astype(float)
+            seeder = _live_seeder(sim)
+            if seeder._assigned_uids is None:
+                seeder._compute(sim)
+            return np.isin(uids, seeder._assigned_uids[gen_idx]).astype(float)
 
         return callback
 
@@ -163,3 +175,18 @@ class _ExclusiveSeeder(ss.Connector):
         else:
             # No infections — empty assignment for each genotype.
             self._assigned_uids = tuple(infected_uids for _ in self.keys)
+
+
+def _live_seeder(sim):
+    """Return the _ExclusiveSeeder registered in ``sim.connectors``.
+
+    init_prev callbacks resolve the seeder through this rather than capturing
+    ``self`` so they always use the connector instance that went through
+    ``init_dists`` — see ``_ExclusiveSeeder.for_genotype``. Exactly one is
+    auto-wired by ``hpv.Sim`` when ``init_seeding='exclusive'``.
+    """
+    for c in sim.connectors.values():
+        if isinstance(c, _ExclusiveSeeder):
+            return c
+    raise RuntimeError('_ExclusiveSeeder not found in sim.connectors; '
+                       'exclusive-seeding init_prev callback cannot resolve it.')
