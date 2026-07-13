@@ -562,10 +562,10 @@ class age_causal_infection(ss.Analyzer):
         if float(sim.timevec[ti].years) < self.start_year:
             return
         dt = float(sim.t.dt)
-        age_raw = np.asarray(sim.people.age.raw)
-        alive = np.asarray(sim.people.alive.raw)
+        age_raw = sim.people.age.raw
+        alive = sim.people.alive.raw
         scale = getattr(sim.people, 'scale', None)
-        scale_raw = np.asarray(scale.raw) if scale is not None else None
+        scale_raw = scale.raw if scale is not None else None
         for m in self.hpv_modules:
             # Gate on cancerous & alive, not just ti_cancerous==ti: a scheduled
             # ti_cancerous persists on agents who die of other causes before
@@ -574,12 +574,12 @@ class age_causal_infection(ss.Analyzer):
             # mortality are correctly dropped here. This also drops the rare
             # agent who reaches cancer and dies of a competing cause on the same
             # tick (~1%).
-            new = np.where((np.asarray(m.ti_cancerous.raw) == ti)
-                           & np.asarray(m.cancerous.raw) & alive)[0]
+            new = np.where((m.ti_cancerous.raw == ti)
+                           & m.cancerous.raw & alive)[0]
             if not len(new):
                 continue
-            ti_inf = np.asarray(m.ti_infected.raw)[new]
-            ti_cin = np.asarray(m.ti_cin.raw)[new]
+            ti_inf = m.ti_infected.raw[new]
+            ti_cin = m.ti_cin.raw[new]
             ok = np.isfinite(ti_inf) & np.isfinite(ti_cin)
             new, ti_inf, ti_cin = new[ok], ti_inf[ok], ti_cin[ok]
             cur = age_raw[new]
@@ -664,16 +664,16 @@ class dalys(ss.Analyzer):
         if year < self.start_year:
             return
         dt = float(sim.t.dt)
-        age_raw = np.asarray(sim.people.age.raw)
+        age_raw = sim.people.age.raw
         scale = getattr(sim.people, 'scale', None)
-        scale_raw = np.asarray(scale.raw) if scale is not None else None
-        alive = np.asarray(sim.people.alive.raw)
+        scale_raw = scale.raw if scale is not None else None
+        alive = sim.people.alive.raw
         for m in self.hpv_modules:
             # See age_causal_infection.step for the cancerous & alive gate
             # rationale (drops scheduled-but-not-realized onsets and same-tick
             # competing deaths; on grow, fine agents with competing mortality).
-            new = np.where((np.asarray(m.ti_cancerous.raw) == ti)
-                           & np.asarray(m.cancerous.raw) & alive)[0]
+            new = np.where((m.ti_cancerous.raw == ti)
+                           & m.cancerous.raw & alive)[0]
             if not len(new):
                 continue
             # Defensive isfinite guard (symmetric with age_causal_infection):
@@ -681,7 +681,7 @@ class dalys(ss.Analyzer):
             # non-fatal-cancer or reschedule path could leave it NaN — without
             # this filter a single NaN death_age would poison the whole onset
             # year's YLL/YLD sum.
-            ti_dead = np.asarray(m.ti_dead_cancer.raw)[new]
+            ti_dead = m.ti_dead_cancer.raw[new]
             ok = np.isfinite(ti_dead)
             new, ti_dead = new[ok], ti_dead[ok]
             if not len(new):

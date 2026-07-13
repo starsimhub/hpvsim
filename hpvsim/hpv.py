@@ -328,16 +328,19 @@ class HPV(ss.Infection):
             if key not in self.results:
                 continue
             state_arr = getattr(self, state_name)
-            mask = np.asarray(state_arr[auids], dtype=bool)
-            uids_in = auids[mask]
+            uids_in = auids[state_arr.values]
             self.results[key][ti] = (
                 ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
             )
 
         # Re-derive per-genotype prevalence from the now-correct scale-weighted
         # n_infected (super computed it from the stale plain-count n_infected).
+        # Denominator is the alive-masked scale-weighted count, matching v2
+        # (people.scale_flows(alive_inds)) and HPVTotal; auids would include
+        # agents who died this step but aren't yet removed (remove_dead runs
+        # after update_results), inflating the denominator ~0.6%/step (~9% at t=0).
         if 'prevalence' in self.results and 'n_infected' in self.results:
-            n_alive_sw = ppl.scale_flows(auids)
+            n_alive_sw = ppl.scale_flows(ppl.alive.uids)
             self.results['prevalence'][ti] = (
                 self.results['n_infected'][ti] / n_alive_sw
                 if n_alive_sw > 0 else 0.0

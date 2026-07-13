@@ -260,16 +260,17 @@ class HPVTotal(ss.Analyzer):
         if n_alive_sw == 0:
             return
         # Per-agent state unions across modules, restricted to alive agents.
-        # Build on auids (not on full alive.values array) to avoid out-of-bounds
-        # indexing when ppl.grow() has extended arrays beyond their initial size.
+        # `.values` is the auid-indexed active-agent view; the alive mask still
+        # matters because auids holds agents who died this step (remove_dead
+        # runs after analyzers). The mask is invariant across states, so hoist.
         auids = people.auids
+        alive_mask = people.alive.values
         union_arrays = {}
         for key, attr in self._UNION_STATES.items():
             # Boolean union across all HPV modules, filtered to alive agents.
             in_state = np.zeros(len(auids), dtype=bool)
             for m in hpvs:
-                in_state |= np.asarray(getattr(m, attr)[auids], dtype=bool)
-            alive_mask = np.asarray(people.alive[auids], dtype=bool)
+                in_state |= getattr(m, attr).values
             in_state &= alive_mask
             uids_in = auids[in_state]
             union_arrays[key] = uids_in
@@ -282,11 +283,13 @@ class HPVTotal(ss.Analyzer):
         self.results['n_susceptible'][ti] = n_alive_sw - sw_inf
         self.results['prevalence'][ti] = sw_inf / n_alive_sw
         # Cumulative unique: agents whose ti_first_infection has fired on
-        # any genotype (including init-seeded). Filter to alive agents.
-        ever_infected = np.zeros(len(auids), dtype=bool)
+        # any genotype (including init-seeded), among those still alive.
+        # `.values` is auid-indexed, but auids still holds agents who died
+        # this step (remove_dead runs after analyzers), so mask by alive.
+        ever_infected = np.zeros_like(people.alive.values)
         for m in hpvs:
-            ever_infected |= np.isfinite(np.asarray(m.ti_first_infection[auids]))
-        ever_infected &= np.asarray(people.alive[auids], dtype=bool)
+            ever_infected |= np.isfinite(m.ti_first_infection.values)
+        ever_infected &= people.alive.values
         self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
 
     def finalize_results(self):
