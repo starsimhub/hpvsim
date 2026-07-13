@@ -19,8 +19,8 @@ Annual cadence is enforced by ``dt=ss.year`` in ``__init__``: ``ss.Loop``
 only fires ``step()`` at times in this module's ``t.tvec``, so it runs once
 per integer year regardless of sim.dt.
 
-``AnnualBirths`` uses the same annual-cadence trick to match v2's ``add_births``
-convention: births fire once per calendar year in a single pulse.
+``AnnualBirths`` uses the same annual-cadence trick to fire births once per
+calendar year in a single pulse.
 """
 import numpy as np
 import pandas as pd
@@ -72,12 +72,11 @@ class AgeMigration(ss.Demographics):
         # in lockstep through age bins, producing discrete pyramid steps
         # rather than smooth transitions. Jittering by uniform(0, 1) means
         # year-N immigrants are spread across [N, N+1) within the year.
-        # Skipped when v2_compat=True to match v2's discrete annual-cohort
-        # structure (immigrants land at exact integer ages, as add_births does).
+        # Skipped when v2_compat=True so immigrants land at exact integer ages.
         self._age_jitter = ss.uniform(low=0.0, high=1.0)
         # v2_compat: when True, skip age jitter so immigrants land at exact
-        # integer ages, matching v2's add_births convention. Pair with
-        # AnnualBirths to align both channels to v2's discrete-cohort structure.
+        # integer ages. Pair with AnnualBirths for fully discrete integer-age
+        # demographics.
         self._v2_compat = v2_compat
         return
 
@@ -166,7 +165,7 @@ class AgeMigration(ss.Demographics):
         # Snapshot alive UIDs at the start of the step, EXCLUDING fine
         # multiscale agents: they are high-resolution cancer stand-ins, not
         # real bodies, so they neither count toward the age x sex pyramid
-        # target nor are eligible to emigrate (v2 used alive_level0).
+        # target nor are eligible to emigrate.
         # This ensures the boolean masks remain aligned with the UID list even
         # as immigrants are added during the loop.
         all_alive = people.auids.copy()
@@ -242,9 +241,8 @@ class AgeMigration(ss.Demographics):
             # cohort doesn't all transition age bins on the same tick. Uses
             # the per-module CRN dist; ages_at_arrival is the integer
             # lower-bound of each immigrant's year band.
-            # Skipped when v2_compat is on — v2's add_births places immigrants
-            # at exact integer ages to match the discrete annual birth cohort
-            # structure.
+            # Skipped when v2_compat is on, placing immigrants at exact
+            # integer ages.
             if not self._v2_compat:
                 ages_at_arrival = ages_at_arrival + self._age_jitter.rvs(new_uids)
             people.age[new_uids] = ages_at_arrival
@@ -314,8 +312,7 @@ class Births(ss.Births):
 
     Births are an independent per-agent Bernoulli, so dropping fine agents
     from the drawn birth_uids is statistically identical to excluding them
-    from the eligible pool — matching v2's add_births, which counts only
-    level0 agents (n_alive_level0).
+    from the eligible pool; only non-fine (level0) agents reproduce.
     """
 
     def get_births(self):
@@ -327,7 +324,7 @@ class Births(ss.Births):
 
 
 class AnnualBirths(Births):
-    """Annual-pulse births matching v2's ``add_births`` convention.
+    """Annual-pulse births: one birth cohort per calendar year.
 
     Standard ``ss.Births`` distributes births evenly across all steps. This
     subclass fires a single birth pulse at each integer year boundary by giving
@@ -341,10 +338,6 @@ class AnnualBirths(Births):
     and ``AnnualBirths`` (1 step × full rate). Only the *timing* changes: every
     year's cohort is born on the same calendar step instead of being spread
     across four quarterly sub-cohorts.
-
-    This matches v2's ``add_births`` logic: ``dt_demog=1.0``, fired every
-    ``update_freq = int(dt_demog / dt) = 4`` steps at annual boundaries, using
-    the full annual crude birth rate scaled by ``dt_demog``.
 
     Opt-in only — default ``ss.Births`` behavior (continuous births) is
     unchanged. Activate by passing ``demographics=[hpv.AnnualBirths(...), ...]``

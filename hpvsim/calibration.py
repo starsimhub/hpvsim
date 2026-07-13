@@ -1,4 +1,4 @@
-"""HPVsim calibration — ss.Calibration subclass with v2.2.7-style gof eval.
+"""HPVsim calibration — ss.Calibration subclass with a weighted-gof eval.
 
 Provides:
     - hpv.Calibration: ss.Calibration subclass that takes a ``data`` dict of
@@ -33,7 +33,7 @@ class Calibration(ss.Calibration):
       ``AgeResults`` result name. The default eval_fn extracts the matching
       simulated values, aligns on (year, column), and sums
       ``compute_gof`` across all rows/columns, scaled by per-key
-      ``weights``. Mirrors v2.2.7's MAE-based mismatch.
+      ``weights`` (a mean-absolute-error mismatch).
     - ``components=[...]`` or a custom ``eval_fn``: standard ss.Calibration
       paths, unchanged.
 
@@ -184,7 +184,6 @@ def compute_gof(actual, predicted, normalize=True, use_frac=False,
                 skestimator=None, estimator=None, **kwargs):
     """Goodness-of-fit between two arrays — normalized absolute error by default.
 
-    Ported from HPVsim v2.2.7 (``hpvsim._v2_legacy.misc.compute_gof``).
     Mean squared error is ``normalize=False, use_squared=True, as_scalar='mean'``.
 
     Args:

@@ -21,7 +21,7 @@ from .network import SexualNetwork
 # Per-genotype curves ('hpv16', 'hpv18', 'hi5', 'ohr') are used in
 # 'independent' init_seeding mode, where each genotype seeds from its own
 # curve. hpv16's per-genotype curve aliases 'total' since hpv16 dominates
-# the total in the source v2 data. hpv18 is 0.6x of hpv16; hi5/ohr are 0.4x.
+# the total prevalence. hpv18 is 0.6x of hpv16; hi5/ohr are 0.4x.
 _INIT_HPV_PREV_AGE_BRACKETS = np.array([12, 17, 24, 34, 44, 64, 80, 150])
 
 _INIT_PREV = {
@@ -49,7 +49,7 @@ def _make_init_prev_fn(key):
     """Return the per-uid init-prev sampler for a given _INIT_PREV key.
 
     Accepts a genotype key ('hpv16', 'hpv18', 'hi5', 'ohr') for per-genotype
-    seeding or 'total' for the v2-equivalent total-HPV curve.
+    seeding or 'total' for the total-HPV curve.
     """
     curves = _INIT_PREV[key]
     f_curve = curves['f']

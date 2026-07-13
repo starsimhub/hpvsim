@@ -8,8 +8,7 @@ Exercises every M07 verification target:
   - sc.parallelize for parallel sim CREATION
   - ss.parallel for parallel sim EXECUTION
   - ss.MultiSim.median for result REDUCTION
-  - make_sim(seed, coverage) is the Starsim-native replacement for v2's
-    hpv.Scenarios.
+  - make_sim(seed, coverage) builds one labeled sim per scenario point
 
 Run from the repo root:
     python examples/m07_uq_sweep.py

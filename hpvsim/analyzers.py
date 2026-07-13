@@ -609,7 +609,7 @@ class dalys(ss.Analyzer):
     on the grow multiscale engine, extra cancers are real fine agents
     (``scale=1/ratio``) in ``sim.people``, so all onsets are captured at any
     ``ms_agent_ratio``. Absolute population DALYs require multiplying by
-    ``sim.pars.pop_scale`` (same convention as v2's per-agent-scale output).
+    ``sim.pars.pop_scale``.
 
     Args:
         start: ss.date-coercible; only count onsets at/after this year.
