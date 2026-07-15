@@ -60,13 +60,7 @@ Kwargs:
 
 import numpy as np
 import starsim as ss
-
-from .cross_genotype import HPVTotal, CrossImmunity
-from .data.country import load_country
-from .demographics import AgeMigration, AnnualBirths, Births
-from .hpv import HPV, _normalize_genotype
-from .network import SexualNetwork
-from .seeding import _ExclusiveSeeder
+import hpvsim as hpv
 
 
 class Sim(ss.Sim):
@@ -79,7 +73,7 @@ class Sim(ss.Sim):
                  **kwargs):
         # Pass start year so the age pyramid matches sim.start (loader
         # defaults to year 2000 with a materially different distribution).
-        country = load_country(location, year=int(start))
+        country = hpv.load_country(location, year=int(start))
         people = kwargs.pop('people', None)
         if people is None:
             people = ss.People(n_agents, age_data=country['age_data'],
@@ -99,11 +93,11 @@ class Sim(ss.Sim):
                 f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}"
             )
 
-        auto_connectors = [CrossImmunity()]
+        auto_connectors = [hpv.CrossImmunity()]
 
         if diseases is None:
             # Default to single-genotype HPV16 if neither supplied.
-            keys = (tuple(_normalize_genotype(g) for g in genotypes)
+            keys = (tuple(hpv._normalize_genotype(g) for g in genotypes)
                     if genotypes is not None else ('hpv16',))
             gpars_overrides = genotype_pars or {}
 
@@ -121,14 +115,14 @@ class Sim(ss.Sim):
                         f'resolved genotype keys {sorted(sim_keys)}'
                     )
 
-            diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
+            diseases = [hpv.HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
                             **gpars_overrides.get(k, {})) for k in keys]
             if init_seeding == 'exclusive':
                 # 'exclusive': one Bernoulli per agent for any HPV, then one
                 # genotype per infected agent via the seeder's per-genotype callback.
                 # 'independent' is the no-op path — each HPV's per-genotype init_prev
                 # curve drives its own seeding independently.
-                self._seeder = _ExclusiveSeeder(
+                self._seeder = hpv._ExclusiveSeeder(
                     genotype_keys=keys, init_hpv_dist=init_hpv_dist
                 )
                 for d, k in zip(diseases, keys):
@@ -141,17 +135,17 @@ class Sim(ss.Sim):
 
         networks = kwargs.pop('networks', None)
         if networks is None:
-            networks = [SexualNetwork(**country['network_pars'])]
+            networks = [hpv.SexualNetwork(**country['network_pars'])]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
-            births_cls = AnnualBirths if v2_compat_demographics else Births
+            births_cls = hpv.AnnualBirths if v2_compat_demographics else hpv.Births
             demographics = [
                 births_cls(birth_rate=country['birth_rate']),
                 ss.Deaths(death_rate=country['death_rate']),
-                AgeMigration(v2_compat=v2_compat_demographics),
+                hpv.AgeMigration(v2_compat=v2_compat_demographics),
             ]
 
-        analyzers = [HPVTotal()] + user_analyzers
+        analyzers = [hpv.HPVTotal()] + user_analyzers
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()
