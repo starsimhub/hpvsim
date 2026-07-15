@@ -42,7 +42,7 @@ dependencies = [
     'scipy',
     'pandas>=2.0.0',
     'sciris>=3.0.0',
-    'starsim>=3.3',
+    'starsim>=3.5',  # 3.5 changed Dist construction (see hpvsim/parameters.py ss.beta_dist); pinned baselines are 3.5-valued
     'matplotlib',
     'seaborn',
     'optuna',

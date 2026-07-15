@@ -208,6 +208,10 @@ class HPVTotal(ss.Analyzer):
         Diseases initialize before analyzers in Starsim's setup, so the
         per-genotype HPV result definitions (dtype + label) are available
         as a template when this runs.
+
+        The union-based stocks (n_infected, n_precin, n_cin, n_cancerous) are
+        declared as ``dtype=float`` so that ``step()`` can write scale-weighted
+        values (fine agents carry ``scale=1/ratio`` and must count as 1/ratio).
         """
         super().init_results()
         hpvs = self.hpv_modules
@@ -218,10 +222,13 @@ class HPVTotal(ss.Analyzer):
         for key, src in template.items():
             if key in self._SKIP or key in self._DERIVED:
                 continue
-            defs.append(ss.Result(key, dtype=src.dtype,
+            # Union-based stocks are written as scale-weighted floats in
+            # step(); all other results mirror the per-genotype dtype.
+            result_dtype = float if key in self._UNION_STATES else src.dtype
+            defs.append(ss.Result(key, dtype=result_dtype,
                                   label=f'{src.label} (any genotype)'))
         # Derived results (computed in step()).
-        defs.append(ss.Result('n_susceptible', dtype=int,
+        defs.append(ss.Result('n_susceptible', dtype=float,
                               label='Currently uninfected with any genotype'))
         defs.append(ss.Result('prevalence', dtype=float,
                               label='Prevalence of any HPV genotype'))
@@ -235,40 +242,51 @@ class HPVTotal(ss.Analyzer):
 
         Element-wise sums for the remaining results are computed in
         ``finalize_results`` once each module's full per-step array exists.
+
+        Union stocks (n_infected, n_precin, n_cin, n_cancerous) are written as
+        scale-weighted floats: ``people.scale_flows(uids_in_state)`` so that
+        fine agents (scale=1/ratio) count as 1/ratio, not 1. Derived results
+        (n_susceptible, prevalence) are computed from scale-weighted totals.
         """
         ti = self.sim.ti
         hpvs = self.hpv_modules
         if not hpvs:
             return
         people = self.sim.people
-        # auids includes dead-but-not-yet-removed agents, so the alive mask
-        # (not len(auids)) is the right denominator for prevalence and the
-        # right filter for current-state counts.
-        alive = people.alive.values
-        n_alive = int(alive.sum())
-        if n_alive == 0:
+        # auids contains all currently-tracked agents (alive + recently dead
+        # pending removal). alive.uids filters to those marked alive.
+        alive_uids = people.alive.uids
+        n_alive_sw = people.scale_flows(alive_uids)
+        if n_alive_sw == 0:
             return
-        # Per-agent state unions across modules, masked to alive agents.
+        # Per-agent state unions across modules, restricted to alive agents.
+        # Build on auids (not on full alive.values array) to avoid out-of-bounds
+        # indexing when ppl.grow() has extended arrays beyond their initial size.
+        auids = people.auids
         union_arrays = {}
         for key, attr in self._UNION_STATES.items():
-            u = np.zeros(alive.shape, dtype=bool)
+            # Boolean union across all HPV modules, filtered to alive agents.
+            in_state = np.zeros(len(auids), dtype=bool)
             for m in hpvs:
-                u |= getattr(m, attr).values
-            u &= alive
-            union_arrays[key] = u
-            self.results[key][ti] = int(u.sum())
-        # Derived from n_infected.
-        n_inf = int(union_arrays['n_infected'].sum())
-        self.results['n_susceptible'][ti] = n_alive - n_inf
-        self.results['prevalence'][ti] = n_inf / n_alive
+                in_state |= np.asarray(getattr(m, attr)[auids], dtype=bool)
+            alive_mask = np.asarray(people.alive[auids], dtype=bool)
+            in_state &= alive_mask
+            uids_in = auids[in_state]
+            union_arrays[key] = uids_in
+            # Scale-weighted count: fine agents count as 1/ratio, not 1.
+            self.results[key][ti] = (
+                people.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
+            )
+        # Derived from scale-weighted n_infected.
+        sw_inf = float(self.results['n_infected'][ti])
+        self.results['n_susceptible'][ti] = n_alive_sw - sw_inf
+        self.results['prevalence'][ti] = sw_inf / n_alive_sw
         # Cumulative unique: agents whose ti_first_infection has fired on
-        # any genotype (including init-seeded). Filter to alive agents so the
-        # count reflects currently-visible ever-infected agents. Once an
-        # agent dies and is removed from auids, they drop out of this count.
-        ever_infected = np.zeros(alive.shape, dtype=bool)
+        # any genotype (including init-seeded). Filter to alive agents.
+        ever_infected = np.zeros(len(auids), dtype=bool)
         for m in hpvs:
-            ever_infected |= np.isfinite(m.ti_first_infection.values)
-        ever_infected &= alive
+            ever_infected |= np.isfinite(np.asarray(m.ti_first_infection[auids]))
+        ever_infected &= np.asarray(people.alive[auids], dtype=bool)
         self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
 
     def finalize_results(self):

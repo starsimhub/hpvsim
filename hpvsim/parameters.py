@@ -52,16 +52,22 @@ class SimPars(ss.SimPars):
 
 
 def _beta_from_mean_var(mean, var):
-    """Build an ``ss.Dist(distname='beta', ...)`` from (mean, variance).
+    """Build a beta ``ss.Dist`` from (mean, variance).
 
     Converts to the beta distribution's shape parameters (a, b):
         a = ((1 - mean) / var - 1 / mean) * mean ** 2
         b = a * (1 / mean - 1)
     Valid for mean in (0, 1) and var < mean * (1 - mean).
+
+    Uses the ``ss.beta_dist`` factory rather than a bare
+    ``ss.Dist(distname='beta', ...)``: starsim >=3.5 no longer resolves a
+    name-only Dist to its scipy object, leaving ``self.dist=None`` so ``.rvs()``
+    raises ``AttributeError: 'NoneType' ... 'ppf'``. ``ss.beta_dist`` wires the
+    scipy dist explicitly and exists on both 3.4 and 3.5.
     """
     a = ((1 - mean) / var - 1 / mean) * mean ** 2
     b = a * (1 / mean - 1)
-    return ss.Dist(distname='beta', a=a, b=b)
+    return ss.beta_dist(a=a, b=b)
 
 
 def _imm_init_dist(mean=0.35, var=0.025):

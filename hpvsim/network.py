@@ -62,6 +62,24 @@ class SexualNetwork(ss.SexualNetwork):
     it as a per-act probability multiplier.
     """
 
+    def active(self, people):
+        """Network participation requires a non-fine (level0) agent.
+
+        Fine multiscale agents (people.fine) are high-resolution cancer
+        stand-ins excluded from transmission, mirroring v2's is_active
+        requirement that participants be level0.
+
+        The ``fine`` state is registered by ``hpv.Sim`` only when it builds its
+        own People (``people is None``). A network attached to a bare
+        ``ss.People`` (e.g. in network unit tests) has no ``fine`` state, so
+        guard the access and treat every agent as non-fine — matching the
+        ``'fine' in people.states`` guards used throughout demographics.py.
+        """
+        act = super().active(people)
+        if 'fine' in people.states:
+            act = act & ~people.fine
+        return act
+
     def net_beta(self, disease_beta=None, inds=None, disease=None):
         if inds is None:
             inds = Ellipsis

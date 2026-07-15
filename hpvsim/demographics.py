@@ -27,7 +27,7 @@ import pandas as pd
 import starsim as ss
 
 
-__all__ = ['AgeMigration', 'AnnualBirths']
+__all__ = ['AgeMigration', 'Births', 'AnnualBirths']
 
 
 class AgeMigration(ss.Demographics):
@@ -64,6 +64,9 @@ class AgeMigration(ss.Demographics):
         self._pop_by_year = None                    # {year: per-year pyramid DataFrame}, built in init_pre.
         # CRN-safe emigrant selection — domain set per call.
         self._emi_select = ss.choice(replace=False)
+        # Per-band emigration hazard applied independently to fine multiscale
+        # agents (excluded from the pyramid target). p set per band per call.
+        self._fine_emi_bern = ss.bernoulli(p=0.0)
         # Sub-year age jitter for incoming immigrants. Without this, every
         # "year-N" immigrant arrives at exactly age N.0 and the cohort ages
         # in lockstep through age bins, producing discrete pyramid steps
@@ -160,13 +163,35 @@ class AgeMigration(ss.Demographics):
         ages_data = pat_year['age'].values.astype(int)
 
         people = sim.people
-        # Snapshot alive UIDs and their attributes at the start of the step.
+        # Snapshot alive UIDs at the start of the step, EXCLUDING fine
+        # multiscale agents: they are high-resolution cancer stand-ins, not
+        # real bodies, so they neither count toward the age x sex pyramid
+        # target nor are eligible to emigrate (v2 used alive_level0).
         # This ensures the boolean masks remain aligned with the UID list even
         # as immigrants are added during the loop.
-        snap_uids = people.auids.copy()
+        all_alive = people.auids.copy()
+        if 'fine' in people.states:
+            snap_uids = all_alive[~people.fine[all_alive]]
+        else:
+            snap_uids = all_alive
         # age is float32 — cast to int for integer-bin lookup; female is already bool.
         ages = people.age[snap_uids].astype(int)
         female = people.female[snap_uids]
+
+        # Fine multiscale agents are excluded from the pyramid count/target
+        # above (counting them as whole bodies over-fills cancer-age bands and
+        # causes catastrophic over-emigration). But they must still face the
+        # SAME per-capita emigration rate as real bodies in their band, or they
+        # over-realize cancer relative to single scale (incidence inflates with
+        # ms_agent_ratio and horizon — the coarse source can emigrate before its
+        # cancer fires, but its fine peers otherwise cannot). Snapshot them
+        # separately and apply an independent per-band Bernoulli hazard below.
+        has_fine = ('fine' in people.states) and bool(
+            np.asarray(people.fine[all_alive], dtype=bool).any())
+        if has_fine:
+            fine_uids = all_alive[np.asarray(people.fine[all_alive], dtype=bool)]
+            fine_ages = people.age[fine_uids].astype(int)
+            fine_female = np.asarray(people.female[fine_uids], dtype=bool)
 
         n_imm_total = 0
         n_emi_total = 0
@@ -200,6 +225,13 @@ class AgeMigration(ss.Demographics):
                     band_uids = snap_uids[in_band]
                     self._emigrate(band_uids, n=-diff)
                     n_emi_total += -diff
+                    # Apply the same per-capita emigration rate to fine agents in
+                    # this (age, sex) band, independently (not counted in target).
+                    if has_fine and count_sim > 0:
+                        p_band = min((-diff) / count_sim, 1.0)
+                        fmask = ((fine_female if sex_is_female else ~fine_female)
+                                 & (fine_ages == age))
+                        self._emigrate_fine(fine_uids[fmask], p_band)
 
         if n_imm_total > 0:
             # Single People.grow + write per attribute, sized to the total
@@ -250,8 +282,51 @@ class AgeMigration(ss.Demographics):
         self.sim.people.request_removal(chosen_uids)
         return
 
+    def _emigrate_fine(self, fine_band_uids, p):
+        """Emigrate fine multiscale agents at per-band probability ``p``.
 
-class AnnualBirths(ss.Births):
+        Independent Bernoulli hazard (not target-count based) so fine agents
+        face the same per-capita emigration rate as real bodies in their band
+        without being counted in the pyramid target. Only still-pending agents
+        (not yet cancerous in any genotype) are removed — already-cancerous fine
+        agents are realized/counted, so removing them would not change incidence
+        but would disturb cancer-death accounting.
+        """
+        if p <= 0 or len(fine_band_uids) == 0:
+            return
+        self._fine_emi_bern.set(p=min(float(p), 1.0))
+        chosen = self._fine_emi_bern.filter(fine_band_uids)
+        if len(chosen) == 0:
+            return
+        pending = np.ones(len(chosen), dtype=bool)
+        for dis in self.sim.diseases.values():
+            canc = getattr(dis, 'cancerous', None)
+            if canc is not None:
+                pending &= ~np.asarray(canc[chosen], dtype=bool)
+        to_remove = chosen[pending]
+        if len(to_remove):
+            self.sim.people.request_removal(to_remove)
+        return
+
+
+class Births(ss.Births):
+    """ss.Births that excludes fine multiscale agents from reproducing.
+
+    Births are an independent per-agent Bernoulli, so dropping fine agents
+    from the drawn birth_uids is statistically identical to excluding them
+    from the eligible pool — matching v2's add_births, which counts only
+    level0 agents (n_alive_level0).
+    """
+
+    def get_births(self):
+        birth_uids = super().get_births()
+        ppl = self.sim.people
+        if 'fine' in ppl.states:
+            birth_uids = birth_uids[~ppl.fine[birth_uids]]
+        return birth_uids
+
+
+class AnnualBirths(Births):
     """Annual-pulse births matching v2's ``add_births`` convention.
 
     Standard ``ss.Births`` distributes births evenly across all steps. This
