@@ -211,19 +211,19 @@ class HPV(ss.Infection):
         # isolation is what keeps ms_agent_ratio==1 bit-identical and cancer
         # incidence flat across ratios (the base agents get identical draws
         # regardless of how many fine agents are grown). They are drawn by size
-        # (non-CRN); cross-scenario CRN is out of scope for multiscale. Built
-        # unitless from the live dists' (mean, std) in YEARS so .rvs() returns
-        # years directly (matching what compute_severity expects); ss.lognorm_ex
-        # applies the same external->internal parameterization _grow_fine_agents
-        # previously hand-coded.
-        self._extra_dur_precin = ss.lognorm_ex(
-            mean=float(self.pars.dur_precin.pars['mean']),
-            std=float(self.pars.dur_precin.pars['std']),
-        )
-        self._extra_dur_cin = ss.lognorm_ex(
-            mean=float(self.pars.dur_cin.pars['mean']),
-            std=float(self.pars.dur_cin.pars['std']),
-        )
+        # (non-CRN); cross-scenario CRN is out of scope for multiscale.
+        #
+        # The live dists' mean/std are ss.years TimePars. float() strips the
+        # TimePar so these dists stay UNITLESS and .rvs() returns plain YEARS —
+        # which is what compute_severity and the grow math expect. Without the
+        # cast, starsim's convert_timepars would divide by dt at init (a TimePar
+        # duration becomes a number of TIMESTEPS), so .rvs() would be 1/dt too
+        # large (4x at dt=0.25) and _grow_fine_agents does NOT re-multiply by
+        # dt_yr on this path (unlike the live dur_cin path in set_prognoses).
+        pc = self.pars.dur_precin.pars
+        cn = self.pars.dur_cin.pars
+        self._extra_dur_precin = ss.lognorm_ex(mean=float(pc['mean']), std=float(pc['std']))
+        self._extra_dur_cin = ss.lognorm_ex(mean=float(cn['mean']), std=float(cn['std']))
         self._extra_cin_unif = ss.random()
         self._extra_cancer_unif = ss.random()
         return
@@ -558,9 +558,9 @@ class HPV(ss.Infection):
 
         m = ratio - 1
         size = (n, m)
-        amod = np.asarray(age_mod, dtype=float)[:, None]
-        rel = np.asarray(rel_sev_cin, dtype=float)[:, None] * np.ones(size)
-        sevimm = np.asarray(sev_imm_cin, dtype=float)[:, None] * np.ones(size)
+        amod = age_mod[:, None]
+        rel = rel_sev_cin[:, None] * np.ones(size)
+        sevimm = sev_imm_cin[:, None] * np.ones(size)
 
         # age_risk-modified extra dur_cin (years).
         extra_dur_cin = self._extra_dur_cin.rvs(size) * amod
@@ -582,7 +582,7 @@ class HPV(ss.Infection):
         pcanc = compute_severity(extra_dur_cin, rel_sev=rel, pars=p.cancer_fn)
         extra_cancer = self._extra_cancer_unif.rvs(size) < pcanc
         # Existing fine agents never spawn more fine agents (v2 level0 guard).
-        not_fine = ~np.asarray(ppl.fine[cin_uids], dtype=bool)
+        not_fine = ~ppl.fine[cin_uids]
         extra_cancer &= not_fine[:, None]
         counts = extra_cancer.sum(axis=1)
         n_new = int(counts.sum())

@@ -68,17 +68,35 @@ def _make_init_prev_fn(key):
 
 
 class _ExclusiveSeeder(ss.Connector):
-    """Coordinated initial seeding for multi-genotype HPV.
+    """Mutually-exclusive initial seeding for multi-genotype HPV (v2-faithful).
 
-    Registered as an ``ss.Connector`` so the seeding Dists go through the
-    standard ``define_pars`` -> ``init_pre`` -> ``init_dists`` lifecycle.
+    In ``init_seeding='exclusive'`` each seeded agent starts with AT MOST ONE
+    genotype: a per-agent any-HPV draw (the 'total' prevalence curve) picks who
+    is infected, then a single genotype is assigned per infected agent. This
+    differs from ``'independent'`` seeding, where every genotype draws from its
+    own curve and co-infection at t=0 is possible.
 
-    On the first invocation of any per-genotype callback, computes the
-    global assignment (per-agent total-prevalence Bernoulli + per-infected
-    -agent genotype choice) and caches it. Each genotype's callback
-    returns 1.0 for uids assigned to it and 0.0 otherwise; an
-    ``ss.bernoulli`` with those probabilities deterministically yields
-    exactly the assigned uids in ``init_prev.filter()``.
+    Why a Connector (rather than seeding all genotypes in one place)? Two
+    starsim constraints:
+      * Each genotype is a separate ``HPV`` disease module, and starsim seeds
+        every disease independently in ``Disease.init_post`` via
+        ``init_prev.filter()`` (which also records ``_n_initial_cases`` so the
+        seeded cases are excluded from first-step incidence results). Reusing
+        that path keeps exclusive seeding consistent with the independent path
+        and gets the bookkeeping for free.
+      * We therefore need the assignment to be *shared* across those modules.
+        A Connector is the natural home for the two seeding Dists (so they go
+        through the standard ``define_pars`` -> ``init_pre`` -> ``init_dists``
+        lifecycle) and for the shared assignment cache. Note connectors run
+        ``init_post`` BEFORE diseases, so the seeder cannot seed directly in its
+        own ``init_post`` (rel_sev is not sampled yet) — instead it computes
+        lazily on the first per-genotype callback, which fires from within the
+        diseases' ``init_post``.
+
+    Mechanism: on the first per-genotype callback, ``_compute`` fixes the global
+    assignment (any-HPV Bernoulli + per-infected genotype choice) and caches it.
+    Each genotype's callback returns 1.0 for its assigned uids and 0.0 otherwise,
+    so ``ss.bernoulli(p=callback).filter()`` yields exactly those uids.
     """
 
     def __init__(self, genotype_keys, init_hpv_dist=None, **kwargs):
@@ -104,19 +122,17 @@ class _ExclusiveSeeder(ss.Connector):
     def for_genotype(self, key):
         """Return an init_prev callback for ``ss.bernoulli(p=callback)``.
 
-        Returns 1.0 for uids assigned to this genotype, 0.0 otherwise.
-        The first invocation triggers the shared lazy compute.
+        Returns 1.0 for uids assigned to this genotype, 0.0 otherwise; the
+        first invocation triggers the shared lazy compute.
 
-        The callback resolves the LIVE seeder from ``sim.connectors`` rather
-        than capturing ``self``. A deep-copy (``sc.dcp`` / ``ss.Calibration`` /
-        ``MultiSim`` / parallel) copies the connector-registered seeder and the
-        closure-captured seeder as SEPARATE objects; only the connector copy
-        goes through ``init_dists``, so a callback bound to the captured copy
-        would ``force``-reinit ``seed_bern``/``seed_choice`` onto a different
-        (and, on starsim >=3.5, platform-dependent) seed -> non-deterministic,
-        non-portable seeding. Resolving the connector instance keeps a single
-        properly-initialised source of truth, making seeding copy-stable and
-        platform-stable.
+        The callback resolves the live seeder from ``sim.connectors`` (via
+        ``_live_seeder``) instead of capturing ``self`` so it stays correct
+        under deep-copy (``ss.Calibration`` / ``MultiSim`` / parallel). A copy
+        clones the connector-registered seeder and any closure-captured seeder
+        as separate objects, and only the connector copy goes through
+        ``init_dists`` — so a callback bound to the captured copy would use
+        uninitialised/force-reinitialised Dists and seed a different set of
+        agents. Resolving the connector keeps one initialised source of truth.
         """
         gen_idx = self.keys.index(key)
 
@@ -154,10 +170,8 @@ class _ExclusiveSeeder(ss.Connector):
             p_per_uid[~net.active(people)[auids]] = 0.0
 
         # Step 3: Bernoulli draw — who gets any HPV at all.
-        # Note: when ss.Calibration deep-copies the sim, the _ExclusiveSeeder
-        # stored as sim._seeder may be a different object from the one in
-        # sim.connectors (which is the one init_dists initialises). Ensure
-        # seed_bern is initialised before use so both paths work.
+        # _live_seeder routes callbacks to the connector-registered seeder, but
+        # guard anyway: init seed_bern if a copy left it uninitialised.
         self.pars.seed_bern.set(p=p_per_uid)
         if not self.pars.seed_bern.initialized:
             self.pars.seed_bern.init(sim=sim, force=True)
