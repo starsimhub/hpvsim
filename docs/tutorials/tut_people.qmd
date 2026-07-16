@@ -21,7 +21,7 @@ HPVsim includes pre-downloaded demographic data, including:
  * Birth rates from 1950-2100 from the World Bank;
  * Age- and sex-specific mortality rates from 1950-2100 from the UN's World Population Projections.
 
-As we saw in Tutorial 1, you load these data simply by using the `location` parameter. HPVsim v3.0 ships with data for `'nigeria'`; support for additional locations is expanding.
+As we saw in Tutorial 1, you load these data simply by using the `location` parameter. HPVsim ships demographic data (age structure, births, deaths) for any country in the UN World Population Prospects; just pass the country name (case-insensitive). Network calibration is location-agnostic by default — analysis scripts supply their own per-country network parameters.
 
 When a `location` is set, HPVsim uses these data to seed the initial age/sex pyramid and to drive births, deaths, and age-specific migration over the course of the run. The migration module pins the simulated age pyramid to the target population trajectory each year; the resulting immigrant/emigrant flows are reported under `sim.results.agemigration`.
 
