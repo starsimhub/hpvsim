@@ -87,19 +87,20 @@ website:
           href: api/index.qmd
         - section: "**Modules**"
           contents:
-            - api/analysis.qmd
-            - api/base.qmd
+            - api/analyzers.qmd
             - api/calibration.qmd
+            - api/cross_genotype.qmd
             - api/defaults.qmd
-            - api/hiv.qmd
-            - api/immunity.qmd
+            - api/demographics.qmd
+            - api/hpv.qmd
             - api/interventions.qmd
+            - api/migration_utils.qmd
             - api/misc.qmd
+            - api/network.qmd
             - api/parameters.qmd
-            - api/people.qmd
             - api/plotting.qmd
-            - api/population.qmd
-            - api/run.qmd
+            - api/products.qmd
+            - api/seeding.qmd
             - api/settings.qmd
             - api/sim.qmd
             - api/utils.qmd
@@ -157,19 +158,20 @@ quartodoc:
     - title: API reference
       desc: Full details on all HPVsim classes and functions.
       contents:
-        - analysis
-        - base
+        - analyzers
         - calibration
+        - cross_genotype
         - defaults
-        - hiv
-        - immunity
+        - demographics
+        - hpv
         - interventions
+        - migration_utils
         - misc
+        - network
         - parameters
-        - people
         - plotting
-        - population
-        - run
+        - products
+        - seeding
         - settings
         - sim
         - utils
