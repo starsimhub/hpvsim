@@ -54,7 +54,7 @@ class AgeMigration(ss.Demographics):
         super().__init__(dt=ss.year)
         self.update_pars(pars, **kwargs)
         self._pop_total = pop_total                 # [year, pop_size] DataFrame; sets _scale and the data-year window.
-        self._pop_by_age = pop_by_age               # [year, age, male, female] DataFrame; the per-step target pyramid.
+        self._pop_by_age = pop_by_age               # [year, age, male, female] DataFrame; source for _pop_by_year, released after init_pre builds it.
         # Sim agents per real-world person at sim.start (n_agents / pop_total
         # at start year). Used to scale target_counts each step so the pyramid
         # is matched in agent-space, not person-space.
@@ -95,40 +95,49 @@ class AgeMigration(ss.Demographics):
             sim_start.year if hasattr(sim_start, 'year') else sim_start
         )
 
-        # Pull from country data if not explicitly supplied.
-        if self._pop_total is None or self._pop_by_age is None:
-            from .data.country import load_country
-            # hpv.Sim stores location on the sim; fall back to pars if a
-            # caller wired it there instead.
-            location = (
-                getattr(sim, 'location', None)
-                or getattr(sim.pars, 'location', None)
-            )
-            if location is None:
-                raise AttributeError(
-                    'AgeMigration could not find a location on the sim. '
-                    'Either pass pop_total/pop_by_age explicitly, or use '
-                    'hpv.Sim which stores sim.location.'
+        # Pull from country data if not explicitly supplied, then group
+        # pop_by_age into a {year: DataFrame} dict so step() can do an O(1)
+        # lookup instead of an O(rows) mask + sort every year. Guarding on
+        # _pop_by_year makes this idempotent: a second init_pre finds the
+        # lookup already built and the raw table already released (below).
+        if self._pop_by_year is None:
+            if self._pop_total is None or self._pop_by_age is None:
+                from .data.country import load_country
+                # hpv.Sim stores location on the sim; fall back to pars if a
+                # caller wired it there instead.
+                location = (
+                    getattr(sim, 'location', None)
+                    or getattr(sim.pars, 'location', None)
                 )
-            cd = load_country(location, year=int(sim_start_year))
-            if self._pop_total is None:
-                self._pop_total = cd['pop_total']
-            if self._pop_by_age is None:
-                self._pop_by_age = cd['pop_by_age']
+                if location is None:
+                    raise AttributeError(
+                        'AgeMigration could not find a location on the sim. '
+                        'Either pass pop_total/pop_by_age explicitly, or use '
+                        'hpv.Sim which stores sim.location.'
+                    )
+                cd = load_country(location, year=int(sim_start_year))
+                if self._pop_total is None:
+                    self._pop_total = cd['pop_total']
+                if self._pop_by_age is None:
+                    self._pop_by_age = cd['pop_by_age']
 
-        # Scale factor: n_agents / data_population_at_sim_start.
+            self._pop_by_year = {
+                int(y): grp.sort_values('age')
+                for y, grp in self._pop_by_age.groupby('year')
+            }
+            # Release the raw table: it is the single largest object on the
+            # module (the full age x sex x year pyramid) and is only needed
+            # to build the per-year lookup above. Nulling it roughly halves
+            # the module's memory and save-file footprint.
+            self._pop_by_age = None
+
+        # Scale factor: n_agents / data_population_at_sim_start. Recomputed
+        # each init_pre since n_agents / start may change.
         pt = self._pop_total
         data_pop_at_start = float(
             np.interp(sim_start_year, pt['year'].values, pt['pop_size'].values)
         )
         self._scale = float(sim.pars.n_agents) / data_pop_at_start
-
-        # Group pop_by_age once into a {year: DataFrame} dict so step() can
-        # do an O(1) lookup instead of an O(rows) mask + sort every year.
-        self._pop_by_year = {
-            int(y): grp.sort_values('age')
-            for y, grp in self._pop_by_age.groupby('year')
-        }
         return
 
     def init_results(self):
