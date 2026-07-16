@@ -3,6 +3,40 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
+## Version 3.0.0 (2026-07-16)
+
+HPVsim v3 is a ground-up migration onto [Starsim](https://docs.starsim.org).
+The disease model, sexual network, demographics, interventions, and analyzers
+are now Starsim modules, and `hpv.Sim` wraps `starsim.Sim`. The natural-history
+model, genotypes, and interventions are preserved; the API changed
+substantially. See the [migration guide](docs/migration.qmd) for a full v2→v3
+walkthrough.
+
+- Rebuilt on Starsim (`starsim>=3.5`); requires Python ≥ 3.10.
+- Multi-genotype HPV with cross-immunity, natural-history progression
+  (precin/CIN/cancer), sexual network, births/deaths/age-specific migration,
+  vaccination, screening, and test-and-treat cascades all reimplemented as
+  Starsim modules.
+- Multiscale modeling (`ms_agent_ratio`) grows real fine agents rather than
+  scheduling extras, giving an intervention-correct, unbiased cancer level.
+- Analyzers (`snapshot`, `age_pyramid`, `age_causal_infection`, `dalys`,
+  `AgeResults`, per-genotype results) and built-in plotting ported.
+- *Regression information*: v3 uses Starsim's RNG framework and does not share
+  a stream with v2; results are not bit-identical to v2 even with the same
+  seed. Validate on overlapping uncertainty intervals, not exact values.
+- *Regression information*: the `hpv.Sim` constructor no longer takes a
+  positional parameter dict (the first positional argument is `location`); pass
+  parameters as keyword arguments or `hpv.Sim(**pars)`. `end` is now `stop`; the
+  pooled `'hr'` genotype shorthand is replaced by `hi5`/`ohr`.
+- *Regression information*: results are organized by module
+  (`sim.results.hpv16.cum_infections`, aggregate `sim.results.hpvtotal.*`)
+  rather than one flat dict; `sim.short_summary` and the top-level
+  `hpv.save`/`hpv.load`/`hpv.MultiSim` helpers are removed (use `sim.save()` /
+  `ss.load()` / `ss.MultiSim`).
+- Not ported to v3.0: waning immunity, v2's incidence-based HIV (HIV–HPV
+  co-infection ships in a later release), `EventSchedule`, and custom
+  `settings.py` (superseded by `ss.options`).
+
 ## Version 2.3.0 (2026-04-20)
 
 - Fixes dt-dependent results by scaling partnership formation rates to

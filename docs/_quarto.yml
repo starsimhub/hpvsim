@@ -48,6 +48,8 @@ website:
         href: overview.md
       - text: What's new
         href: whats-new.md
+      - text: Migrating from v2
+        href: migration.qmd
       - text: Tutorials
         href: tutorials.md
       - text: Code of conduct
@@ -65,6 +67,8 @@ website:
           href: overview.md
         - text: "**What's new**"
           href: whats-new.md
+        - text: "**Migrating from v2**"
+          href: migration.qmd
         - section: "**Tutorials**"
           contents:
             - tutorials/tut_intro.qmd

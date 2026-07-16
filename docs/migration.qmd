@@ -1,0 +1,167 @@
+---
+title: "Migrating from HPVsim v2 to v3"
+---
+
+HPVsim v3 is rebuilt on [Starsim](https://docs.starsim.org). The disease
+model, sexual network, demographics, interventions, and analyzers are now
+Starsim modules, and `hpv.Sim` is a thin wrapper around `starsim.Sim`. The
+science is the same — the same natural-history model, genotypes, and
+interventions — but the API surface changed in ways that will break most v2
+scripts. This guide covers what changed and how to update your code.
+
+::: {.callout-important}
+v3 uses Starsim's random-number framework, which does **not** share a stream
+with v2. Results are therefore not bit-identical to v2 even with the same
+seed; equivalence is at the level of overlapping uncertainty intervals, not
+exact reproduction.
+:::
+
+## Installation
+
+```bash
+pip install hpvsim==3.0.0
+```
+
+v3 requires Python ≥ 3.10 and pulls in `starsim>=3.5`.
+
+## Constructing a Sim
+
+The single most common breaking change: **v2 passed a parameter dict as the
+first positional argument; v3's first positional argument is `location`.**
+
+```python
+# v2 — breaks in v3 (the dict is interpreted as `location`)
+pars = dict(n_agents=10e3, genotypes=[16, 18, 'hr'], start=1980, end=2030)
+sim = hpv.Sim(pars)
+
+# v3 — pass parameters as keyword arguments
+sim = hpv.Sim(n_agents=10_000, genotypes=[16, 18, 'hi5', 'ohr'],
+              start=1980, stop=2030)
+
+# v3 — or splat a dict of keyword arguments
+pars = dict(n_agents=10_000, genotypes=[16, 18, 'hi5', 'ohr'],
+            start=1980, stop=2030)
+sim = hpv.Sim(**pars)
+```
+
+Note the other changes in that example:
+
+| v2 | v3 | Notes |
+|---|---|---|
+| `end=2030` | `stop=2030` | The simulation end is `stop`. Passing `end` raises `KeyNotFoundError`. |
+| `genotypes=[16, 18, 'hr']` | `genotypes=[16, 18, 'hi5', 'ohr']` | The pooled `'hr'` shorthand is gone. Valid names are `hpv16`, `hpv18`, `hi5`, `ohr` (integers `16`/`18` are accepted and normalized). |
+| `hpv.Sim(pars)` | `hpv.Sim(**pars)` | `pars` is no longer positional. |
+
+The `pars=` keyword still exists, but it only accepts **base Starsim sim
+parameters** (`n_agents`, `start`, `stop`, `dt`, `total_pop`, …). HPVsim-specific
+arguments — `genotypes`, `location`, `genotype_pars`, `init_seeding`,
+`ms_agent_ratio` — must be passed as their own keyword arguments, not inside
+`pars`.
+
+## Genotype parameters
+
+Per-genotype overrides move from nested parameter dicts to the `genotype_pars`
+argument, keyed by genotype name:
+
+```python
+sim = hpv.Sim(
+    genotypes=[16, 18],
+    genotype_pars={'hpv16': {'rel_beta': 1.1}},
+)
+```
+
+## Seeding
+
+v3 defaults to `init_seeding='exclusive'`: at initialization each infected
+agent carries exactly one genotype (matching v2's no-co-infection-at-init
+behavior). Pass `init_seeding='independent'` to let each genotype's `init_prev`
+seed independently.
+
+## Results
+
+Results are now organized by module (Starsim style) rather than as one flat
+dictionary. Per-genotype results live under the genotype's key, and an
+aggregate `hpvtotal` view sums across genotypes:
+
+```python
+# v2
+sim.results['infections']
+sim.results['cancers']
+
+# v3 — per genotype
+sim.results.hpv16.cum_infections
+sim.results.hpv16.new_cancers
+
+# v3 — aggregate across genotypes
+sim.results.hpvtotal.cum_infections
+```
+
+Plotting is unchanged in spirit:
+
+```python
+sim.plot()
+```
+
+There is no longer a `sim.short_summary` attribute.
+
+## Saving and loading
+
+The top-level `hpv.save` / `hpv.load` convenience functions are gone. Use the
+sim's own `save` method and Starsim's `load`:
+
+```python
+# v2
+hpv.save('mysim.sim', sim)
+sim = hpv.load('mysim.sim')
+
+# v3
+sim.save('mysim.sim')
+import starsim as ss
+sim = ss.load('mysim.sim')
+```
+
+`sim.save()` shrinks the sim (freeing RNG and back-references) before writing;
+the saved sim reloads ready to inspect. `sciris` also round-trips a sim
+directly (`sc.save` / `sc.load`).
+
+## Running many sims
+
+There is no `hpv.MultiSim`; use Starsim's `MultiSim` with an `hpv.Sim`:
+
+```python
+import starsim as ss
+msim = ss.MultiSim(hpv.Sim(genotypes=[16, 18]), n_runs=10).run()
+msim.median()
+```
+
+## Interventions and analyzers
+
+Interventions and analyzers are passed to the sim as before, via the
+`interventions=` and `analyzers=` arguments, but they are now Starsim modules.
+Vaccination, screening, and treat-and-treat cascades are configured through
+HPVsim's intervention classes; age-stratified results use `hpv.AgeResults`, and
+the aggregate `hpv.HPVTotal` analyzer is added automatically. See the
+[interventions](tutorials/tut_interventions.qmd) and
+[analyzers](tutorials/tut_analyzers.qmd) tutorials for the v3 API.
+
+## Behavioral differences to expect
+
+- **RNG / seeds.** Different framework, different stream — see the note at the
+  top. Compare on intervals, not exact values.
+- **Multiscale cancer.** With `ms_agent_ratio > 1`, v3 grows real fine agents
+  and tracks an *unbiased* cancer level. v2.3's default (`ms_agent_ratio=10`)
+  deflated cancer incidence; v3 corrects this, so absolute cancer counts can
+  differ from an old v2.3 run.
+- **Demographics.** Age-specific migration pins the age pyramid to the target
+  population trajectory each year; small immigration/emigration flows appear in
+  `results.agemigration` that v2 did not report separately.
+
+## Not ported to v3.0
+
+These v2 features are intentionally not in the v3.0 release:
+
+- **Waning immunity** — never used in published analyses.
+- **v2's incidence-based HIV** — superseded by transmission-based HIV; HIV–HPV
+  co-infection ships in a later release, not v3.0.
+- **`EventSchedule`** — rarely used.
+- **Custom `settings.py`** — superseded by `ss.options`.
