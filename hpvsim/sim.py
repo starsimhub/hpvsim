@@ -193,3 +193,18 @@ class Sim(ss.Sim):
             uids = self.people.auids
             self.people.age.raw[uids] = np.floor(self.people.age.raw[uids])
         return self
+
+    def shrink(self, inplace=True, full=True, size_limit=None, base_size=30, die=True):
+        """Shrink the sim for saving; skips the per-module size check by default.
+
+        Identical to ``ss.Sim.shrink`` except ``size_limit`` defaults to None
+        rather than 1.0. The CrossImmunity connector and HPVTotal analyzer each
+        hold references to the shared disease modules; starsim's per-module size
+        budget counts those referenced modules against them and raises on a
+        multi-genotype sim, even though ``sc.save`` serializes the disease
+        modules once and the actual file is small (~1 MB). Dist and
+        back-reference shrinking still run — only the (double-counting) size
+        check is disabled. Pass ``size_limit=1.0`` to restore it.
+        """
+        return super().shrink(inplace=inplace, full=full, size_limit=size_limit,
+                              base_size=base_size, die=die)

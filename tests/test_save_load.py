@@ -36,21 +36,20 @@ def _cum_infections(sim):
 
 
 def test_sim_save_load_roundtrip(tmp_path):
-    """sim.save(shrink=False) + ss.load preserves the sim and its results.
+    """Default sim.save() (shrink=True) + ss.load preserves the sim.
 
-    shrink=False is used because starsim's shrink size-check trips on the
-    CrossImmunity connector and HPVTotal analyzer for multi-genotype sims:
-    each holds references to the (shared) disease modules, which the
-    per-module budget counts against them even though pickle serializes the
-    disease modules once. shrink=False sidesteps the check and saves the full,
-    re-runnable sim; the actual file stays small (~1 MB).
+    hpv.Sim.shrink defaults size_limit=None, so the default save skips
+    starsim's per-module size check — which otherwise trips on the
+    CrossImmunity connector and HPVTotal analyzer (each references the shared
+    disease modules; the budget double-counts them). Dist shrinking still
+    runs, so the saved file is small.
     """
     sim = _tiny_sim()
     sim.run()
     ref = _cum_infections(sim)
 
     fp = str(tmp_path / 'sim.sim')
-    sim.save(fp, shrink=False)
+    sim.save(fp)
     assert (tmp_path / 'sim.sim').exists()
 
     loaded = ss.load(fp)
@@ -71,6 +70,23 @@ def test_sim_save_load_via_misc(tmp_path):
     loaded = misc.load(fp)
     assert isinstance(loaded, hpv.Sim)
     assert np.allclose(_cum_infections(loaded), ref)
+
+
+def test_multigenotype_default_save(tmp_path):
+    """Default sim.save() works for a multi-genotype sim.
+
+    Guards the hpv.Sim.shrink size_limit=None override: without it, starsim's
+    per-module size check raises on CrossImmunity / HPVTotal for >1 genotype.
+    """
+    sim = hpv.Sim(n_agents=300, location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'],
+                  start=2000, stop=2005, dt=0.25, rand_seed=0, verbose=0)
+    sim.run()
+
+    fp = str(tmp_path / 'multi.sim')
+    sim.save(fp)  # default shrink=True; must not raise
+    loaded = ss.load(fp)
+    assert isinstance(loaded, hpv.Sim)
+    assert np.allclose(_cum_infections(loaded), _cum_infections(sim))
 
 
 def test_multisim_save_load_roundtrip(tmp_path):
