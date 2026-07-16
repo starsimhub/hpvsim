@@ -55,6 +55,8 @@ Kwargs:
 """
 
 import numpy as np
+import pandas as pd
+import sciris as sc
 import starsim as ss
 import hpvsim as hpv
 
@@ -208,3 +210,47 @@ class Sim(ss.Sim):
         """
         return super().shrink(inplace=inplace, full=full, size_limit=size_limit,
                               base_size=base_size, die=die)
+
+    def to_json(self, filename=None, keys=None, indent=2, verbose=False, **kwargs):
+        """Export parameters and results as JSON.
+
+        Works around an upstream Starsim bug: ``ss.Sim.to_json`` does
+        ``self.to_df().to_dict()``, but Starsim's own ``Results.to_df`` returns
+        an objdict of per-module DataFrames (not a single DataFrame) whenever a
+        sim's modules span different time axes — so ``.to_dict()`` raises. This
+        hits any mixed-timeline sim; HPVsim triggers it every run because
+        ``AgeMigration`` steps annually while the disease modules step
+        sub-annually. Here each per-module frame is converted to a dict (a plain
+        DataFrame is still handled, for the single-timeline case). Remove this
+        override once the upstream ``to_json`` handles the objdict return.
+
+        Args:
+            filename (str): if None, return a dict; else write JSON to this path.
+            keys (str/list): any of 'pars', 'summary', 'results' (default: all).
+            indent (int): JSON indentation when writing to file.
+            kwargs (dict): passed to ``sc.jsonify``.
+        """
+        if keys is None:
+            keys = ['pars', 'summary', 'results']
+        keys = sc.promotetolist(keys)
+
+        d = sc.objdict()
+        for key in keys:
+            if key in ('pars', 'parameters'):
+                d.pars = self.pars.to_json()
+            elif key == 'summary':
+                d.summary = (dict(sc.dcp(self.summary)) if self.results_ready
+                             else 'Summary not available (Sim has not yet been run)')
+            elif key == 'results':
+                df = self.to_df()
+                if isinstance(df, pd.DataFrame):
+                    d.results = df.to_dict()
+                else:  # objdict of per-module DataFrames
+                    d.results = {k: v.to_dict() for k, v in df.items()}
+            else:  # pragma: no cover
+                ss.warn(f'Could not convert "{key}" to JSON; continuing...')
+
+        d = sc.jsonify(d, **kwargs)
+        if filename is not None:
+            sc.savejson(filename=filename, obj=d, indent=indent)
+        return d

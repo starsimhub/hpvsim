@@ -35,6 +35,42 @@ def _cum_infections(sim):
     return np.asarray(sim.results.hpv16.cum_infections[:])
 
 
+def test_to_json_multigenotype(tmp_path):
+    """sim.to_json() works for a multi-genotype sim (dict, keys=, file write).
+
+    Guards the hpv.Sim.to_json override: the base ss.Sim.to_json does
+    to_df().to_dict(), which raises on any mixed-timeline sim (AgeMigration is
+    annual, disease modules sub-annual) because to_df returns an objdict of
+    per-module frames.
+    """
+    import json
+    sim = hpv.Sim(n_agents=300, location='nigeria', genotypes=[16, 18],
+                  start=2000, stop=2003, dt=0.5, rand_seed=0, verbose=0)
+    sim.run()
+
+    d = sim.to_json()  # must not raise
+    assert {'pars', 'summary', 'results'}.issubset(d.keys())
+    assert 'hpv16' in d['results'] and 'hpv18' in d['results']
+
+    assert list(sim.to_json(keys='summary').keys()) == ['summary']
+
+    fp = str(tmp_path / 'sim.json')
+    sim.to_json(fp)
+    with open(fp) as f:
+        assert 'results' in json.load(f)
+
+
+def test_to_df_returns_per_module_frames():
+    """sim.to_df() returns per-module DataFrames without raising."""
+    import pandas as pd
+    sim = _tiny_sim()
+    sim.run()
+    df = sim.to_df()
+    # Mixed-timeline sim -> objdict of DataFrames keyed by module.
+    frames = df.values() if hasattr(df, 'values') and not isinstance(df, pd.DataFrame) else [df]
+    assert all(isinstance(v, pd.DataFrame) for v in frames)
+
+
 def test_sim_save_load_roundtrip(tmp_path):
     """Default sim.save() (shrink=True) + ss.load preserves the sim.
 
