@@ -135,7 +135,7 @@ class AgeResults(ss.Analyzer):
         Picks the last tick whose date falls within each calendar year, so
         annual flows accumulated through the year are captured.
         """
-        tv_years = np.asarray(sim.timevec.years, dtype=float)
+        tv_years = sim.timevec.years
         out = {}
         for y in years:
             mask = (tv_years >= y) & (tv_years < y + 1)
@@ -341,7 +341,7 @@ def _resolve_year_ticks(sim, years):
     flows accumulated through the year are captured (year-end semantics, in
     contrast to _resolve_date_ticks' nearest-tick point-in-time semantics).
     """
-    tv_years = np.asarray(sim.timevec.years, dtype=float)
+    tv_years = sim.timevec.years
     out = {}
     for y in years:
         mask = (tv_years >= y) & (tv_years < y + 1)
@@ -363,7 +363,7 @@ def _resolve_date_ticks(sim, dates):
     resolve to the same tick, the later one overwrites the earlier in the
     returned odict.
     """
-    tv_years = np.asarray(sim.timevec.years, dtype=float)
+    tv_years = sim.timevec.years
     out = sc.odict()
     for d in sc.tolist(dates):
         dd = ss.date(d)
@@ -397,7 +397,7 @@ class snapshot(ss.Analyzer):
     def init_pre(self, sim):
         super().init_pre(sim)
         tps = sc.tolist(self.timepoints) if self.timepoints is not None else [sim.timevec[-1]]
-        tv_end = float(np.asarray(sim.timevec.years, dtype=float)[-1])
+        tv_end = sim.timevec.years[-1]
         kept = []
         for d in tps:
             dd = ss.date(d)
@@ -470,7 +470,7 @@ class age_pyramid(ss.Analyzer):
             self.data = (pd.read_csv(self.datafile) if isinstance(self.datafile, str)
                          else pd.DataFrame(self.datafile))
         tps = sc.tolist(self.timepoints) if self.timepoints is not None else [sim.timevec[-1]]
-        tv_end = float(np.asarray(sim.timevec.years, dtype=float)[-1])
+        tv_end = sim.timevec.years[-1]
         kept = []
         for d in tps:
             dd = ss.date(d)
@@ -545,13 +545,10 @@ class age_causal_infection(ss.Analyzer):
         self.dwelltime = {k: [] for k in ('precin', 'cin', 'total')}
 
     def _record(self, cancer_age, causal_age, cin_age, weight):
-        cancer_age = np.asarray(cancer_age, dtype=float)
-        causal_age = np.asarray(causal_age, dtype=float)
-        cin_age = np.asarray(cin_age, dtype=float)
         self.age_cancer.extend(cancer_age.tolist())
         self.age_causal.extend(causal_age.tolist())
         self.age_cin.extend(cin_age.tolist())
-        self.weights.extend(np.asarray(weight, dtype=float).tolist())
+        self.weights.extend(weight.tolist())
         self.dwelltime['precin'].extend((cin_age - causal_age).tolist())
         self.dwelltime['cin'].extend((cancer_age - cin_age).tolist())
         self.dwelltime['total'].extend((cancer_age - causal_age).tolist())
@@ -635,7 +632,7 @@ class dalys(ss.Analyzer):
         from .hpv import HPV
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
         super().init_pre(sim)
-        tv_years = np.asarray(sim.timevec.years, dtype=float)
+        tv_years = sim.timevec.years
         self.start_year = (int(np.floor(ss.date(self.start).years)) if self.start is not None
                            else int(np.floor(tv_years[0])))
         self.end_year = int(np.floor(tv_years[-1]))
@@ -649,9 +646,6 @@ class dalys(ss.Analyzer):
         if year < self.start_year or year > self.end_year:
             return
         idx = year - self.start_year
-        cancer_age = np.asarray(cancer_age, dtype=float)
-        death_age = np.asarray(death_age, dtype=float)
-        weight = np.asarray(weight, dtype=float)
         dur = death_age - cancer_age
         self.yld[idx] += float((weight * dur * self.av_disutility).sum())
         years_left = np.maximum(0.0, self.life_expectancy - death_age)
@@ -717,7 +711,7 @@ def results_by_genotype(sim, key='cum_cancers', normalize=False):
     from .hpv import HPV
     mods = [d for d in sim.diseases.values() if isinstance(d, HPV)]
     data = {m.name: np.asarray(m.results[key], dtype=float) for m in mods}
-    df = pd.DataFrame(data, index=pd.Index(np.asarray(sim.timevec.years), name='year'))
+    df = pd.DataFrame(data, index=pd.Index(sim.timevec.years, name='year'))
     if normalize:
         totals = df.sum(axis=1)
         df = df.div(totals.where(totals > 0, 1.0), axis=0)
