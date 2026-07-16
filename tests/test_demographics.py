@@ -62,3 +62,33 @@ def test_age_migration_pulls_pyramid_toward_target():
     tvd_with = 0.5 * np.abs(p_with - target_dist[:len(p_with)]).sum()
     tvd_off  = 0.5 * np.abs(p_off  - target_dist[:len(p_off)]).sum()
     assert tvd_with < tvd_off, f'AgeMigration off→TVD {tvd_off:.3f}, on→TVD {tvd_with:.3f}'
+
+
+def _module(sim, name):
+    return [m for m in sim.modules if getattr(m, 'name', '') == name][0]
+
+
+def test_demographic_data_trimmed_to_sim_window():
+    """Demographic modules retain only data within the sim window.
+
+    Guards the footprint optimization: the raw country tables span ~1950-2101,
+    but AgeMigration and ss.Deaths only ever query years in [start, stop]. The
+    raw pop_by_age table is released after building the per-year lookup, that
+    lookup is trimmed to the window, and death_rate is trimmed before it
+    reaches ss.Deaths. Regressing any of these reinflates every save file.
+    """
+    start, stop = 1990, 2010
+    sim = hpv.Sim(n_agents=300, location='nigeria', genotypes=[16],
+                  start=start, stop=stop, dt=0.25, rand_seed=0, verbose=0)
+    sim.run()
+
+    am = _module(sim, 'agemigration')
+    assert am._pop_by_age is None, 'raw pop_by_age should be released after init_pre'
+    yrs = sorted(am._pop_by_year)
+    assert yrs[0] >= start - 1 and yrs[-1] <= stop + 1, \
+        f'_pop_by_year spans {yrs[0]}-{yrs[-1]}, expected within {start-1}-{stop+1}'
+    assert len(yrs) <= (stop - start) + 3, f'_pop_by_year kept {len(yrs)} years (untrimmed?)'
+
+    dr = _module(sim, 'deaths').pars['death_rate']
+    assert dr['Time'].min() >= start - 1 and dr['Time'].max() <= stop + 1, \
+        f"death_rate Time spans {dr['Time'].min()}-{dr['Time'].max()}, expected within window"

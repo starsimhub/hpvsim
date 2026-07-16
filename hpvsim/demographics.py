@@ -94,12 +94,16 @@ class AgeMigration(ss.Demographics):
         sim_start_year = float(
             sim_start.year if hasattr(sim_start, 'year') else sim_start
         )
+        sim_stop = sim.pars.stop
+        sim_stop_year = float(
+            sim_stop.year if hasattr(sim_stop, 'year') else sim_stop
+        )
 
-        # Pull from country data if not explicitly supplied, then group
-        # pop_by_age into a {year: DataFrame} dict so step() can do an O(1)
-        # lookup instead of an O(rows) mask + sort every year. Guarding on
-        # _pop_by_year makes this idempotent: a second init_pre finds the
-        # lookup already built and the raw table already released (below).
+        # Pull from country data if not explicitly supplied, then build a
+        # {year: {age, male, female}} lookup of compact numpy arrays so step()
+        # can do an O(1) lookup instead of an O(rows) mask + sort every year.
+        # Guarding on _pop_by_year makes this idempotent: a second init_pre
+        # finds the lookup already built and the raw table already released.
         if self._pop_by_year is None:
             if self._pop_total is None or self._pop_by_age is None:
                 from .data.country import load_country
@@ -121,14 +125,26 @@ class AgeMigration(ss.Demographics):
                 if self._pop_by_age is None:
                     self._pop_by_age = cd['pop_by_age']
 
-            self._pop_by_year = {
-                int(y): grp.sort_values('age')
-                for y, grp in self._pop_by_age.groupby('year')
-            }
-            # Release the raw table: it is the single largest object on the
-            # module (the full age x sex x year pyramid) and is only needed
-            # to build the per-year lookup above. Nulling it roughly halves
-            # the module's memory and save-file footprint.
+            # The raw table spans ~1950-2101; step() only looks up years within
+            # the sim window, so trim to [start, stop] (+/-1yr pad). Store each
+            # year as plain numpy arrays rather than a DataFrame: the DataFrame
+            # carried redundant per-row 'year' (== the key) and 'age' (== the
+            # index) columns and heavy pandas overhead, inflating the lookup
+            # ~5x over its numeric payload. Counts stay float64 so the target
+            # values step() rounds are bit-identical to the DataFrame path.
+            lo = int(np.floor(sim_start_year)) - 1
+            hi = int(np.ceil(sim_stop_year)) + 1
+            pba = self._pop_by_age
+            pba = pba[(pba['year'] >= lo) & (pba['year'] <= hi)]
+            self._pop_by_year = {}
+            for y, grp in pba.groupby('year'):
+                g = grp.sort_values('age')
+                self._pop_by_year[int(y)] = dict(
+                    age=g['age'].to_numpy(dtype=np.int32),
+                    male=g['male'].to_numpy(dtype=np.float64),
+                    female=g['female'].to_numpy(dtype=np.float64),
+                )
+            # Release the raw table: it is only needed to build the lookup above.
             self._pop_by_age = None
 
         # Scale factor: n_agents / data_population_at_sim_start. Recomputed
@@ -168,7 +184,7 @@ class AgeMigration(ss.Demographics):
         if pat_year is None:
             return
 
-        ages_data = pat_year['age'].values.astype(int)
+        ages_data = pat_year['age']
 
         people = sim.people
         # Snapshot alive UIDs at the start of the step, EXCLUDING fine
@@ -216,7 +232,7 @@ class AgeMigration(ss.Demographics):
             ('female',  female),
         ):
             sex_is_female = (sex_label == 'female')
-            target_counts = pat_year[sex_label].values * self._scale
+            target_counts = pat_year[sex_label] * self._scale
 
             for age, target in zip(ages_data, target_counts):
                 in_band = sex_mask & (ages == age)

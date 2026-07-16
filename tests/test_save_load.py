@@ -38,9 +38,12 @@ def _cum_infections(sim):
 def test_sim_save_load_roundtrip(tmp_path):
     """sim.save(shrink=False) + ss.load preserves the sim and its results.
 
-    Note: sim.save() defaults to shrink=True, which currently raises on the
-    deaths module (a starsim shrink size-limit quirk); shrink=False is the
-    working path for a results-carrying save.
+    shrink=False is used because starsim's shrink size-check trips on the
+    CrossImmunity connector and HPVTotal analyzer for multi-genotype sims:
+    each holds references to the (shared) disease modules, which the
+    per-module budget counts against them even though pickle serializes the
+    disease modules once. shrink=False sidesteps the check and saves the full,
+    re-runnable sim; the actual file stays small (~1 MB).
     """
     sim = _tiny_sim()
     sim.run()

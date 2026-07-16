@@ -135,9 +135,18 @@ class Sim(ss.Sim):
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
             births_cls = hpv.AnnualBirths if v2_compat_demographics else hpv.Births
+            # The raw mortality table spans ~1950-2100, but ss.Deaths only ever
+            # queries years within the sim window (and otherwise retains the
+            # whole frame). Trim to [start, stop] (+/-1yr pad for boundary
+            # interpolation) so the module carries only what it uses.
+            death_rate = country['death_rate']
+            death_rate = death_rate[
+                (death_rate['Time'] >= int(start) - 1)
+                & (death_rate['Time'] <= int(stop) + 1)
+            ]
             demographics = [
                 births_cls(birth_rate=country['birth_rate']),
-                ss.Deaths(death_rate=country['death_rate']),
+                ss.Deaths(death_rate=death_rate),
                 hpv.AgeMigration(v2_compat=v2_compat_demographics),
             ]
 
