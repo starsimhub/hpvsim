@@ -28,14 +28,15 @@ from ..migration_utils import _v2_dist_to_starsim
 from . import loaders as _loaders
 
 
-_KNOWN_LOCATIONS = ['nigeria']
-
-
-def _default_network_pars(location=None):  # noqa: ARG001  (location reserved for future per-country data)
+def _default_network_pars(location=None):  # noqa: ARG001  (location accepted for API symmetry)
     """Default network parameters consumed by SexualNetwork construction.
 
-    The ``location`` argument is accepted for API symmetry and future
-    per-country extension; current defaults are location-agnostic.
+    Network calibration is intentionally location-agnostic and matches
+    v2's shipped behavior: HPVsim ships demographic data per country but
+    not network calibration. Analysis scripts override these defaults
+    with their own per-country calibration (see e.g.
+    ``hpvsim_methods_manuscript/plot_fig56.py``'s ``make_network``).
+    The ``location`` argument is accepted for API symmetry.
 
     Keys returned:
         debut, f_cross_layer, m_cross_layer,
@@ -145,8 +146,17 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
 def load_country(location, year=None):
     """Return Starsim-shaped data for ``location``.
 
+    Any country in the bundled UN WPP 2024 data is valid; see
+    ``hpv.data.get_country_aliases()`` for accepted name variants. The
+    underlying loaders raise ``ValueError`` with suggestion-based
+    diagnostics for unknown names.
+
+    Network calibration is location-agnostic (see
+    ``_default_network_pars``). Analysis scripts supply per-country
+    network pars as needed.
+
     Args:
-        location (str): country name; must be one of ``_KNOWN_LOCATIONS``.
+        location (str): country name (case-insensitive).
         year (int): year to load the initial age distribution for.
 
     Returns:
@@ -160,10 +170,6 @@ def load_country(location, year=None):
             - 'pop_by_age': DataFrame [year, age, male, female] (age pyramid over time)
     """
     location = location.lower()
-    if location not in _KNOWN_LOCATIONS:
-        raise ValueError(
-            f"Unknown location {location!r}. Supported locations: {_KNOWN_LOCATIONS}."
-        )
 
     return dict(
         age_data=_age_data(location, year=year),
@@ -215,15 +221,24 @@ def _death_rate(location):
     })
 
 
-def _network_pars(location):
+def _network_pars(location, overrides=None):
     """Build network parameters for ``hpv.SexualNetwork``.
 
     Returns ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ...,
     'm': ...}}``. Each layer dict carries: partners, mixing, layer_probs,
     cross_layer, duration, acts. ``debut`` is shared across layers (one
     per-agent sample).
+
+    ``overrides`` is an optional dict whose keys replace entries in the raw
+    ``_default_network_pars`` result *before* the Starsim-shaping wrapping
+    (so it carries raw forms: ``debut``/``*_partners`` as v2 dist dicts,
+    ``layer_probs`` as the (3, N) arrays, ``*_cross_layer`` as annual floats).
+    Used by analysis scripts to supply a per-location network calibration
+    without forking this builder.
     """
     default_pars = _default_network_pars(location)
+    if overrides:
+        default_pars = {**default_pars, **overrides}
     annual = ss.years(1)  # unit shared by all annual probability params
 
     # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` for a
