@@ -8,15 +8,15 @@ Analyzers are objects that do not change the behavior of a simulation, but just 
 
 
 <div class="alert alert-info">
-    
-Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_analyzers.ipynb) to open an interactive version of this notebook.
-    
+
+Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_analyzers.ipynb) to open an interactive version of this notebook.
+
 </div>
 
 
 ## Results by age
 
-By far the most common reason to use an analyzer is to report results by age. The results in `sim.results` already include results disaggregated by age, e.g. `sim.results['cancers_by_age']`, but these results use standardized age bins which may not match the age bins for available data on cervical cancers. Age-specific outputs can be customized using an analyzer to match the age bins of the data. The following example shows how to set this up:
+By far the most common reason to use an analyzer is to report results by age. The per-genotype and aggregate results in `sim.results` (e.g. `sim.results.hpvtotal.cancers`) use standardized age bins which may not match the age bins for available data on cervical cancers. The `AgeResults` analyzer lets you record any HPV result at the exact age bins and years you choose. You configure it with a `result_args` dictionary whose keys are the results you want by age; each entry lists the `years` to snapshot and the bin `edges`:
 
 ```{python}
 #| collapsed: false
@@ -26,113 +26,90 @@ import numpy as np
 import sciris as sc
 import hpvsim as hpv
 
-# Create some parameters, setting beta (per-contact transmission probability) higher
-# to create more cancers for illutration
-pars = dict(beta=0.5, n_agents=50e3, start=1970, n_years=50, dt=1., location='tanzania')
-
-# Also set initial HPV prevalence to be high, again to generate more cancers
-pars['init_hpv_prev'] = {
-    'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
-    'm'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
-    'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
-}
-
-# Create the age analyzers.
-az1 = hpv.age_results(
+# A multi-decade run with a decent population size generates enough cancers to
+# illustrate age-specific results.
+age_analyzer = hpv.AgeResults(
     result_args=sc.objdict(
-        hpv_prevalence=sc.objdict( # The keys of this dictionary are any results you want by age, and can be any key of sim.results
-            years=2019, # List the years that you want to generate results for
+        # The keys are any per-age result of the HPV modules.
+        hpv_prevalence=sc.objdict(
+            years=[2019],  # The year(s) to generate results for
             edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
         ),
-        hpv_incidence=sc.objdict(
-            years=2019,
-            edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-        ),
-        cancer_incidence=sc.objdict(
-            years=2019,
-            edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
-        ),
-        cancer_mortality=sc.objdict(
-            years=2019,
+        cancers=sc.objdict(
+            years=[2019],
             edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-        )
+        ),
     )
 )
 
-sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az1])
+sim = hpv.Sim(n_agents=20e3, genotypes=[16, 18], location='nigeria',
+              start=1970, stop=2020, dt=1.0, analyzers=[age_analyzer])
 sim.run()
-a = sim.get_analyzer()
-a.plot();
+
+a = sim.analyzers['ageresults']
+hpv.plot_by_age(a, 'cancers')
 ```
 
-It's also possible to plot these results alongside data.
+The recorded values are also available as a tidy dataframe, which is the easiest way to line the model up against your own data (rows are the snapshot years, columns are the age bins):
 
 ```{python}
 #| collapsed: false
 #| jupyter: {outputs_hidden: false}
 #| tags: []
-az2 = hpv.age_results(
-    result_args=sc.objdict(
-        cancers=sc.objdict(
-            datafile='nigeria_cancer_cases.csv',
-        ),
-    )
-)
-sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az2])
-sim.run()
-a = sim.get_analyzer()
-a.plot();
+a.to_dataframe(key='cancers')
 ```
 
-These results are not particularly well matched to the data, but we will deal with this in the calibration tutorial later.
+To fit these age-specific outputs to observed data, pass the data to the `Calibration` object — see the [calibration tutorial](tut_calibration.qmd).
 
 ## Snapshots
 
-Snapshots both take "pictures" of the `sim.people` object at specified points in time. This is because while most of the information from `sim.people` is retrievable at the end of the sim from the stored events, it's much easier to see what's going on at the time. The following example leverages a snapshot in order to create a figure demonstrating age mixing patterns among sexual contacts:
+A snapshot takes a "picture" of the `sim.people` object at specified points in time — a frozen deep copy you can inspect after the run. The following example snapshots the population and plots its age structure by sex at that moment:
 
 ```{python}
 #| tags: []
-snap = hpv.snapshot(timepoints=['2020'])
-sim = hpv.Sim(pars, analyzers=snap)
+snap = hpv.snapshot(timepoints=[2020])
+sim = hpv.Sim(genotypes=[16, 18], location='nigeria',
+              start=2000, stop=2020, dt=1.0, n_agents=20e3, analyzers=[snap])
 sim.run()
 
-a = sim.get_analyzer()
-people = a.snapshots[0]
+# Retrieve the People snapshot taken in 2020.
+people = sim.analyzers['snapshot'].get(2020)
 
-# Plot age mixing
 import pylab as pl
-import matplotlib as mpl
-fig, ax = pl.subplots(nrows=1, ncols=1, figsize=(5, 4))
+alive = people.alive.values
+ages = people.age.values[alive]
+female = people.female.values[alive]
 
-fc = people.contacts['m']['age_f'] # Get the age of female contacts in marital partnership
-mc = people.contacts['m']['age_m'] # Get the age of male contacts in marital partnership
-h = ax.hist2d(fc, mc, bins=np.linspace(0, 75, 16), density=True, norm=mpl.colors.LogNorm())
-ax.set_xlabel('Age of female partner')
-ax.set_ylabel('Age of male partner')
-fig.colorbar(h[3], ax=ax)
-ax.set_title('Marital age mixing')
-pl.show();
+fig, ax = pl.subplots(figsize=(6, 4))
+ax.hist([ages[female], ages[~female]], bins=np.arange(0, 90, 5),
+        stacked=True, label=['Female', 'Male'])
+ax.set_xlabel('Age')
+ax.set_ylabel('Number of people')
+ax.set_title('Population age structure in 2020')
+ax.legend()
+pl.show()
 ```
+
+Because the snapshot is a deep copy, it is unaffected by anything that happens to `sim.people` later in the run — handy for comparing the population at two different times.
 
 ## Age pyramids
 
-Age pyramids, like snapshots, take a picture of the people at a given point in time, and then bin them into age groups by sex. These can also be plotted alongside data:
+Age pyramids, like snapshots, take a picture of the people at a given point in time, and then bin them into age groups by sex. When you have a matching observed pyramid you can overlay it by passing `datafile=`:
 
 ```{python}
 #| tags: []
-# Create some parameters
-pars = dict(n_agents=50e3, start=2000, n_years=30, dt=0.5)
-
 # Make the age pyramid analyzer
 age_pyr = hpv.age_pyramid(
-    timepoints=['2010', '2020'],
-    datafile='south_africa_age_pyramid.csv',
+    timepoints=[2010, 2020],
     edges=np.linspace(0, 100, 21))
 
-# Make the sim, run, get the analyzer, and plot
-sim = hpv.Sim(pars, location='south africa', analyzers=age_pyr)
+# Make the sim, run, get the analyzer, and plot. HPVsim ships demographic
+# data for any country in the UN World Population Prospects, so we can point
+# the sim at a different location simply by name.
+sim = hpv.Sim(location='south africa', start=2000, stop=2030, dt=0.5,
+              n_agents=20e3, analyzers=[age_pyr])
 sim.run()
-a = sim.get_analyzer()
-fig = a.plot(percentages=True);
-```
 
+a = sim.analyzers['age_pyramid']
+a.plot()
+```

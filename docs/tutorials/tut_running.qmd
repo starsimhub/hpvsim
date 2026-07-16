@@ -9,7 +9,7 @@ While running individual sims can be interesting for simple explorations, at som
 
 <div class="alert alert-info">
 
-Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_running.ipynb) to open an interactive version of this notebook.
+Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_running.ipynb) to open an interactive version of this notebook.
 
 </div>
 
@@ -46,7 +46,7 @@ The individual sim results are stored in `msim.sims`. You can inspect them direc
 
 ```{python}
 for s in msim.sims:
-    s.brief()
+    s.summarize()
 ```
 
 Often you care about *statistics* across seeds rather than individual runs. Call

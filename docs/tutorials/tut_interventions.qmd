@@ -8,9 +8,9 @@ Interventions are one of the most critical parts of HPVsim. This tutorial shows 
 
 
 <div class="alert alert-info">
-    
-Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_interventions.ipynb) to open an interactive version of this notebook.
-    
+
+Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_interventions.ipynb) to open an interactive version of this notebook.
+
 </div>
 
 ## Products and interventions
@@ -25,8 +25,6 @@ Information about the default products included with HPVsim (e.g. attributes lik
 It's also possible to make a custom product, e.g.
 
 ```{python}
-#| collapsed: false
-#| jupyter: {outputs_hidden: false}
 import hpvsim as hpv
 import pandas as pd
 my_treatment_data = pd.DataFrame({'name':'new_tx', 'state':['precin','cin1','cin2','cin3','cancerous'],'genotype':'all','efficacy':[.2,.3,.3,.4,.4]})
@@ -42,63 +40,62 @@ Most of the time, it isn't necessary to create your own products if you just wan
 Screening and treatment is implemented in HPVsim as a flexible set of interventions that can be mixed and matched. By specifying how each of the components link together, it's possible to create quite complex algorithms. This is illustrated in the following example:
 
 ```{python}
-#| collapsed: false
-#| jupyter: {outputs_hidden: false}
+import starsim as ss
+
 # Define a series of interventions to screen, triage, assign treatment, and administer treatment
 prob = 0.6
-screen      = hpv.routine_screening(start_year=2015, prob=prob, product='via', label='screen') # Routine screening
-to_triage   = lambda sim: sim.get_intervention('screen').outcomes['positive'] # Define who's eligible for triage
-triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='hpv', label='triage') # Triage people
-to_treat    = lambda sim: sim.get_intervention('triage').outcomes['positive'] # Define who's eligible to be assigned treatment
-assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product='tx_assigner', label='assign_tx') # Assign treatment
-to_ablate   = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation'] # Define who's eligible for ablation treatment
+screen      = hpv.routine_screening(start_year=2015, prob=prob, product='via', name='screen') # Routine screening
+to_triage   = lambda sim: sim.interventions['screen'].outcomes['positive'] # Define who's eligible for triage
+triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='hpv', name='triage') # Triage people
+to_treat    = lambda sim: sim.interventions['triage'].outcomes['positive'] # Define who's eligible to be assigned treatment
+assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product='tx_assigner', name='assign_tx') # Assign treatment
+to_ablate   = lambda sim: sim.interventions['assign_tx'].outcomes['ablation'] # Define who's eligible for ablation treatment
 ablation    = hpv.treat_num(eligibility=to_ablate, prob=prob, product='ablation') # Administer ablation
-to_excise   = lambda sim: sim.get_intervention('assign_tx').outcomes['excision'] # Define who's eligible for excision
-excision    = hpv.treat_delay(eligibility=to_excise, prob=prob, product='excision') # Administer excision
+to_excise   = lambda sim: sim.interventions['assign_tx'].outcomes['excision'] # Define who's eligible for excision
+excision    = hpv.treat_delay(delay=1.0, eligibility=to_excise, prob=prob, product='excision') # Administer excision
 
 # Define the parameters
 pars = dict(
     n_agents      = 20e3,       # Population size
-    n_years       = 35,         # Number of years to simulate
+    start         = 2000,       # Simulation start year
+    stop          = 2035,       # Simulation end year
     verbose       = 0,          # Don't print details of the run
     rand_seed     = 2,          # Set a non-default seed
     genotypes     = [16, 18],   # Include the two genotypes of greatest general interest
 )
 
 # Create the sim with and without interventions
-orig_sim = hpv.Sim(pars, label='Baseline')
-sim = hpv.Sim(pars, interventions = [screen, triage, assign_tx, ablation, excision], label='With screen & treat')
+orig_sim = hpv.Sim(**pars, label='Baseline')
+sim = hpv.Sim(**pars, interventions=[screen, triage, assign_tx, ablation, excision], label='With screen & treat')
 
 # Run and plot
-msim = hpv.parallel(orig_sim, sim)
+msim = ss.MultiSim([orig_sim, sim]).run(parallel=False)
 msim.plot();
 ```
 
 A few things to note here:
 
-* By default, interventions are shown with vertical dashed lines. You can turn this off by passing `do_plot=False` to the intervention.
-* Note that like other "parameters", you can either pass interventions to the sim directly or as part of the pars dictionary; the examples below illustrate these options.
+* Each intervention is given a unique `name`. Downstream interventions reference an upstream one's results through `sim.interventions['<name>'].outcomes[...]`, which is how the cascade is wired together. A treatment intervention's `name` must differ from its `product` (they share a namespace), so the leaf treatments above are left unnamed.
+* Interventions are passed to the sim via the `interventions=` argument.
 * Several of the interventions above are defined as routine interventions, e.g. `hpv.routine_screening()` and `hpv.routine_triage()`. In general, most interventions exist as both routine and campaign versions. The difference between the two comes down to how the dates are interpreted:
-    * `hpv.routine_screening(start=2020, end=2030, prob=0.2)` implies that the intervention will be in place each year between 2020-2030;
-    * `hpv.campaign_screening(years=[2020,2030], prob=0.2)` implies that the intervention will be delivered twice: once in 2020 and once in 2030.
+    * `hpv.routine_screening(start_year=2020, end_year=2030, prob=0.2)` implies that the intervention will be in place each year between 2020-2030;
+    * `hpv.campaign_screening(years=[2020, 2030], prob=0.2)` implies that the intervention will be delivered twice: once in 2020 and once in 2030.
 
-The script `examples/t05_screen_algorithms.py` shows how to set up each of the seven algorithms recommended by in the WHO's guidelined for screening and treatment of cervical pre-cancer lesions (see https://www.ncbi.nlm.nih.gov/books/NBK572308/).
+The script `examples/t05_screen_algorithms.py` shows how to set up each of the seven algorithms recommended in the WHO's guidelines for screening and treatment of cervical pre-cancer lesions (see https://www.ncbi.nlm.nih.gov/books/NBK572308/).
 
 ## Prophylactic vaccination
 
 Prophylactic vaccination within HPVsim simply targets a vaccine product towards a subset of the population.
 
 ```{python}
-#| jp-MarkdownHeadingCollapsed: true
-#| tags: []
-vx = hpv.routine_vx(prob=prob, start_year=2015, age_range=[9,10], product='bivalent')
+vx = hpv.routine_vx(prob=prob, start_year=2015, age_range=[9,10], product='bivalent', name='vaccination')
 
 # Create the sim with and without interventions
-orig_sim = hpv.Sim(pars, label='Baseline')
-sim = hpv.Sim(pars, interventions = vx, label='With vaccination')
+orig_sim = hpv.Sim(**pars, label='Baseline')
+sim = hpv.Sim(**pars, interventions=vx, label='With vaccination')
 
 # Run and plot
-msim = hpv.parallel(orig_sim, sim)
+msim = ss.MultiSim([orig_sim, sim]).run(parallel=False)
 msim.plot();
 ```
 
@@ -112,56 +109,28 @@ Note that probabilities passed to interventions are annual probabilities, not to
 
 Therapeutic vaccination can be included in a few different formats/use cases:
 
-* As a part of a screen & treat algorithm
-* As a mass vaccination without screening.
+* As a mass vaccination without screening, and
+* as a part of a screen & treat algorithm.
 
-The following examples illustrate this:
+The following example illustrates both. Mass therapeutic vaccination delivers a product to an age range directly (here a campaign dose plus an ongoing routine dose); screen-linked therapeutic vaccination uses `hpv.linked_txvx`, whose eligibility draws on the positives from an upstream screening intervention.
 
 ```{python}
-#| collapsed: false
-#| jupyter: {outputs_hidden: false}
-import numpy as np
-import hpvsim as hpv
+# Mass therapeutic vaccination: a one-off campaign dose plus an ongoing routine dose
+campaign_txvx = hpv.campaign_txvx(prob=0.9, years=2015, age_range=[30, 50], product='txvx1', name='campaign txvx')
+routine_txvx  = hpv.routine_txvx(prob=0.8, start_year=2016, age_range=[30, 31], product='txvx2', name='routine txvx')
+mass_vx_intvs = [campaign_txvx, routine_txvx]
 
-# Define mass therapeutic vaccination:
-campaign_txvx_dose1 = hpv.campaign_txvx(prob = 0.9, years = 2015, age_range = [30,50], product = 'txvx1', label = 'campaign txvx')
-second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
-campaign_txvx_dose2 = hpv.campaign_txvx(prob = 0.7, years=[2015,2016], age_range=[30, 70], product = 'txvx2', eligibility = second_dose_eligible, label = 'campaign txvx 2nd dose')
-routine_txvx_dose1 = hpv.routine_txvx(prob = 0.9, start_year = 2016, age_range = [30,31], product = 'txvx2',label = 'routine txvx')
-second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
-routine_txvx_dose2 = hpv.routine_txvx(prob = 0.8, start_year = 2016, age_range = [30,31], product = 'txvx1', eligibility=second_dose_eligible, label = 'routine txvx 2nd dose')
-mass_vx_intvs = [campaign_txvx_dose1, campaign_txvx_dose2, routine_txvx_dose1, routine_txvx_dose2]
-for intv in mass_vx_intvs: intv.do_plot=False
+# Therapeutic vaccination delivered through screening: screen, then vaccinate the positives
+screened_pos   = lambda sim: sim.interventions['routine screening'].outcomes['positive']
+routine_screen = hpv.routine_screening(start_year=2016, product='hpv', prob=0.1, age_range=[30, 50], name='routine screening')
+deliver_txvx   = hpv.linked_txvx(prob=0.8, product='txvx1', eligibility=screened_pos, name='txvx')
+screen_vx_intv = [routine_screen, deliver_txvx]
 
-# Define therapeutic vaccination within screen and treat
-campaign_txvx_dose1 = hpv.campaign_txvx(prob = 0.9, years = 2015, age_range = [30,50], product = 'txvx1', label = 'campaign txvx')
-second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
-campaign_txvx_dose2 = hpv.campaign_txvx(prob = 0.7, years=[2015,2016], age_range=[30, 70], product = 'txvx2', eligibility = second_dose_eligible, label = 'campaign txvx 2nd dose')
-routine_txvx_dose1 = hpv.routine_txvx(prob = 0.9, start_year = 2016, age_range = [30,31], product = 'txvx2',label = 'routine txvx')
-second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
-routine_txvx_dose2 = hpv.routine_txvx(prob = 0.8, start_year = 2016, age_range = [30,31], product = 'txvx1', eligibility=second_dose_eligible, label = 'routine txvx 2nd dose')
-mass_vx_intvs = [campaign_txvx_dose1, campaign_txvx_dose2, routine_txvx_dose1, routine_txvx_dose2]
-for intv in mass_vx_intvs: intv.do_plot=False
-
-
-# Screen, triage, assign treatment, treat
-screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
-routine_screen = hpv.routine_screening(start_year=2016, product='hpv', prob=0.1, eligibility=screen_eligible, age_range=[30, 50], label='routine screening')
-screened_pos = lambda sim: sim.get_intervention('routine screening').outcomes['positive'] # Get those who screen positive
-pos_screen_assesser = hpv.routine_triage(start_year=2016, product = 'txvx_assigner', prob = 1.0, annual_prob=False, eligibility = screened_pos, label = 'txvx assigner') # Offer TxVx or refer them for further testing
-txvx_eligible = lambda sim: sim.get_intervention('txvx assigner').outcomes['txvx'] # Get people who've been classified as txvx eligible based on the positive screen assessment
-deliver_txvx = hpv.linked_txvx(prob = 0.8, product = 'txvx1', eligibility = txvx_eligible, label = 'txvx') # Deliver txvx to them
-
-screen_vx_intv = [routine_screen, pos_screen_assesser, deliver_txvx]
-for intv in screen_vx_intv: intv.do_plot=False
-
-sim0 = hpv.Sim(pars=pars, label='Baseline')
-sim1 = hpv.Sim(pars=pars, interventions=mass_vx_intvs, label='Mass therapeutic vaccination')
-sim2 = hpv.Sim(pars=pars, interventions=screen_vx_intv, label='Therapeutic vaccination through screening')
+sim0 = hpv.Sim(**pars, label='Baseline')
+sim1 = hpv.Sim(**pars, interventions=mass_vx_intvs, label='Mass therapeutic vaccination')
+sim2 = hpv.Sim(**pars, interventions=screen_vx_intv, label='Therapeutic vaccination through screening')
 
 # Run and plot
-msim = hpv.parallel(sim0, sim1, sim2)
+msim = ss.MultiSim([sim0, sim1, sim2]).run(parallel=False)
 msim.plot();
 ```
-
-
