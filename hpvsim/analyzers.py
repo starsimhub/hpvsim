@@ -559,28 +559,26 @@ class age_causal_infection(ss.Analyzer):
         if float(sim.timevec[ti].years) < self.start_year:
             return
         dt = float(sim.t.dt)
-        age_raw = sim.people.age.raw
-        alive = sim.people.alive.raw
-        scale = getattr(sim.people, 'scale', None)
-        scale_raw = scale.raw if scale is not None else None
+        people = sim.people
+        scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:
-            # Gate on cancerous & alive, not just ti_cancerous==ti: a scheduled
+            # Gate on cancerous, not just ti_cancerous==ti: a scheduled
             # ti_cancerous persists on agents who die of other causes before
             # onset, so the bare time-match overcounts vs realized incidence.
-            # On the grow engine, fine agents subject to independent competing
-            # mortality are correctly dropped here. This also drops the rare
-            # agent who reaches cancer and dies of a competing cause on the same
-            # tick (~1%).
-            new = np.where((m.ti_cancerous.raw == ti)
-                           & m.cancerous.raw & alive)[0]
+            # BoolArr.uids returns active (alive) agents only, so the alive
+            # filter is implicit. On the grow engine, fine agents subject to
+            # independent competing mortality are correctly dropped here; this
+            # also drops the rare agent who reaches cancer and dies of a
+            # competing cause on the same tick (~1%).
+            new = ((m.ti_cancerous == ti) & m.cancerous).uids
             if not len(new):
                 continue
-            ti_inf = m.ti_infected.raw[new]
-            ti_cin = m.ti_cin.raw[new]
+            ti_inf = m.ti_infected[new]
+            ti_cin = m.ti_cin[new]
             ok = np.isfinite(ti_inf) & np.isfinite(ti_cin)
             new, ti_inf, ti_cin = new[ok], ti_inf[ok], ti_cin[ok]
-            cur = age_raw[new]
-            w = scale_raw[new] if scale_raw is not None else np.ones(len(new))
+            cur = people.age[new]
+            w = people.scale[new] if scale is not None else np.ones(len(new))
             self._record(cur, cur - (ti - ti_inf) * dt, cur - (ti - ti_cin) * dt, w)
 
     def finalize(self):
@@ -658,16 +656,14 @@ class dalys(ss.Analyzer):
         if year < self.start_year:
             return
         dt = float(sim.t.dt)
-        age_raw = sim.people.age.raw
-        scale = getattr(sim.people, 'scale', None)
-        scale_raw = scale.raw if scale is not None else None
-        alive = sim.people.alive.raw
+        people = sim.people
+        scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:
-            # See age_causal_infection.step for the cancerous & alive gate
-            # rationale (drops scheduled-but-not-realized onsets and same-tick
-            # competing deaths; on grow, fine agents with competing mortality).
-            new = np.where((m.ti_cancerous.raw == ti)
-                           & m.cancerous.raw & alive)[0]
+            # See age_causal_infection.step for the cancerous gate rationale
+            # (drops scheduled-but-not-realized onsets and same-tick competing
+            # deaths; on grow, fine agents with competing mortality). BoolArr.uids
+            # returns active (alive) agents only, so the alive filter is implicit.
+            new = ((m.ti_cancerous == ti) & m.cancerous).uids
             if not len(new):
                 continue
             # Defensive isfinite guard (symmetric with age_causal_infection):
@@ -675,14 +671,14 @@ class dalys(ss.Analyzer):
             # non-fatal-cancer or reschedule path could leave it NaN — without
             # this filter a single NaN death_age would poison the whole onset
             # year's YLL/YLD sum.
-            ti_dead = m.ti_dead_cancer.raw[new]
+            ti_dead = m.ti_dead_cancer[new]
             ok = np.isfinite(ti_dead)
             new, ti_dead = new[ok], ti_dead[ok]
             if not len(new):
                 continue
-            cancer_age = age_raw[new]
+            cancer_age = people.age[new]
             death_age = cancer_age + (ti_dead - ti) * dt
-            w = scale_raw[new] if scale_raw is not None else np.ones(len(new))
+            w = people.scale[new] if scale is not None else np.ones(len(new))
             self._accumulate(year, cancer_age, death_age, w)
 
     def finalize(self):
