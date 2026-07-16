@@ -7,7 +7,7 @@ name = "hpvsim"
 dynamic = ["version"]
 description = "HPVsim: Human Papillomavirus Simulator"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["HPV", "human papillomavirus", "cervical cancer", "agent-based model", "disease modeling", "simulation"]
