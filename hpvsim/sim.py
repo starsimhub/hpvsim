@@ -8,8 +8,10 @@ HPVTotal analyzer — and forwards to ``ss.Sim``.
 
 ``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
 modules are added after the auto-defaults (CrossImmunity, the _ExclusiveSeeder
-when ``init_seeding='exclusive'``, and HPVTotal). To replace the auto-defaults
-entirely, drop down to vanilla ``ss.Sim``.
+when ``init_seeding='exclusive'``, HPVTotal, and — when an ``hpv.HIV`` disease
+is present in ``diseases=`` — an ``hpv_hiv_connector`` appended after
+CrossImmunity and a ``HIVStratifiedResults`` analyzer). To replace the
+auto-defaults entirely, drop down to vanilla ``ss.Sim``.
 
 Other slots (``diseases``, ``networks``, ``demographics``, ``people``) retain
 override semantics. ``diseases=`` is mutually exclusive with ``genotypes=``.
@@ -58,6 +60,17 @@ import numpy as np
 import starsim as ss
 import hpvsim as hpv
 
+# Explicit imports for symbols referenced by bare name in this module (the HIV
+# wiring and disease/connector partition use bare names; the genotype/seeding
+# helpers use the ``hpv.`` prefix — both styles coexist post-M08 merge).
+from .cross_genotype import HPVTotal, CrossImmunity
+from .data.country import load_country
+from .demographics import AgeMigration, AnnualBirths, Births
+from .hiv import HIV, hpv_hiv_connector, HIVStratifiedResults
+from .hpv import HPV, _normalize_genotype
+from .network import SexualNetwork
+from .seeding import _ExclusiveSeeder
+
 
 class Sim(ss.Sim):
     """HPVsim simulation."""
@@ -75,13 +88,19 @@ class Sim(ss.Sim):
             people = ss.People(n_agents, age_data=country['age_data'],
                                extra_states=[ss.BoolArr('fine', default=False)])
 
-        diseases = kwargs.pop('diseases', None)
+        user_diseases = kwargs.pop('diseases', None) or []
         user_connectors = kwargs.pop('connectors', None) or []
         user_analyzers = kwargs.pop('analyzers', None) or []
 
-        if diseases is not None and genotypes is not None:
+        # Partition diseases= by type: HPV genotype modules are built from
+        # genotypes= (or supplied directly as HPV instances); any non-HPV
+        # disease (e.g. hpv.HIV) is merged in alongside them.
+        hpv_instances = [d for d in user_diseases if isinstance(d, HPV)]
+        other_diseases = [d for d in user_diseases if not isinstance(d, HPV)]
+
+        if hpv_instances and genotypes is not None:
             raise ValueError(
-                'Pass diseases= OR genotypes=, not both.'
+                'Specify HPV via genotypes= or HPV instances in diseases=, not both.'
             )
 
         if init_seeding not in ('exclusive', 'independent'):
@@ -89,9 +108,19 @@ class Sim(ss.Sim):
                 f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}"
             )
 
-        auto_connectors = [hpv.CrossImmunity()]
+        # CrossImmunity runs first each step (it overwrites rel_sus). A user
+        # may supply a configured CrossImmunity (e.g. a calibrated rel_sev
+        # severity scaler); honor it at the front rather than auto-adding a
+        # second default one. Any other user connectors keep their order after
+        # the auto chain (CrossImmunity -> seeder -> hpv_hiv_connector).
+        user_cross = [c for c in user_connectors if isinstance(c, CrossImmunity)]
+        user_connectors = [c for c in user_connectors
+                           if not isinstance(c, CrossImmunity)]
+        auto_connectors = [user_cross[0] if user_cross else CrossImmunity()]
 
-        if diseases is None:
+        if hpv_instances:
+            hpv_diseases = hpv_instances  # override path; seeder skipped (user-supplied HPV manage their own init_prev)
+        else:
             # Default to single-genotype HPV16 if neither supplied.
             keys = (tuple(hpv._normalize_genotype(g) for g in genotypes)
                     if genotypes is not None else ('hpv16',))
@@ -111,8 +140,8 @@ class Sim(ss.Sim):
                         f'resolved genotype keys {sorted(sim_keys)}'
                     )
 
-            diseases = [hpv.HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
-                            **gpars_overrides.get(k, {})) for k in keys]
+            hpv_diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
+                                **gpars_overrides.get(k, {})) for k in keys]
             if init_seeding == 'exclusive':
                 # 'exclusive': one Bernoulli per agent for any HPV, then one
                 # genotype per infected agent via the seeder's per-genotype callback.
@@ -121,12 +150,25 @@ class Sim(ss.Sim):
                 self._seeder = hpv._ExclusiveSeeder(
                     genotype_keys=keys, init_hpv_dist=init_hpv_dist
                 )
-                for d, k in zip(diseases, keys):
+                for d, k in zip(hpv_diseases, keys):
                     d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
                 # Register so the seeder's Dists go through the standard
                 # define_pars -> init_pre -> init_dists lifecycle.
                 auto_connectors.append(self._seeder)
 
+        diseases = hpv_diseases + other_diseases
+        auto_analyzers = [HPVTotal()]
+        # If HIV is present, auto-wire its connector (appended last, so it runs
+        # after CrossImmunity, which overwrites rel_sus each step; see
+        # hpv_hiv_connector.init_pre) and its stratified-results analyzer.
+        # A user may supply their own (e.g. an hpv_hiv_connector with calibrated
+        # `effects=`); in that case do NOT auto-add a second one, which would
+        # double-apply the rel_sus multiply / double-count the results.
+        if any(isinstance(d, HIV) for d in other_diseases):
+            if not any(isinstance(c, hpv_hiv_connector) for c in user_connectors):
+                auto_connectors.append(hpv_hiv_connector())
+            if not any(isinstance(a, HIVStratifiedResults) for a in user_analyzers):
+                auto_analyzers.append(HIVStratifiedResults())
         connectors = auto_connectors + user_connectors
 
         networks = kwargs.pop('networks', None)
@@ -150,7 +192,7 @@ class Sim(ss.Sim):
                 hpv.AgeMigration(v2_compat=v2_compat_demographics),
             ]
 
-        analyzers = [hpv.HPVTotal()] + user_analyzers
+        analyzers = auto_analyzers + user_analyzers
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()

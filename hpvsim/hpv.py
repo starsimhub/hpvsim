@@ -259,6 +259,15 @@ class HPV(ss.Infection):
     _STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin',
                      'cancerous', 'latent')
 
+    def _hiv_connector(self):
+        """Locate the hpv_hiv_connector on the sim, if any (None when no HIV)."""
+        # Avoid circular import at module load (hiv.py imports HPV from this module).
+        from .hiv import hpv_hiv_connector
+        for c in self.sim.connectors.values():
+            if isinstance(c, hpv_hiv_connector):
+                return c
+        return None
+
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
 
@@ -419,6 +428,10 @@ class HPV(ss.Infection):
             rel_sev_uids = cross.rel_sev[uids]
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
+        # HIV co-infection scales progression severity (gated no-op when no HIV).
+        hivc = self._hiv_connector()
+        if hivc is not None:
+            rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
         sev_imm_uids = self.sev_imm[uids]
 
         # 1. Sample precin durations.
@@ -702,6 +715,18 @@ class HPV(ss.Infection):
                 nab_all  = p.imm_init.rvs(f_cleared)
                 cell_all = p.cell_imm_init.rvs(f_cleared)
 
+                # HIV co-infection reduces conferred immunity (gated no-op).
+                # Note: step_state runs before the connector's step(), so this
+                # reads hiv_rel_imm from the PREVIOUS timestep (a one-dt lag,
+                # immaterial since CD4 moves slowly). Contrast set_prognoses,
+                # which reads hiv_rel_sev fresh because step_infect runs after
+                # the connector.
+                hivc = self._hiv_connector()
+                if hivc is not None:
+                    imm_factor = hivc.hiv_rel_imm[f_cleared]
+                    nab_all = nab_all * imm_factor
+                    cell_all = cell_all * imm_factor
+
                 if len(first_uids):
                     self._sero_bern.set(p=float(p.sero_prob))
                     seroconvert = self._sero_bern.rvs(first_uids)
@@ -716,6 +741,9 @@ class HPV(ss.Infection):
                     self.nab_imm[first_uids]  = seroconvert * nab_all[first_mask]
                     self.cell_imm[first_uids] = cell_all[first_mask]
 
+                # For repeat clearances the running max may retain a higher value
+                # from a prior clearance; the HIV-reduced increment only fails to
+                # boost immunity, it never erases existing antibodies.
                 if len(repeat_uids):
                     self.nab_imm[repeat_uids] = np.maximum(
                         self.nab_imm[repeat_uids], nab_all[has_prior_imm])

@@ -122,17 +122,19 @@ class _ExclusiveSeeder(ss.Connector):
     def for_genotype(self, key):
         """Return an init_prev callback for ``ss.bernoulli(p=callback)``.
 
-        Returns 1.0 for uids assigned to this genotype, 0.0 otherwise; the
-        first invocation triggers the shared lazy compute.
+        Returns 1.0 for uids assigned to this genotype, 0.0 otherwise.
+        The first invocation triggers the shared lazy compute.
 
-        The callback resolves the live seeder from ``sim.connectors`` (via
-        ``_live_seeder``) instead of capturing ``self`` so it stays correct
-        under deep-copy (``ss.Calibration`` / ``MultiSim`` / parallel). A copy
-        clones the connector-registered seeder and any closure-captured seeder
-        as separate objects, and only the connector copy goes through
-        ``init_dists`` — so a callback bound to the captured copy would use
-        uninitialised/force-reinitialised Dists and seed a different set of
-        agents. Resolving the connector keeps one initialised source of truth.
+        The callback resolves the LIVE seeder from ``sim.connectors`` rather
+        than capturing ``self``. A deep-copy (``sc.dcp`` / ``ss.Calibration`` /
+        ``MultiSim`` / parallel) copies the connector-registered seeder and the
+        closure-captured seeder as SEPARATE objects; only the connector copy
+        goes through ``init_dists``, so a callback bound to the captured copy
+        would ``force``-reinit ``seed_bern``/``seed_choice`` onto a different
+        (and, on starsim >=3.5, platform-dependent) seed -> non-deterministic,
+        non-portable seeding. Resolving the connector instance keeps a single
+        properly-initialised source of truth, making seeding copy-stable and
+        platform-stable.
         """
         gen_idx = self.keys.index(key)
 

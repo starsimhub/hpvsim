@@ -49,7 +49,8 @@ class CrossImmunity(ss.Connector):
     genotypes read the same per-agent draw from ``set_prognoses``.
     """
 
-    def __init__(self, cross_imm_sus=None, cross_imm_sev=None, **kwargs):
+    def __init__(self, cross_imm_sus=None, cross_imm_sev=None,
+                 rel_sev_loc=1.0, rel_sev_scale=0.2, **kwargs):
         super().__init__(**kwargs)
         self.cross_imm_sus = cross_imm_sus
         self.cross_imm_sev = cross_imm_sev
@@ -61,10 +62,12 @@ class CrossImmunity(ss.Connector):
             ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
             ss.BoolState('rel_sev_sampled', default=False),
         )
-        # Folded normal via abs() in _ensure_rel_sev; with loc=1.0, scale=0.2
-        # the negative tail mass is < 1e-6 so the practical distribution is
-        # effectively a positive-truncated normal(1, 0.2).
-        self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
+        # Folded normal via abs() in _ensure_rel_sev; with the default
+        # loc=1.0, scale=0.2 the negative tail mass is < 1e-6 so the practical
+        # distribution is equivalent to v2's normal_pos(1, 0.2). A location
+        # calibration may lower loc (e.g. to normal_pos(0.87, 0.2)); expose
+        # loc/scale so it is set at construction.
+        self._rel_sev_dist = ss.normal(loc=rel_sev_loc, scale=rel_sev_scale)
 
     def init_pre(self, sim):
         super().init_pre(sim)
