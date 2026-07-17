@@ -143,6 +143,28 @@ class HPV(ss.Infection):
         )
         self.update_pars(pars=pars, **kwargs)
         self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
+
+        # The directional transmission `beta` dict above was built from the
+        # genotype DEFAULTS. Recompute it from the resolved pars so a `rel_beta`
+        # override (via genotype_pars= / pars=) actually changes transmission;
+        # without this it is silently ignored (the dict keeps the default
+        # rel_beta). Skip if the caller supplied an explicit `beta` — then they
+        # own the dict. With no override the recompute is byte-identical to the
+        # value set in define_pars.
+        _beta_overridden = ('beta' in kwargs) or (pars is not None and 'beta' in pars)
+        if not _beta_overridden:
+            self.pars.beta = {
+                'sexualnetwork': [
+                    gpars.beta * self.pars.rel_beta * gpars.transf2m,
+                    gpars.beta * self.pars.rel_beta * gpars.transm2f,
+                ],
+            }
+
+        # Guard against unit-less duration distributions: a duration given
+        # without ss.years(...) is read in timesteps, not years, so at dt<1 the
+        # infectious period is ~1/dt too short and the epidemic silently
+        # collapses. Fail loudly rather than run wrong science.
+        self._validate_duration_units()
         # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
         # ti_infected. We add the natural-history states below.
         self.define_states(
@@ -225,6 +247,41 @@ class HPV(ss.Infection):
         self._extra_dur_cin = ss.lognorm_ex(mean=float(cn['mean']), std=float(cn['std']))
         self._extra_cin_unif = ss.random()
         self._extra_cancer_unif = ss.random()
+        return
+
+    def _validate_duration_units(self):
+        """Raise if a duration par lost its time units.
+
+        Duration distributions must carry ``ss.years`` (an ``ss.dur``): starsim
+        converts duration TimePars to timesteps by dividing by ``dt``, so a
+        unit-less value (e.g. ``ss.lognorm_ex(mean=3, std=9)``) is treated as
+        timesteps and, at ``dt<1``, makes the infectious period ~``1/dt`` too
+        short — the epidemic silently collapses. Only the public module duration
+        pars are checked (the private ``_extra_dur_*`` dists are intentionally
+        unit-less for the grow multiscale path).
+        """
+        for key in ('dur_precin', 'dur_cin', 'dur_cancer', 'dur_inf_male'):
+            dist = self.pars.get(key, None)
+            if dist is None or isinstance(dist, ss.dur):
+                continue  # a bare ss.dur constant is fine
+            if isinstance(dist, ss.Dist):
+                vals = list(getattr(dist, 'pars', {}).values())
+                has_dur = any(isinstance(v, ss.dur) for v in vals)
+                has_plain = any(isinstance(v, (int, float)) and not isinstance(v, bool)
+                                for v in vals)
+                bad = has_plain and not has_dur
+            else:
+                # A plain scalar (not a Dist, not an ss.dur) is unit-less too.
+                bad = isinstance(dist, (int, float)) and not isinstance(dist, bool)
+            if bad:
+                raise ValueError(
+                    f"HPV genotype {self.genotype!r}: duration parameter {key!r} "
+                    f"was given without time units. A unit-less duration is read "
+                    f"in timesteps, not years, so at dt<1 the infectious period is "
+                    f"~1/dt too short and the epidemic silently collapses. Wrap the "
+                    f"magnitude in ss.years(...), e.g. "
+                    f"ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))."
+                )
         return
 
     def init_post(self):
