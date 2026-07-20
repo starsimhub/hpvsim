@@ -350,7 +350,18 @@ Debugging guidance that generalizes:
   transmission.** Raising per-act `beta` cannot rescue a network already below
   R=1 (each infected agent still contacts too few partners). Fix network
   formation first — annualize `layer_probs`/`cross_layer` (above), then, if
-  still short, raise casual concurrency (`cross_layer`) rather than `beta`.
+  still short, raise casual formation rather than `beta` (next point).
+- **The right casual lever depends on the *age* placement of casual
+  partnerships.** Restoring casual formation only helps if the new partnerships
+  land at HPV-transmitting prime ages (~15–40). Two cases:
+  - Casual `layer_probs` peak at prime ages → raise **concurrency**
+    (`cross_layer`): it unlocks casual for already-married prime-age agents.
+  - Casual `layer_probs` are concentrated at older ages (a not-uncommon
+    calibration artifact) → concurrency just adds *old-age* casual partnerships
+    that don't transmit HPV (prevalence stays flat no matter how high
+    `cross_layer` goes). Here you must raise **prime-age casual participation**
+    (`layer_probs['c']` at the 15–40 age bins) directly. Diagnose by checking
+    the median age of casual edges — if it's ≫30, concurrency is the wrong lever.
 - **Compare against the matching-convention baseline.** The multiscale-CIN-regate
   patch is cancer-side only, so patched and unpatched v2.3 behave identically for
   transmission/prevalence; use patched v2.3.1 for cancer-level comparisons, and
