@@ -124,10 +124,19 @@ sim = hpv.Sim(location='india', genotypes=[16, 18], networks=[net])
 
 Watch these differences:
 
-- **Two probability conventions coexist.** `layer_probs` are applied per
-  timestep as-is (no annual→per-step conversion), but the cross-layer
-  probabilities *are* converted from annual. A v2.3-era value that was
-  annualized for one is not automatically right for the other.
+- **Participation rates are ANNUAL and must carry that convention.** In v3 the
+  network treats `layer_probs` *and* the cross-layer probabilities as annual and
+  converts them to per-timestep internally (`ss.prob(...).to_prob(dt)`, i.e.
+  `1-(1-p)^dt`). **This is the single biggest source of a silently-collapsing
+  epidemic when porting a v2.2.x calibration.** v2.2.x (before the dt-fix,
+  hpvsim issue #13 / commit `2091467f`) applied these rates *per timestep as-is*,
+  so at `dt=0.25` it formed ~4× more partnerships/year than the nominal value.
+  If your calibrated `layer_probs`/`cross_layer` values came from v2.2.x, they
+  are effectively *per-timestep* numbers — pass them through
+  `1-(1-p)^(1/dt)` to annualize before handing them to v3, or the network will
+  be ~`dt`× too sparse, drop below R=1, and HPV will die out with no error. (A
+  quick check: v3 results are **dt-invariant** by construction — if your ported
+  results shift when you change `dt`, you have an unconverted per-timestep rate.)
 - **`people.n_rships` is gone.** Reconstruct lifetime partner counts from the
   edge table (`net.edges`), where `p1` is the female partner and `p2` the male.
 - **`sim.shrink()` deletes the edge table.** If you need post-run partner/edge
@@ -304,6 +313,35 @@ Notes:
   with a single `dt`-tick, so its last-year incidence is under-counted ~`1/dt`.
   When comparing annual or age-standardized rates against v2, run `stop=YYYY+1`
   and use fully-covered calendar years.
+
+## Recalibrating a ported v2 calibration
+
+A v2 calibration will **not** reproduce its outputs on v3 by re-running — expect
+to recalibrate, not just port parameters. Two independent effects break the
+transfer:
+
+- **Multiscale cancer is now unbiased.** v2.3's default `ms_agent_ratio=10`
+  deflated cancer incidence; v3 corrects it (see "Behavioral differences"). A
+  v2.3-calibrated model therefore tends to **over-predict** cancer on v3.
+- **Partnership formation is now dt-correct.** The v2.2.x→v2.3 dt-fix (issue #13,
+  see "Sexual network") removed a ~`1/dt` inflation of partnership rates, so a
+  v2.2.x-calibrated network tends to **under-predict** transmission on v3 — and
+  for sparse, marital-dominated networks it can fall below R=1 and collapse.
+
+Debugging guidance that generalizes:
+
+- **A collapsing epidemic (prevalence → 0) is almost always the network, not
+  transmission.** Raising per-act `beta` cannot rescue a network already below
+  R=1 (each infected agent still contacts too few partners). Fix network
+  formation first — annualize `layer_probs`/`cross_layer` (above), then, if
+  still short, raise casual concurrency (`cross_layer`) rather than `beta`.
+- **Compare against the matching-convention baseline.** The multiscale-CIN-regate
+  patch is cancer-side only, so patched and unpatched v2.3 behave identically for
+  transmission/prevalence; use patched v2.3.1 for cancer-level comparisons, and
+  the original v2.2.x when checking whether the network calibration's target is
+  recoverable.
+- **v3 is not bit-identical to v2** regardless (different RNG stream) — calibrate
+  and compare on overlapping intervals / trends, never exact values.
 
 ## Known issues and tips
 
