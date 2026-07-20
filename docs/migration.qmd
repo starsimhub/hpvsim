@@ -137,10 +137,21 @@ Watch these differences:
   be ~`dt`× too sparse, drop below R=1, and HPV will die out with no error. (A
   quick check: v3 results are **dt-invariant** by construction — if your ported
   results shift when you change `dt`, you have an unconverted per-timestep rate.)
-- **`people.n_rships` is gone.** Reconstruct lifetime partner counts from the
-  edge table (`net.edges`), where `p1` is the female partner and `p2` the male.
+- **Behavior/degree metrics move to the edge table.** The per-agent partner
+  arrays (`people.n_rships`, `people.current_partners`, `people.contacts`) are
+  gone. Reconstruct from `net`:
+  - *Age at first sex* → `net.debut` (an agent is sexually active where
+    `people.age >= net.debut`; there is no `n_rships > 0` flag).
+  - *"In a partnership of layer L now"* → membership in
+    `net.edges_for_layer(L)` endpoints (`p1` female, `p2` male).
+  - *Lifetime/cumulative partner counts* → edges dissolve every step, so there
+    is no running counter; **accumulate with an analyzer** that records new
+    formations each step (`edges_for_layer('c')` where `edges.start_ti ==
+    sim.ti`). This is the standard degree-extraction pattern.
+  - Exclude multiscale stand-ins (`people.fine`) from behavior denominators —
+    the v2 `level0` filter maps to `~people.fine`.
 - **`sim.shrink()` deletes the edge table.** If you need post-run partner/edge
-  extraction, run with `do_shrink=False`.
+  extraction, run with `do_shrink=False` (note: `sim.run()` does not auto-shrink).
 - **NaN debut ages behave differently.** v2 sampled a NaN debut distribution as
   0 (agent always active); v3 samples NaN (agent never active). Missing debut
   data therefore silently removes those agents from transmission in v3 — map it
@@ -231,6 +242,11 @@ mechanical changes that break most v2 cascade code:
   `sim.interventions[name]` / `sim.analyzers[name]`. Iterating the collection
   yields *keys*, not modules (`for a in sim.analyzers` → strings), so an
   `isinstance` filter over it is silently always-false; index by name instead.
+- **`hpv.Sim` deep-copies interventions/analyzers at construction.** The objects
+  you pass in are never populated by the run — always read results back from
+  `sim.interventions[name]` / `sim.analyzers[name]` *after* `sim.run()`, not from
+  the references you constructed. (A common cause of "my analyzer collected
+  nothing.")
 - **Products are modules and need unique names.** Diagnostics, treatments,
   vaccines (`hpv.dx`, `hpv.tx`, `hpv.vx`) are all People modules. Two products
   sharing a name — or a treatment whose `name` equals its `product` name —
