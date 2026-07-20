@@ -346,6 +346,16 @@ transfer:
 
 Debugging guidance that generalizes:
 
+- **Pick the lever by what's off — and `beta` is rarely it.** Cancer
+  incidence / ASR is set by the **CIN→cancer transition** (`cancer_fn`'s
+  `transform_prob`), which is roughly *linear* in the resulting ASR — this is
+  the knob to recalibrate cancer level (down if over-predicting, up if under).
+  Prevalence / transmission is set by the **network** (participation +
+  concurrency; see below). **`beta` is a poor lever for both**: prevalence
+  saturates, so cancer is nearly insensitive to `beta` (raising or lowering it
+  barely moves ASR), and `beta` cannot rescue a network already below R=1. If a
+  `beta` sweep is flat, you're on the wrong knob — use `transform_prob` for
+  cancer level, network params for prevalence.
 - **A collapsing epidemic (prevalence → 0) is almost always the network, not
   transmission.** Raising per-act `beta` cannot rescue a network already below
   R=1 (each infected agent still contacts too few partners). Fix network
@@ -369,6 +379,15 @@ Debugging guidance that generalizes:
   recoverable.
 - **v3 is not bit-identical to v2** regardless (different RNG stream) — calibrate
   and compare on overlapping intervals / trends, never exact values.
+- **The calibration API changed.** v3 calibration is Starsim's `ss.Calibration`
+  (via `hpv.Calibration`): `calib_pars` are `{name: {low, high, guess,
+  suggest_type}}` specs (the `build_fn` receives each as `{'value': …}`);
+  targets go through `data=` (per-key t-indexed frames, `AgeResults` keys only,
+  and type-distribution keys compare *raw counts*, not proportions) or a custom
+  `eval_fn`. Results live in `calib.df` / `calib.best_pars`. The v2
+  `analyzer_results` / `sim_results` / `target_data` attributes are gone, and
+  there is no per-trial sim storage — to draw "top-trials" uncertainty bands you
+  re-run the selected parameter sets.
 
 ## Known issues and tips
 
