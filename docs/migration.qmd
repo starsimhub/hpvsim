@@ -323,6 +323,16 @@ Notes:
   probe that sums over agents must weight by `people.scale` (never a raw
   `.sum()` at `ms_agent_ratio > 1`) and, for absolute counts, by the population
   scale factor.
+- **Measuring prevalence under multiscale — mind the metric.** Two obvious
+  choices are both wrong in different setups. `hpvtotal.n_infected / n_alive`
+  is **ms-dependent**: the numerator is scale-weighted but the top-level
+  `n_alive` result is a *plain* agent count, so spawned fine agents pad the
+  denominator (e.g. one country read 0.107 at `ms=3` but 0.049 at `ms=100`).
+  And `hpvtotal.prevalence` is **`total_pop`-scaled** — a proper 0–1 fraction
+  only when `total_pop = n_agents`; if you set `total_pop` to a national
+  population it comes back ≫ 1. The robust, ms- and `total_pop`-invariant
+  prevalence is the **non-fine (level0) infected fraction**: infected-and-alive
+  agents with `~people.fine`, over alive `~people.fine` agents.
 - **Annual / age-standardized incidence.** `hpv.AgeResults` accumulates
   `cancer_incidence` / `cin_incidence` across the sub-steps of each calendar
   year (v2 reports annually). A sim ending `stop=YYYY` leaves the final year
