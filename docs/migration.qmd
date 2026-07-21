@@ -406,6 +406,12 @@ Debugging guidance that generalizes:
   transmission. Override the `beta` dict directly, e.g.
   `genotype_pars={'hpv16': {'beta': {'sexualnetwork': [b_f2m, b_m2f]}}}`, or set
   it after building and before running.
+- **Guard multi-worker calibration/parallel with `if __name__ == '__main__':`
+  (Windows).** `hpv.Calibration(...).calibrate()` with `n_workers > 1` (and any
+  `ss.MultiSim` / `sc.parallelize`) uses process *spawn* on Windows, so each
+  worker re-imports your driver module. Without the `__main__` guard the workers
+  re-launch the calibration recursively — a fork-bomb that saturates the CPU.
+  Also budget ~a two-minute numba warmup per fresh worker process.
 - **Windows console encoding.** HPVsim prints a `⚙` glyph on startup that can
   crash redirected stdout under the default `cp1252` codepage. Set
   `PYTHONIOENCODING=utf-8` when piping output to a file.
@@ -416,7 +422,12 @@ Debugging guidance that generalizes:
 
 These v2 features are intentionally not in the v3.0 release:
 
-- **Waning immunity** — never used in published analyses.
+- **Waning immunity** — never used in published analyses. One consequence to
+  expect: v3's clearance-conferred immunity is partial and non-waning, so HPV
+  prevalence *rises* with age rather than plateauing/declining. A v2 calibration
+  targeting a flat/declining prevalence-by-age profile may not be reproducible on
+  v3 by parameter tuning alone (confirmed: `sero_prob`/`imm_init` shift the level
+  but not the rising age-shape).
 - **v2's incidence-based HIV** — superseded by the transmission-based HIV module
   described above (v2's incidence-driven epidemic can still be reproduced via
   `hpv.hiv_incidence_import`).
