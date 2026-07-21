@@ -459,8 +459,8 @@ class HIVStratifiedResults(ss.Analyzer):
         """Declare the HIV-stratified result schema (diseases init before analyzers)."""
         super().init_results()
         self.define_results(
-            ss.Result('cancers_with_hiv', dtype=int, label='New cancers (HIV+)'),
-            ss.Result('cancers_no_hiv', dtype=int, label='New cancers (HIV-)'),
+            ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'),
+            ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'),
             ss.Result('hpv_prevalence_with_hiv', dtype=float, label='HPV prevalence (HIV+)'),
             ss.Result('hpv_prevalence_no_hiv', dtype=float, label='HPV prevalence (HIV-)'),
         )
@@ -477,12 +477,18 @@ class HIVStratifiedResults(ss.Analyzer):
         for m in self.hpv_modules:
             any_hpv |= m.infected.values
 
-        n_pos = int(hiv_pos.sum())
-        n_neg = int(hiv_neg.sum())
+        # Scale-weight all counts by people.scale so grow-multiscale fine agents
+        # (scale = 1/ms_agent_ratio) count fractionally, consistent with every
+        # other hpvsim result (see hpv.py stocks). Prevalence weights numerator
+        # AND denominator; the previous raw-count version over-counted fine
+        # agents at ms_agent_ratio > 1 (cancers concentrate on fine agents).
+        scale = people.scale.values
+        n_pos = float((hiv_pos * scale).sum())
+        n_neg = float((hiv_neg * scale).sum())
         self.results['hpv_prevalence_with_hiv'][ti] = (
-            float((any_hpv & hiv_pos).sum()) / n_pos if n_pos else 0.0)
+            float(((any_hpv & hiv_pos) * scale).sum()) / n_pos if n_pos else 0.0)
         self.results['hpv_prevalence_no_hiv'][ti] = (
-            float((any_hpv & hiv_neg).sum()) / n_neg if n_neg else 0.0)
+            float(((any_hpv & hiv_neg) * scale).sum()) / n_neg if n_neg else 0.0)
 
         # New cancers this step, attributed by current HIV status. NOTE: this
         # analyzer runs after step_die in the Starsim loop, so an agent who turns
@@ -497,5 +503,5 @@ class HIVStratifiedResults(ss.Analyzer):
         for m in self.hpv_modules:
             fired = (m.cancerous.values & (m.ti_cancerous.values == ti))
             new_cancer |= fired
-        self.results['cancers_with_hiv'][ti] = int((new_cancer & hiv_pos).sum())
-        self.results['cancers_no_hiv'][ti] = int((new_cancer & hiv_neg).sum())
+        self.results['cancers_with_hiv'][ti] = float(((new_cancer & hiv_pos) * scale).sum())
+        self.results['cancers_no_hiv'][ti] = float(((new_cancer & hiv_neg) * scale).sum())
