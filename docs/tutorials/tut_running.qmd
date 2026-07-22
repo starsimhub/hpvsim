@@ -15,10 +15,9 @@ Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?
 
 ## Multi-seed runs and scenario sweeps
 
-HPVsim v3 uses Starsim's native multi-sim machinery — `ss.MultiSim`,
+HPVsim uses Starsim's native multi-sim machinery — `ss.MultiSim`,
 `ss.parallel`, and Sciris's `sc.parallelize` — for replicate runs,
-scenario comparisons, and parameter sweeps. v2's `hpv.Scenarios` class
-has been removed; the pattern below is the Starsim-native replacement.
+scenario comparisons, and parameter sweeps.
 
 ### Replicate runs (multi-seed UQ)
 
@@ -67,8 +66,7 @@ rarely normally distributed across seeds, so a mean ± 2 SD band is not a true
 ### Comparing scenarios
 
 For scenario comparisons, write a `make_sim(seed, scenario)` function that
-builds one sim per scenario, and pass the labeled sims to `ss.parallel`. This
-is the Starsim-native replacement for v2's `hpv.Scenarios`:
+builds one sim per scenario, and pass the labeled sims to `ss.parallel`:
 
 ```{python}
 import hpvsim as hpv
@@ -173,17 +171,6 @@ you construct a MultiSim from *already-run* sims (e.g. `ss.MultiSim(sims)` where
 each `s` in `sims` has already been run), the objects are the same.
 
 </div>
-
-### Migrating from v2's `hpv.Scenarios`
-
-| v2 pattern | v3 replacement |
-|---|---|
-| `hpv.Scenarios(scenarios={'low': {...}, 'high': {...}})` | `make_sim(seed, scenario)` + `ss.parallel(*sims)` |
-| `scens.run()` | `ss.parallel(*sims)` |
-| `scens.results['low']` | filter `msim.sims` by label, wrap in `ss.MultiSim` |
-| `hpv.MultiSim(sim, n_runs=N)` | `ss.MultiSim(sim, n_runs=N)` (same name in Starsim) |
-| `hpv.parallel(s1, s2)` | `ss.parallel(s1, s2)` (same name in Starsim) |
-| `hpv.MultiSim.merge(msims)` | combine sim lists with `+` and re-wrap: `ss.MultiSim(msim1.sims + msim2.sims)` |
 
 A full worked example — 4 × 20 (coverage × seed) routine-vx sweep with
 median + 10/90 quantile cancer plots — lives in `examples/m07_uq_sweep.py`.

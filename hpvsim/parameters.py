@@ -73,7 +73,7 @@ def _beta_from_mean_var(mean, var):
 def _imm_init_dist(mean=0.35, var=0.025):
     """Beta sample for per-clearance humoral-immunity boost.
 
-    Defaults match the legacy v2 calibration. Callers wanting a different
+    Defaults are the calibrated values. Callers wanting a different
     immunity-boost distribution can construct their own and assign it to
     ``GenotypePars.imm_init`` (or pass via ``pars=``) on the per-genotype HPV
     module.
@@ -84,7 +84,7 @@ def _imm_init_dist(mean=0.35, var=0.025):
 def _cell_imm_dist(mean=0.25, var=0.025):
     """Beta sample for per-clearance severity-immunity boost (cell_imm_init).
 
-    Defaults match the legacy v2 calibration. See ``_imm_init_dist`` for
+    Defaults are the calibrated values. See ``_imm_init_dist`` for
     how to override per-genotype.
     """
     return _beta_from_mean_var(mean, var)

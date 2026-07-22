@@ -180,25 +180,24 @@ class vx(ss.Vx):
     vaccine, or sensitivity sweeps over cross-protection coefficients) and is
     rarely needed.
 
-    The vaccine model mirrors v2's two-parameter architecture:
+    The vaccine model has two parameters:
 
     - ``sterilizing_p`` (default 0.95): per-agent Bernoulli probability of
-      sterilizing immunity, drawn ONCE per agent (not per genotype). Matches
-      v2's hardcoded ``imm_init=0.95`` in ``default_vx``.
+      sterilizing immunity, drawn ONCE per agent (not per genotype).
     - ``rel_imm[g]`` from the CSV: per-genotype cross-protection coefficient.
       Sterilizing agents receive ``vax_imm[g] = rel_imm[g]``; leaky agents
       receive ``vax_imm[g] = rel_imm[g] * sterilizing_p``.
 
     The effective per-genotype protection is approximately
-    ``0.9975 * rel_imm[g]``, matching v2 to within ~0.25 percentage points.
-    Existing ``vax_imm`` is never downgraded (max-of-existing semantics).
+    ``0.9975 * rel_imm[g]``. Existing ``vax_imm`` is never downgraded
+    (max-of-existing semantics).
 
     Vaccine immunity is written to ``vax_imm`` (NOT ``nab_imm``). The
     ``CrossImmunity`` connector applies ``vax_imm`` directly per-genotype
     without flowing it through the cross-immunity matrix, so the CSV's
     per-genotype ``rel_imm`` values are the complete vaccine cross-protection
-    profile — matching v2 semantics where vaccine immunity does not amplify
-    into cross-protection against non-target genotypes.
+    profile: vaccine immunity does not amplify into cross-protection against
+    non-target genotypes.
     """
 
     def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95, **kwargs):
@@ -216,12 +215,10 @@ class vx(ss.Vx):
         """Apply the vaccine: per-agent all-or-nothing sterilizing draw,
         scaled per genotype by the CSV's rel_imm cross-protection coefficient.
 
-        Mirrors v2's architecture: a single per-agent sterilizing Bernoulli at
-        ``sterilizing_p`` (default 0.95, matching v2's hardcoded imm_init=0.95),
-        then per-genotype scaling by ``rel_imm[g]`` from products_vx.csv. v2
-        encodes the per-genotype effect via the cross-immunity matrix coefficient
-        M[g, vx_source] = rel_imm[g]; v3 encodes it directly into vax_imm[g] using
-        ``rel_imm[g]`` as a multiplicative scalar on the per-agent peak.
+        A single per-agent sterilizing Bernoulli at ``sterilizing_p``
+        (default 0.95), then per-genotype scaling by ``rel_imm[g]`` from
+        products_vx.csv. ``rel_imm[g]`` is applied directly to ``vax_imm[g]``
+        as a multiplicative scalar on the per-agent peak.
 
         For each vaccinated agent:
           - Sterilizing fate is drawn once at p=sterilizing_p (NOT per-genotype).

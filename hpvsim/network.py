@@ -66,8 +66,8 @@ class SexualNetwork(ss.SexualNetwork):
         """Network participation requires a non-fine (level0) agent.
 
         Fine multiscale agents (people.fine) are high-resolution cancer
-        stand-ins excluded from transmission, mirroring v2's is_active
-        requirement that participants be level0.
+        stand-ins excluded from transmission; only non-fine (level0)
+        agents participate.
 
         The ``fine`` state is registered by ``hpv.Sim`` only when it builds its
         own People (``people is None``). A network attached to a bare
@@ -149,10 +149,9 @@ class SexualNetwork(ss.SexualNetwork):
         self.set_network_states()
         # Pre-form one batch of partnerships before any sim step runs, so the
         # network is at its per-step occupancy when the first transmission
-        # step fires. Without this, v3 transmits against an empty pair graph
-        # at ti=0 and the network has to warm up over the first ~4 years,
-        # producing a year-1 deficit vs v2 (whose make_people seeds an
-        # initial partnership graph in popdict['contacts']).
+        # step fires. Without this, transmission at ti=0 runs against an
+        # empty pair graph and the network has to warm up over the first
+        # ~4 years, producing a year-1 infection deficit.
         for lkey in self.layers:
             self._add_pairs_for_layer(lkey)
 

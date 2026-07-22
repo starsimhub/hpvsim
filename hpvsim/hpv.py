@@ -44,7 +44,7 @@ _RESET_ON_CLONE = {'ti_dead': np.nan, 'ti_removed': np.nan, 'alive': True}
 
 
 def _clone_agents(sim, src_uids, new_uids):
-    """Copy every per-agent Arr from src_uids to new_uids (v2 states_to_set).
+    """Copy every per-agent Arr from src_uids to new_uids.
 
     starsim registers every module's per-agent states into ``people.states``
     under combined names, so the first loop over ``ppl.states`` already clones
@@ -138,8 +138,7 @@ class HPV(ss.Infection):
             sero_prob=gpars.sero_prob,
             # Multiscale: number of agents each cancer-capable agent represents.
             # 1 = single scale (bit-identical no-op). >1 grows real fine cancer
-            # agents at scale 1/ms_agent_ratio. See
-            # docs/superpowers/specs/2026-06-29-v2-faithful-grow-multiscale-design.md
+            # agents at scale 1/ms_agent_ratio.
             ms_agent_ratio=1,
         )
         self.update_pars(pars=pars, **kwargs)
@@ -328,16 +327,19 @@ class HPV(ss.Infection):
             if key not in self.results:
                 continue
             state_arr = getattr(self, state_name)
-            mask = np.asarray(state_arr[auids], dtype=bool)
-            uids_in = auids[mask]
+            uids_in = auids[state_arr.values]
             self.results[key][ti] = (
                 ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
             )
 
         # Re-derive per-genotype prevalence from the now-correct scale-weighted
         # n_infected (super computed it from the stale plain-count n_infected).
+        # Denominator is the alive-masked scale-weighted count (consistent with
+        # HPVTotal); auids would include agents who died this step but aren't yet
+        # removed (remove_dead runs after update_results), inflating the
+        # denominator ~0.6%/step (~9% at t=0).
         if 'prevalence' in self.results and 'n_infected' in self.results:
-            n_alive_sw = ppl.scale_flows(auids)
+            n_alive_sw = ppl.scale_flows(ppl.alive.uids)
             self.results['prevalence'][ti] = (
                 self.results['n_infected'][ti] / n_alive_sw
                 if n_alive_sw > 0 else 0.0
@@ -514,16 +516,15 @@ class HPV(ss.Infection):
                 )
             )
 
-        # 6. Multiscale: grow real fine cancer agents (v2 set_severity port).
+        # 6. Multiscale: grow real fine cancer agents.
         self._grow_fine_agents(cin_uids, cancer_uids, dur_cin, age_mod,
                                rel_sev_cin, sev_imm_uids[cin_mask], dt_yr)
 
     def _grow_fine_agents(self, cin_uids, cancer_uids, dur_cin, age_mod,
                           rel_sev_cin, sev_imm_cin, dt_yr):
-        """Grow ratio-1 extra real fine cancer agents per CIN agent (v2-faithful).
+        """Grow ratio-1 extra real fine cancer agents per CIN agent.
 
-        Mirrors hpvsim_v23_frozen@fix-multiscale-cin-regate set_severity: the
-        transforming base agents are shrunk to scale 1/ratio; for every CIN
+        The transforming base agents are shrunk to scale 1/ratio; for every CIN
         reacher, ratio-1 extra trajectories are drawn (age_risk-modified
         dur_cin; CIN-conditional rejection-sampled dur_precin), cancer is drawn
         for each extra, and one real fine agent is grown per extra-cancer
@@ -540,8 +541,7 @@ class HPV(ss.Infection):
         RNG: the extra draws come from dedicated dists registered in __init__ —
         SEPARATE streams from the live natural-history dists, so growing fine
         agents never perturbs the real agents' draws (keeps ratio==1 bit-identical
-        and incidence flat across ratios). Drawn by size (non-CRN; cross-scenario
-        CRN is out of scope for multiscale).
+        and incidence flat across ratios). Drawn by size (non-CRN).
         """
         ratio = int(self.pars.ms_agent_ratio)
         n = len(cin_uids)
@@ -581,7 +581,7 @@ class HPV(ss.Infection):
         # CIN -> cancer for every extra (all are CIN now).
         pcanc = compute_severity(extra_dur_cin, rel_sev=rel, pars=p.cancer_fn)
         extra_cancer = self._extra_cancer_unif.rvs(size) < pcanc
-        # Existing fine agents never spawn more fine agents (v2 level0 guard).
+        # Existing fine agents never spawn more fine agents (level0 guard).
         not_fine = ~ppl.fine[cin_uids]
         extra_cancer &= not_fine[:, None]
         counts = extra_cancer.sum(axis=1)
@@ -627,15 +627,13 @@ class HPV(ss.Infection):
         return
 
     def _cancel_other_genotype_progression_for(self, uids):
-        """Mirror v2's check_cancer cross-genotype cancellation.
+        """Cancel pending cancer progression in all other genotypes for these uids.
 
         When this module fires cin->cancerous for uids, all OTHER HPV
         modules in the sim must have their pending cancer progression
         cancelled and their state cleared for these agents. Without this,
         agents with multi-genotype CIN can be counted as multiple cancer
         cases (one per genotype) — biologically incorrect.
-
-        Mirrors hpvsim/_v2_legacy/people.py:565-595 (check_cancer).
         """
         if len(uids) == 0:
             return
@@ -645,10 +643,9 @@ class HPV(ss.Infection):
             # Cancel pending cancer progression in this other genotype
             module.ti_cancerous[uids] = np.nan
             module.ti_dead_cancer[uids] = np.nan
-            # Clear all dysplasia state: v2 sets cin[:, inds] = False across
-            # all genotypes; v3 splits CIN into precin + cin so we clear both
-            # (and their scheduled transition times) to keep these agents from
-            # re-promoting precin -> cin on the now-cancerous body.
+            # Clear all dysplasia state: CIN is split into precin + cin, so
+            # clear both (and their scheduled transition times) to keep these
+            # agents from re-promoting precin -> cin on the now-cancerous body.
             module.precin[uids] = False
             module.cin[uids] = False
             module.ti_cin[uids] = np.nan
@@ -750,15 +747,11 @@ class HPV(ss.Infection):
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
-            # +dt to align with v2's convention: v2's check_cancer_deaths
-            # fires in update_states_pre AFTER increment_age, so v2 records
-            # ages_at_cancer_death = initial + (T+1)*dt at step T. v3's
-            # step_state fires BEFORE finish_step's age advance, so reading
-            # sim.people.age here gives initial + T*dt — one step (dt yr)
-            # lower. Adding dt_yr brings the recorded value into v2's
-            # convention so the parity gate compares apples-to-apples.
-            # Revert by removing the +dt_yr if the underlying step-ordering
-            # convention is harmonised in a future Starsim version.
+            # +dt_yr records age as of the end of the step. step_state fires
+            # BEFORE finish_step advances agent age, so reading sim.people.age
+            # here gives the age at step start (initial + T*dt); adding dt_yr
+            # records the age the agent has after this step's increment
+            # (initial + (T+1)*dt), the intended age at cancer death.
             dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
             ppl = self.sim.people
             ages_at_death = ppl.age[to_dead] + dt_yr

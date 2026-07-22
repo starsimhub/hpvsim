@@ -43,12 +43,10 @@ class CrossImmunity(ss.Connector):
         rel_sus[target]     = (1 - sus_imm_nab[target]) * (1 - vax_imm[target]) * (1 - txvx_imm[target])
 
     Also owns per-agent ``rel_sev`` — an intrinsic biological severity
-    scaler that v2 stores once per agent and uses across every genotype's
-    progression. Per-module storage in v3 would give each genotype its
-    own independent rel_sev draw for the same agent, breaking the v2-
-    implied "intrinsic progression speed" correlation. Owning rel_sev
-    here keeps the v2 semantic — sampled once per agent, read by every
-    HPV module's ``set_prognoses``.
+    scaler sampled once per agent and shared across every genotype's
+    progression, so each agent has a single intrinsic progression speed.
+    It lives on the connector rather than per HPV module so that all
+    genotypes read the same per-agent draw from ``set_prognoses``.
     """
 
     def __init__(self, cross_imm_sus=None, cross_imm_sev=None, **kwargs):
@@ -65,7 +63,7 @@ class CrossImmunity(ss.Connector):
         )
         # Folded normal via abs() in _ensure_rel_sev; with loc=1.0, scale=0.2
         # the negative tail mass is < 1e-6 so the practical distribution is
-        # equivalent to v2's normal_pos(1, 0.2).
+        # effectively a positive-truncated normal(1, 0.2).
         self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
 
     def init_pre(self, sim):
@@ -108,9 +106,9 @@ class CrossImmunity(ss.Connector):
     def ensure_rel_sev(self, uids):
         """Sample ``rel_sev`` for any of ``uids`` that don't have a sample yet.
 
-        Called from each HPV module's ``set_prognoses`` so the v2 semantic
-        — sampled once per agent at first need — holds regardless of
-        module init order. Subsequent calls for the same uids are no-ops.
+        Called from each HPV module's ``set_prognoses`` so that each agent
+        is sampled exactly once, at first need, regardless of module init
+        order. Subsequent calls for the same uids are no-ops.
         """
         if len(uids) == 0:
             return
@@ -165,7 +163,7 @@ class HPVTotal(ss.Analyzer):
 
       - **People-level union** for per-agent state counts listed in
         ``_UNION_STATES``: boolean OR across each module's BoolState array,
-        then counted. Matches v2's ``any_hpv_prevalence`` semantics.
+        then counted (an agent infected with any genotype counts once).
       - **Custom derivation** for results that need it: ``n_susceptible``
         (= n_alive - n_infected), ``prevalence`` (= n_infected / n_alive),
         and the extra ``cum_infections_unique`` (people-level cumulative
@@ -260,16 +258,17 @@ class HPVTotal(ss.Analyzer):
         if n_alive_sw == 0:
             return
         # Per-agent state unions across modules, restricted to alive agents.
-        # Build on auids (not on full alive.values array) to avoid out-of-bounds
-        # indexing when ppl.grow() has extended arrays beyond their initial size.
+        # `.values` is the auid-indexed active-agent view; the alive mask still
+        # matters because auids holds agents who died this step (remove_dead
+        # runs after analyzers). The mask is invariant across states, so hoist.
         auids = people.auids
+        alive_mask = people.alive.values
         union_arrays = {}
         for key, attr in self._UNION_STATES.items():
             # Boolean union across all HPV modules, filtered to alive agents.
             in_state = np.zeros(len(auids), dtype=bool)
             for m in hpvs:
-                in_state |= np.asarray(getattr(m, attr)[auids], dtype=bool)
-            alive_mask = np.asarray(people.alive[auids], dtype=bool)
+                in_state |= getattr(m, attr).values
             in_state &= alive_mask
             uids_in = auids[in_state]
             union_arrays[key] = uids_in
@@ -282,11 +281,13 @@ class HPVTotal(ss.Analyzer):
         self.results['n_susceptible'][ti] = n_alive_sw - sw_inf
         self.results['prevalence'][ti] = sw_inf / n_alive_sw
         # Cumulative unique: agents whose ti_first_infection has fired on
-        # any genotype (including init-seeded). Filter to alive agents.
-        ever_infected = np.zeros(len(auids), dtype=bool)
+        # any genotype (including init-seeded), among those still alive.
+        # `.values` is auid-indexed, but auids still holds agents who died
+        # this step (remove_dead runs after analyzers), so mask by alive.
+        ever_infected = np.zeros_like(people.alive.values)
         for m in hpvs:
-            ever_infected |= np.isfinite(np.asarray(m.ti_first_infection[auids]))
-        ever_infected &= np.asarray(people.alive[auids], dtype=bool)
+            ever_infected |= np.isfinite(m.ti_first_infection.values)
+        ever_infected &= people.alive.values
         self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
 
     def finalize_results(self):

@@ -2,12 +2,12 @@
 
 Contains the prophylactic vaccination intervention API:
 ``hpv.BaseVaccination`` (a subclass of ``ss.BaseVaccination`` that
-accepts v2-compatible ``age_range`` / ``sex`` / ``eligibility``
-constructor args and composes them into a single Starsim eligibility
-callable) and the ``hpv.routine_vx`` / ``hpv.campaign_vx`` leaf classes
-that combine it with Starsim's RoutineDelivery / CampaignDelivery.
+accepts ``age_range`` / ``sex`` / ``eligibility`` constructor args and
+composes them into a single Starsim eligibility callable) and the
+``hpv.routine_vx`` / ``hpv.campaign_vx`` leaf classes that combine it
+with Starsim's RoutineDelivery / CampaignDelivery.
 
-M06 adds screening (routine_screening / campaign_screening), triage
+Also provides screening (routine_screening / campaign_screening), triage
 (routine_triage / campaign_triage), treatment, dynamic_pars, and the
 txvx family (BaseTxVx / routine_txvx / campaign_txvx / linked_txvx).
 """
@@ -32,7 +32,7 @@ __all__ = [
 
 
 def _cast_sex(sex):
-    """Cast v2-style sex input into a set of allowed sex ints (0=F, 1=M).
+    """Cast sex input into a set of allowed sex ints (0=F, 1=M).
 
     Accepts:
       - None: no sex filter (returns None)
@@ -84,7 +84,7 @@ def _as_boolarr(extra_result, people):
 
 
 def _compose_vaccine_eligibility(age_range, sex, extra):
-    """Compose v2-style targeting into a Starsim eligibility callable.
+    """Compose age/sex/eligibility targeting into a Starsim eligibility callable.
 
     Returns ``elig(sim) -> ss.uids`` that intersects:
       - sim.people.alive
@@ -115,7 +115,7 @@ def _compose_vaccine_eligibility(age_range, sex, extra):
 
 
 def _compose_screening_eligibility(age_range, sex, extra, debut_age):
-    """Compose v2-style screening eligibility into a Starsim callable.
+    """Compose screening eligibility into a Starsim callable.
 
     Extends ``_compose_vaccine_eligibility`` with an optional ``debut_age`` lower-
     bound on ``sim.people.age``. When ``debut_age`` is None, semantics are
@@ -150,14 +150,14 @@ def _compose_screening_eligibility(age_range, sex, extra, debut_age):
 class BaseVaccination(ss.BaseVaccination):
     """HPV-specific prophylactic vaccination base.
 
-    Wraps Starsim's ``ss.BaseVaccination`` to add v2-compatible
-    ``age_range`` / ``sex`` / ``eligibility`` constructor args. These
-    compose into a single Starsim eligibility callable. The originals are
-    stored on the instance for introspection (e.g. AgeResults consumption).
+    Wraps Starsim's ``ss.BaseVaccination`` to add ``age_range`` / ``sex`` /
+    ``eligibility`` constructor args. These compose into a single Starsim
+    eligibility callable. The originals are stored on the instance for
+    introspection (e.g. AgeResults consumption).
 
     Also overrides ``_parse_product_str`` so that
     ``routine_vx(product='bivalent', ...)`` resolves through
-    ``hpv.vx(name='bivalent')``, mirroring v2's string-product convention.
+    ``hpv.vx(name='bivalent')``.
     """
 
     def __init__(self, *args, age_range=None, sex=None, eligibility=None,
@@ -189,10 +189,10 @@ class campaign_vx(BaseVaccination, ss.CampaignDelivery):
 class BaseTest(ss.BaseTest):
     """HPV-specific test/screening base.
 
-    Adds v2-compatible age_range / sex / eligibility / debut_age kwargs,
-    composed into a single Starsim eligibility callable via
-    _compose_screening_eligibility. Overrides _parse_product_str so
-    routine_screening(product='via', ...) resolves through hpv.dx(name='via').
+    Adds age_range / sex / eligibility / debut_age kwargs, composed into a
+    single Starsim eligibility callable via _compose_screening_eligibility.
+    Overrides _parse_product_str so routine_screening(product='via', ...)
+    resolves through hpv.dx(name='via').
     """
 
     def __init__(self, *args, age_range=None, sex='f', eligibility=None,
@@ -267,7 +267,7 @@ class BaseTreatment(ss.BaseTreatment):
     """HPV-specific treatment base.
 
     Adds:
-    - v2-compatible age_range / sex / eligibility kwargs
+    - age_range / sex / eligibility kwargs
     - HPV-specific eligibility: female + alive + cancer-status-matched
       (cancer treatments require any-genotype cancerous; non-cancer
       treatments require no cancerous on any genotype)
