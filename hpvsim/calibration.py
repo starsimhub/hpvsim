@@ -13,6 +13,8 @@ The default eval_fn pulls each target's simulated values out of the
 ``compute_gof`` over the flattened (year × column) values. Per-target
 ``weights`` scale each result's mismatch before summing.
 """
+import tempfile
+
 import numpy as np
 import pandas as pd
 import sciris as sc
@@ -47,7 +49,13 @@ class Calibration(ss.Calibration):
                  **kwargs):
         if build_fn is None:
             build_fn = build_sim
-        kwargs.setdefault('study_name', 'hpvsim_calibration')
+        # Give each calibration its own Optuna study database, in a temp dir, so
+        # multiple hpv.Calibration runs in one session (or the test suite) do not
+        # share or leak trials through a single database in the cwd. Callers can
+        # still pass study_name/db_name explicitly (e.g. continue_db resume).
+        if 'study_name' not in kwargs and 'db_name' not in kwargs:
+            kwargs['study_name'] = 'hpvsim_calibration'
+            kwargs['db_name'] = str(sc.path(tempfile.mkdtemp()) / 'hpvsim_calibration.db')
 
         if data is not None:
             if eval_fn is not None:
