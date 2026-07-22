@@ -74,6 +74,58 @@ def test_routine_triage_consumes_screen_outcomes():
     assert sim.interventions['triage'].screened.uids.size <= sim.interventions['primary'].screened.uids.size
 
 
+def test_cytology_primary_screen_populates_n_dx():
+    """Regression: a screening product with no plain 'positive' outcome
+    (cytology's ascus/abnormal) works as a PRIMARY screen.
+
+    Upstream ss.BaseScreening.step hardcodes outcomes['positive'] for n_dx,
+    which KeyErrors for such products; hpv.BaseScreening overrides step to
+    count any non-negative result instead.
+    """
+    intv = hpv.routine_screening(
+        name='primary', product='lbc', prob=1.0,
+        age_range=[30, 50], sex='f', start_year=2021, end_year=2024,
+    )
+    sim = _baseline_sim_with([intv])
+    sim.run()  # must not raise KeyError: 'positive'
+    live = sim.interventions['primary']
+    n_screened = np.asarray(live.results['n_screened'])
+    n_dx = np.asarray(live.results['n_dx'])
+    assert n_screened.sum() > 0
+    assert n_dx.sum() > 0                 # ascus/abnormal are counted as diagnosed
+    assert (n_dx <= n_screened).all()     # diagnosed is a subset of screened
+
+
+def test_hpv_type_primary_screen_runs():
+    """hpv_type (positive_1618/positive_ohr, no plain 'positive') as a primary screen."""
+    intv = hpv.routine_screening(
+        name='primary', product='hpv_type', prob=1.0,
+        age_range=[30, 50], sex='f', start_year=2021, end_year=2024,
+    )
+    sim = _baseline_sim_with([intv])
+    sim.run()  # must not raise
+    live = sim.interventions['primary']
+    n_screened = np.asarray(live.results['n_screened'])
+    n_dx = np.asarray(live.results['n_dx'])
+    assert n_screened.sum() > 0
+    assert (n_dx <= n_screened).all()
+
+
+def test_via_primary_n_dx_unchanged():
+    """A product WITH 'positive' (via) still records n_dx as the positive count."""
+    intv = hpv.routine_screening(
+        name='primary', product='via', prob=1.0,
+        age_range=[30, 50], sex='f', start_year=2021, end_year=2024,
+    )
+    sim = _baseline_sim_with([intv])
+    sim.run()
+    live = sim.interventions['primary']
+    n_screened = np.asarray(live.results['n_screened'])
+    n_dx = np.asarray(live.results['n_dx'])
+    assert n_dx.sum() > 0
+    assert (n_dx <= n_screened).all()
+
+
 def test_routine_screening_string_product_resolves_via_dx():
     """product='via' should resolve through hpv.dx(name='via')."""
     intv = hpv.routine_screening(

@@ -3,25 +3,25 @@ Construct the 7 screen and treat algorithms recommended by the WHO
 See documentation here: https://www.ncbi.nlm.nih.gov/books/NBK572308/
 '''
 
-import hpvsim as hpv
 import numpy as np
+import starsim as ss
+import hpvsim as hpv
 
 debug = 1
 
 def make_sim(seed=0):
     ''' Make a single sim '''
 
-    # Parameters
+    # Parameters (v3: `stop` not `end`; pass as keyword arguments)
     pars = dict(
-        n_agents        = [50e3,5e3][debug],
-        dt              = [0.5,1.0][debug],
-        start           = [1975,2000][debug],
-        end             = 2060,
+        n_agents        = [50_000, 5_000][debug],
+        dt              = [0.5, 1.0][debug],
+        start           = [1975, 2000][debug],
+        stop            = 2060,
         ms_agent_ratio  = 10,
-        burnin          = [45,0][debug],
         rand_seed       = seed,
     )
-    sim = hpv.Sim(pars=pars)
+    sim = hpv.Sim(**pars)
     return sim
 
 
@@ -34,7 +34,18 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     triage_screen_prob = 0.9
     ablate_prob = 0.9
     start_year = 2025
-    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
+
+    # v3 note: screening is delivered at `prob` each active year. A re-screen
+    # interval (e.g. skip anyone screened in the last 5 years) can be built from
+    # the screening module's `ti_screened` state; the v2 people-level
+    # `date_screened` attribute is gone.
+
+    def union(*uid_arrays):
+        ''' Combine outcome uid arrays into a single deduplicated ss.uids '''
+        out = np.array([], dtype=int)
+        for u in uid_arrays:
+            out = np.union1d(out, np.asarray(u))
+        return ss.uids(out)
 
 
     ####################################################################
@@ -45,21 +56,18 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     via_primary = hpv.routine_screening(
         product='via',
         prob=primary_screen_prob,
-        eligibility=screen_eligible,
         start_year=start_year,
-        label='via primary',
+        name='via primary',
     )
 
-    via_positive = lambda sim: sim.get_intervention('via primary').outcomes['positive']
+    via_positive = lambda sim: sim.interventions['via primary'].outcomes['positive']
     ablation1 = hpv.treat_num(
         prob = ablate_prob,
         product = 'ablation',
         eligibility = via_positive,
-        label = 'ablation'
     )
 
     algo1 = [via_primary, ablation1]
-    for intv in algo1: intv.do_plot=False
 
     ####################################################################
     #### Algorithm 2 (https://www.ncbi.nlm.nih.gov/books/NBK572308/)
@@ -69,21 +77,18 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     hpv_primary = hpv.routine_screening(
         product='hpv',
         prob=primary_screen_prob,
-        eligibility=screen_eligible,
         start_year=start_year,
-        label='hpv primary',
+        name='hpv primary',
     )
 
-    hpv_positive = lambda sim: sim.get_intervention('hpv primary').outcomes['positive']
+    hpv_positive = lambda sim: sim.interventions['hpv primary'].outcomes['positive']
     ablation2 = hpv.treat_num(
         prob = ablate_prob,
         product = 'ablation',
         eligibility = hpv_positive,
-        label = 'ablation'
     )
 
     algo2 = [hpv_primary, ablation2]
-    for intv in algo2: intv.do_plot=False
 
     ####################################################################
     #### Algorithm 3 (https://www.ncbi.nlm.nih.gov/books/NBK572308/)
@@ -95,42 +100,38 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     cytology = hpv.routine_screening(
         product='lbc',
         prob=primary_screen_prob,
-        eligibility=screen_eligible,
         start_year=start_year,
-        label='cytology',
+        name='cytology',
     )
 
     # Triage ASCUS with HPV test
-    ascus = lambda sim: sim.get_intervention('cytology').outcomes['ascus']
+    ascus = lambda sim: sim.interventions['cytology'].outcomes['ascus']
     hpv_triage = hpv.routine_triage(
         product='hpv',
         prob=triage_screen_prob,
-        annual_prob=False,
         eligibility=ascus,
-        label='hpv triage'
+        name='hpv triage',
     )
 
     # Send abnormal cytology results, plus ASCUS results that were HPV+, for colpo
-    to_colpo = lambda sim: list(set(sim.get_intervention('cytology').outcomes['abnormal'].tolist() + sim.get_intervention('hpv triage').outcomes['positive'].tolist()))
+    to_colpo = lambda sim: union(sim.interventions['cytology'].outcomes['abnormal'],
+                                 sim.interventions['hpv triage'].outcomes['positive'])
     colpo = hpv.routine_triage(
         product='colposcopy',
         prob = triage_screen_prob,
-        annual_prob=False,
         eligibility=to_colpo,
-        label = 'colposcopy'
+        name = 'colpo',
     )
 
     # After colpo, treat HSILs with ablation
-    hsils = lambda sim: sim.get_intervention('colposcopy').outcomes['hsil']
+    hsils = lambda sim: sim.interventions['colpo'].outcomes['hsil']
     ablation3 = hpv.treat_num(
         prob = ablate_prob,
         product = 'ablation',
         eligibility = hsils,
-        label = 'ablation'
     )
 
     algo3 = [cytology, hpv_triage, colpo, ablation3]
-    for intv in algo3: intv.do_plot=False
 
 
     ####################################################################
@@ -143,42 +144,38 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     hpv_primary4 = hpv.routine_screening(
         product='hpv_type',
         prob=primary_screen_prob,
-        eligibility=screen_eligible,
         start_year=start_year,
-        label='hpv primary',
+        name='hpv primary',
     )
 
     # Those who test + for OHR types are triaged with VIA
-    pos_ohr = lambda sim: sim.get_intervention('hpv primary').outcomes['positive_ohr']
+    pos_ohr = lambda sim: sim.interventions['hpv primary'].outcomes['positive_ohr']
     via_triage = hpv.routine_triage(
         product='via',
         prob=triage_screen_prob,
-        annual_prob=False,
         eligibility=pos_ohr,
-        label='via triage'
+        name='via triage',
     )
 
     # Determine ablation eligibility for people with 16/18, plus those who test positive from VIA
-    to_assign = lambda sim: list(set(sim.get_intervention('hpv primary').outcomes['positive_1618'].tolist() + sim.get_intervention('via triage').outcomes['positive'].tolist()))
+    to_assign = lambda sim: union(sim.interventions['hpv primary'].outcomes['positive_1618'],
+                                  sim.interventions['via triage'].outcomes['positive'])
     tx_assigner = hpv.routine_triage(
         product='tx_assigner',
         prob = triage_screen_prob,
-        annual_prob=False,
         eligibility=to_assign,
-        label = 'tx assigner'
+        name = 'tx assigner',
     )
 
     # Ablate anyone eligible for ablation
-    to_ablate = lambda sim: sim.get_intervention('tx assigner').outcomes['ablation']
+    to_ablate = lambda sim: sim.interventions['tx assigner'].outcomes['ablation']
     ablation4 = hpv.treat_num(
         prob = ablate_prob,
         product = 'ablation',
         eligibility = to_ablate,
-        label = 'ablation'
     )
 
     algo4 = [hpv_primary4, via_triage, tx_assigner, ablation4]
-    for intv in algo4: intv.do_plot=False
 
 
     ####################################################################
@@ -190,42 +187,37 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     hpv_primary5 = hpv.routine_screening(
         product='hpv',
         prob=primary_screen_prob,
-        eligibility=screen_eligible,
         start_year=start_year,
-        label='hpv primary',
+        name='hpv primary',
     )
 
     # Those who test + are triaged with VIA
-    screen_pos = lambda sim: sim.get_intervention('hpv primary').outcomes['positive']
+    screen_pos = lambda sim: sim.interventions['hpv primary'].outcomes['positive']
     via_triage5 = hpv.routine_triage(
         product='via',
         prob=triage_screen_prob,
-        annual_prob=False,
         eligibility=screen_pos,
-        label='via triage'
+        name='via triage',
     )
 
     # Determine ablation eligibility
-    to_assign5 = lambda sim: sim.get_intervention('via triage').outcomes['positive']
+    to_assign5 = lambda sim: sim.interventions['via triage'].outcomes['positive']
     tx_assigner5 = hpv.routine_triage(
         product='tx_assigner',
         prob = triage_screen_prob,
-        annual_prob=False,
         eligibility=to_assign5,
-        label = 'tx assigner'
+        name = 'tx assigner',
     )
 
     # Ablate anyone eligible for ablation
-    to_ablate = lambda sim: sim.get_intervention('tx assigner').outcomes['ablation']
+    to_ablate = lambda sim: sim.interventions['tx assigner'].outcomes['ablation']
     ablation5 = hpv.treat_num(
         prob = ablate_prob,
         product = 'ablation',
         eligibility = to_ablate,
-        label = 'ablation'
     )
 
     algo5 = [hpv_primary5, via_triage5, tx_assigner5, ablation5]
-    for intv in algo5: intv.do_plot=False
 
 
     ####################################################################
@@ -237,32 +229,28 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     hpv_primary6 = hpv.routine_screening(
         product='hpv',
         prob=primary_screen_prob,
-        eligibility=screen_eligible,
         start_year=start_year,
-        label='hpv primary',
+        name='hpv primary',
     )
 
     # Send HPV+ women for colpo
-    to_colpo = lambda sim: sim.get_intervention('hpv primary').outcomes['positive']
+    to_colpo = lambda sim: sim.interventions['hpv primary'].outcomes['positive']
     colpo6 = hpv.routine_triage(
         product='colposcopy',
         prob = triage_screen_prob,
-        annual_prob=False,
         eligibility=to_colpo,
-        label = 'colposcopy'
+        name = 'colpo',
     )
 
     # After colpo, treat HSILs with ablation
-    hsils = lambda sim: sim.get_intervention('colposcopy').outcomes['hsil']
+    hsils = lambda sim: sim.interventions['colpo'].outcomes['hsil']
     ablation6 = hpv.treat_num(
         prob = ablate_prob,
         product = 'ablation',
         eligibility = hsils,
-        label = 'ablation'
     )
 
     algo6 = [hpv_primary6, colpo6, ablation6]
-    for intv in algo6: intv.do_plot=False
 
     ####################################################################
     #### Algorithm 7 (https://www.ncbi.nlm.nih.gov/books/NBK572308/)
@@ -273,42 +261,38 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     hpv_primary7 = hpv.routine_screening(
         product='hpv',
         prob=primary_screen_prob,
-        eligibility=screen_eligible,
         start_year=start_year,
-        label='hpv primary',
+        name='hpv primary',
     )
 
     # Send HPV+ women for cytology
-    to_cytology = lambda sim: sim.get_intervention('hpv primary').outcomes['positive']
+    to_cytology = lambda sim: sim.interventions['hpv primary'].outcomes['positive']
     cytology7 = hpv.routine_triage(
         product='lbc',
-        annual_prob=False,
         prob=triage_screen_prob,
         eligibility=to_cytology,
-        label='cytology',
+        name='cytology',
     )
 
     # Send ASCUS and abnormal cytology results for colpo
-    to_colpo = lambda sim: list(set(sim.get_intervention('cytology').outcomes['abnormal'].tolist() + sim.get_intervention('cytology').outcomes['ascus'].tolist()))
+    to_colpo = lambda sim: union(sim.interventions['cytology'].outcomes['abnormal'],
+                                 sim.interventions['cytology'].outcomes['ascus'])
     colpo7 = hpv.routine_triage(
         product='colposcopy',
-        annual_prob=False,
         prob=triage_screen_prob,
         eligibility=to_colpo,
-        label='colpo',
+        name='colpo',
     )
 
     # After colpo, treat HSILs with ablation
-    hsils = lambda sim: sim.get_intervention('colposcopy').outcomes['hsil']
+    hsils = lambda sim: sim.interventions['colpo'].outcomes['hsil']
     ablation7 = hpv.treat_num(
         prob = ablate_prob,
         product = 'ablation',
         eligibility = hsils,
-        label = 'ablation'
     )
 
     algo7 = [hpv_primary7, cytology7, colpo7, ablation7]
-    for intv in algo7: intv.do_plot=False
 
 
     ####################################################################
@@ -324,9 +308,7 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     sim5 = hpv.Sim(interventions=algo5, label='Algorithm 5')
     sim6 = hpv.Sim(interventions=algo6, label='Algorithm 6')
     sim7 = hpv.Sim(interventions=algo7, label='Algorithm 7')
-    msim = hpv.parallel([sim0, sim1, sim2, sim3, sim4, sim5, sim6, sim7])
-
-    msim.compare()
+    msim = ss.MultiSim([sim0, sim1, sim2, sim3, sim4, sim5, sim6, sim7]).run()
 
     return msim
 
@@ -337,4 +319,3 @@ def make_algorithms(sim=None, seed=0, debug=debug):
 if __name__ == '__main__':
 
     msim = make_algorithms()
-
