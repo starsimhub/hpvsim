@@ -15,11 +15,12 @@ built-in tools for simulating commonly-used interventions, has been
 extensively tested and documented, and runs in a matter of seconds to
 minutes on a laptop.
 
-In mid-2025, version 3.0 of HPVsim will be released, built on the
-Starsim [Starsim](https://starsim.org/) modeling architecture. Since
-this represents a significant shift, version 3.0 and above will live in
-a [separate repository](https://github.com/starsimhub/hpvsim). The code
-in this repository will be frozen after version 2.2, aside from any
+Version 3.0 of HPVsim is built on the [Starsim](https://starsim.org/)
+modeling architecture. This is a significant shift from the v2 series:
+the disease model, sexual network, demographics, interventions, and
+analyzers are now Starsim modules, and the API changed accordingly. The
+science is preserved — see the [migration guide](https://docs.hpvsim.org/migration.html)
+for a full v2→v3 walkthrough. The v2 series is frozen aside from
 critical bugfixes.
 
 The scientific paper describing HPVsim is available at
@@ -63,8 +64,9 @@ data manually by running `hpvsim-download-data` from the terminal.
 
 ## Usage and documentation
 
-Documentation is available at <https://docs.hpvsim.org>. Additional
-usage examples are available in the `tests` folder.
+Documentation is available at <https://docs.hpvsim.org>, including
+[tutorials](https://docs.hpvsim.org/tutorials.html). Additional usage
+examples are available in the `examples` folder.
 
 ## Contributing
 

@@ -96,6 +96,7 @@ website:
             - api/cross_genotype.qmd
             - api/defaults.qmd
             - api/demographics.qmd
+            - api/hiv.qmd
             - api/hpv.qmd
             - api/interventions.qmd
             - api/migration_utils.qmd
@@ -167,6 +168,7 @@ quartodoc:
         - cross_genotype
         - defaults
         - demographics
+        - hiv
         - hpv
         - interventions
         - migration_utils

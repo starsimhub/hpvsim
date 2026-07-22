@@ -21,9 +21,8 @@ __all__ = ['HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector',
            'HIVStratifiedResults']
 
 
-# CD4-stratified HIV→HPV effect multipliers. Copied by value from v2's
-# HIVsim defaults (hpvsim/_v2_legacy/hiv.py:29-44) per the no-quarantine-import
-# rule. v2's CD4 strata are 'lt200' = [0, 200) and 'gt200' = [200, 500); agents
+# CD4-stratified HIV→HPV effect multipliers. Copied by value from HPVsim v2's
+# HIVsim defaults. v2's CD4 strata are 'lt200' = [0, 200) and 'gt200' = [200, 500); agents
 # with CD4 >= 500 fall in NEITHER stratum and so receive NO HIV→HPV effect
 # (factor 1.0, biological). This is load-bearing: HIV+ agents start at CD4~594
 # and ART reconstitutes CD4 above 500, so most HIV+ person-time is CD4 >= 500 —

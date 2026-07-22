@@ -342,62 +342,44 @@ Notes:
 
 ## Recalibrating a ported v2 calibration
 
-A v2 calibration will **not** reproduce its outputs on v3 by re-running — expect
-to recalibrate, not just port parameters. Two independent effects break the
-transfer:
+A v2 calibration will **not** reproduce its outputs by re-running on v3 — expect
+to recalibrate, not just port parameters. Two changes break the transfer (both
+detailed above): multiscale cancer is now unbiased, so a v2.3 fit (default
+`ms_agent_ratio=10`, which deflated cancer) tends to **over-predict** cancer on
+v3; and partnership formation is now dt-correct (the v2.2.x→v2.3 dt-fix removed a
+~`1/dt` inflation), so a v2.2.x network tends to **under-predict** transmission —
+a sparse, marital-dominated one can fall below R=1 and collapse.
 
-- **Multiscale cancer is now unbiased.** v2.3's default `ms_agent_ratio=10`
-  deflated cancer incidence; v3 corrects it (see "Behavioral differences"). A
-  v2.3-calibrated model therefore tends to **over-predict** cancer on v3.
-- **Partnership formation is now dt-correct.** The v2.2.x→v2.3 dt-fix (issue #13,
-  see "Sexual network") removed a ~`1/dt` inflation of partnership rates, so a
-  v2.2.x-calibrated network tends to **under-predict** transmission on v3 — and
-  for sparse, marital-dominated networks it can fall below R=1 and collapse.
+Choosing the lever:
 
-Debugging guidance that generalizes:
+- **Cancer level → `transform_prob`** (the CIN→cancer transition in `cancer_fn`),
+  which is roughly *linear* in ASR. `beta` is a poor lever here: prevalence
+  saturates, so ASR is nearly insensitive to it — a flat `beta` sweep means
+  you're on the wrong knob.
+- **Prevalence / transmission → the network** (participation + concurrency).
+  `beta` cannot rescue a network already below R=1. A collapsing epidemic
+  (prevalence → 0) is almost always the network: first annualize
+  `layer_probs`/`cross_layer` (see "Sexual network"), then raise casual
+  formation.
+- **The right casual lever depends on the *age* of casual partnerships** —
+  restoring formation only helps if the partnerships land at HPV-transmitting
+  prime ages (~15–40). If casual `layer_probs` peak at prime ages, raise
+  concurrency (`cross_layer`); if they're concentrated at older ages (a common
+  calibration artifact), concurrency just adds non-transmitting old-age
+  partnerships — raise prime-age `layer_probs['c']` (15–40 bins) directly.
+  Diagnose from the median age of casual edges.
+- **Compare against a matching-convention baseline** — patched v2.3.1 for
+  cancer-level, original v2.2.x for whether a network target is recoverable (the
+  multiscale-CIN-regate patch is cancer-side only). And v3 is never bit-identical
+  to v2 (different RNG) — compare on intervals/trends, never exact values.
 
-- **Pick the lever by what's off — and `beta` is rarely it.** Cancer
-  incidence / ASR is set by the **CIN→cancer transition** (`cancer_fn`'s
-  `transform_prob`), which is roughly *linear* in the resulting ASR — this is
-  the knob to recalibrate cancer level (down if over-predicting, up if under).
-  Prevalence / transmission is set by the **network** (participation +
-  concurrency; see below). **`beta` is a poor lever for both**: prevalence
-  saturates, so cancer is nearly insensitive to `beta` (raising or lowering it
-  barely moves ASR), and `beta` cannot rescue a network already below R=1. If a
-  `beta` sweep is flat, you're on the wrong knob — use `transform_prob` for
-  cancer level, network params for prevalence.
-- **A collapsing epidemic (prevalence → 0) is almost always the network, not
-  transmission.** Raising per-act `beta` cannot rescue a network already below
-  R=1 (each infected agent still contacts too few partners). Fix network
-  formation first — annualize `layer_probs`/`cross_layer` (above), then, if
-  still short, raise casual formation rather than `beta` (next point).
-- **The right casual lever depends on the *age* placement of casual
-  partnerships.** Restoring casual formation only helps if the new partnerships
-  land at HPV-transmitting prime ages (~15–40). Two cases:
-  - Casual `layer_probs` peak at prime ages → raise **concurrency**
-    (`cross_layer`): it unlocks casual for already-married prime-age agents.
-  - Casual `layer_probs` are concentrated at older ages (a not-uncommon
-    calibration artifact) → concurrency just adds *old-age* casual partnerships
-    that don't transmit HPV (prevalence stays flat no matter how high
-    `cross_layer` goes). Here you must raise **prime-age casual participation**
-    (`layer_probs['c']` at the 15–40 age bins) directly. Diagnose by checking
-    the median age of casual edges — if it's ≫30, concurrency is the wrong lever.
-- **Compare against the matching-convention baseline.** The multiscale-CIN-regate
-  patch is cancer-side only, so patched and unpatched v2.3 behave identically for
-  transmission/prevalence; use patched v2.3.1 for cancer-level comparisons, and
-  the original v2.2.x when checking whether the network calibration's target is
-  recoverable.
-- **v3 is not bit-identical to v2** regardless (different RNG stream) — calibrate
-  and compare on overlapping intervals / trends, never exact values.
-- **The calibration API changed.** v3 calibration is Starsim's `ss.Calibration`
-  (via `hpv.Calibration`): `calib_pars` are `{name: {low, high, guess,
-  suggest_type}}` specs (the `build_fn` receives each as `{'value': …}`);
-  targets go through `data=` (per-key t-indexed frames, `AgeResults` keys only,
-  and type-distribution keys compare *raw counts*, not proportions) or a custom
-  `eval_fn`. Results live in `calib.df` / `calib.best_pars`. The v2
-  `analyzer_results` / `sim_results` / `target_data` attributes are gone, and
-  there is no per-trial sim storage — to draw "top-trials" uncertainty bands you
-  re-run the selected parameter sets.
+**Calibration API.** v3 uses Starsim's `ss.Calibration` (via `hpv.Calibration`):
+`calib_pars` are `{name: {low, high, guess, suggest_type}}` specs (the `build_fn`
+receives each as `{'value': …}`); targets go through `data=` (per-key t-indexed
+frames, `AgeResults` keys only, type-distribution keys compare *raw counts*) or a
+custom `eval_fn`. Results live in `calib.df` / `calib.best_pars`. The v2
+`analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim
+storage are gone — re-run selected parameter sets to draw uncertainty bands.
 
 ## Known issues and tips
 

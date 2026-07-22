@@ -21,6 +21,10 @@ walkthrough.
   scheduling extras, giving an intervention-correct, unbiased cancer level.
 - Analyzers (`snapshot`, `age_pyramid`, `age_causal_infection`, `dalys`,
   `AgeResults`, per-genotype results) and built-in plotting ported.
+- HIV–HPV co-infection via a transmission-based HIV module (built on STIsim).
+  Adding an `hpv.HIV` disease auto-wires the `hpv_hiv_connector` (raising HPV
+  susceptibility/severity by CD4 stratum) and an `HIVStratifiedResults`
+  analyzer. See the migration guide for the API.
 - *Regression information*: v3 uses Starsim's RNG framework and does not share
   a stream with v2; results are not bit-identical to v2 even with the same
   seed. Validate on overlapping uncertainty intervals, not exact values.
@@ -33,8 +37,9 @@ walkthrough.
   rather than one flat dict; `sim.short_summary` and the top-level
   `hpv.save`/`hpv.load`/`hpv.MultiSim` helpers are removed (use `sim.save()` /
   `ss.load()` / `ss.MultiSim`).
-- Not ported to v3.0: waning immunity, v2's incidence-based HIV (HIV–HPV
-  co-infection ships in a later release), `EventSchedule`, and custom
+- Not ported to v3.0: waning immunity, v2's incidence-based HIV (superseded by
+  the transmission-based HIV module above; a v2-style imposed incidence curve is
+  still available via `hpv.hiv_incidence_import`), `EventSchedule`, and custom
   `settings.py` (superseded by `ss.options`).
 
 ## Version 2.3.0 (2026-04-20)
