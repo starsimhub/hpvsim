@@ -293,32 +293,6 @@ class AgeResults(ss.Analyzer):
         return pd.DataFrame(rows, columns=cols,
                             index=pd.Index(index, name='t'))
 
-    def to_xn_per_bin(self, key):
-        """Return per-age-bin (x, n) DataFrames for a prevalence-mode result.
-
-        Each value of the returned dict is a 't'-indexed DataFrame with two
-        columns: ``x`` (positives) and ``n`` (total). Used by the
-        BetaBinomial-style consumers of (positives, totals) per bin.
-
-        Raises if `key` is not a prevalence result.
-        """
-        if key not in self._PREV_TO_STATE:
-            raise ValueError(
-                f'AgeResults.to_xn_per_bin: {key!r} is not a prevalence '
-                f'result; supported keys are {list(self._PREV_TO_STATE)}'
-            )
-        rdict = self.result_args[key]
-        years = sorted(self.outputs[key].keys())
-        result = {}
-        for bi, label in enumerate(rdict.age_labels):
-            x_vals = [float(self.outputs[key][y][bi, 0]) for y in years]
-            n_vals = [float(self.outputs[key][y][bi, 1]) for y in years]
-            result[label] = pd.DataFrame(
-                {'x': x_vals, 'n': n_vals},
-                index=pd.Index(years, name='t'),
-            )
-        return result
-
 
 def _make_age_labels(edges):
     """['0-5', '5-10', ..., '95+'] from bin edges."""
@@ -610,15 +584,24 @@ class dalys(ss.Analyzer):
         start: ss.date-coercible; only count onsets at/after this year.
         life_expectancy: reference life expectancy for YLL (default 84;
             pass a country-specific value where available).
+        disability_weights: objdict/dict with ``weights`` and ``time_fraction``
+            lists (one entry per cancer stage). Defaults to GBD2017; pass your
+            own to use different disability weights.
     """
 
-    def __init__(self, start=None, life_expectancy=84, **kwargs):
+    # GBD2017 cervical-cancer disability weights and time fractions per stage.
+    _DEFAULT_DISABILITY_WEIGHTS = dict(
+        weights=[0.288, 0.049, 0.451, 0.54],
+        time_fraction=[0.05, 0.85, 0.09, 0.01],
+    )
+
+    def __init__(self, start=None, life_expectancy=84, disability_weights=None, **kwargs):
         super().__init__(**kwargs)
         self.start = start
         self.life_expectancy = life_expectancy
         self.disability_weights = sc.objdict(
-            weights=[0.288, 0.049, 0.451, 0.54],     # GBD2017
-            time_fraction=[0.05, 0.85, 0.09, 0.01],
+            disability_weights if disability_weights is not None
+            else self._DEFAULT_DISABILITY_WEIGHTS
         )
 
     @property
