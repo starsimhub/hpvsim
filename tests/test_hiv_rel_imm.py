@@ -1,4 +1,4 @@
-"""M08 Task 5: HPV clearance-conferred immunity is scaled by the HIV connector's
+"""HPV clearance-conferred immunity is scaled by the HIV connector's
 per-agent ``hiv_rel_imm`` factor (CD4-stratified), as a gated no-op when no HIV
 connector is present.
 

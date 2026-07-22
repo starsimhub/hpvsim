@@ -1,9 +1,9 @@
-"""Integration smoke tests for M05 vaccination interventions.
+"""Integration smoke tests for vaccination interventions.
 
 These tests run small sims end-to-end (200-500 agents, ~5-year horizon) to
 verify the routine/campaign interventions fire on schedule, update
 per-intervention state correctly, target the right age/sex cohorts, and
-do not perturb the M03 no-vx baseline (CRN-stream guard).
+do not perturb the no-vx baseline.
 """
 import numpy as np
 import pytest

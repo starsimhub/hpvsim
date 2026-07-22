@@ -1,4 +1,4 @@
-"""M08 T10: Rwanda HIV/ART data loader tests.
+"""Rwanda HIV/ART data loader tests.
 
 Verifies that the Rwanda HIV inputs (ART coverage by age/sex/year + an
 initial HIV prevalence seed) are bundled into the package and exposed via

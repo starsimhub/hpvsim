@@ -49,7 +49,7 @@ def grow_sim():
 def test_grow_spawns_fine_cancer_agents_at_ratio_gt1(grow_sim):
     """At ratio>1 the grow engine materializes real fine cancer agents.
 
-    (Replaces the M09 ledger tuple test: the grow engine has no _cancer_events
+    (Replaces the ledger tuple test: the grow engine has no _cancer_events
     ledger — extra cancers are real agents in sim.people with fine=True and the
     shrunk multiscale scale 1/ratio.)
     """

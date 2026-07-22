@@ -1,4 +1,4 @@
-"""Unit tests for the M06 eligibility helpers."""
+"""Unit tests for the intervention eligibility helpers."""
 import numpy as np
 import starsim as ss
 import hpvsim as hpv

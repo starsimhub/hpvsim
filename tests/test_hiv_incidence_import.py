@@ -1,4 +1,4 @@
-"""M08: incidence-driven HIV importer tests.
+"""Incidence-driven HIV importer tests.
 
 The ``hpv.hiv_incidence_import`` intervention drives STIsim's HIV by imposing
 the Rwanda HIV incidence curve: each step it selects HIV-negative susceptibles

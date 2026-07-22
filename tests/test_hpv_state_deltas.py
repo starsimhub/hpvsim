@@ -1,4 +1,4 @@
-"""Test that HPV gains `latent` BoolState and `txvx_imm` FloatArr in M06."""
+"""Test that HPV carries a `latent` BoolState and a `txvx_imm` FloatArr."""
 import numpy as np
 import starsim as ss
 import hpvsim as hpv

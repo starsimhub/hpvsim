@@ -243,7 +243,7 @@ def test_hi5_specific_v2_values():
 
 
 def test_known_genotypes_extended_to_four():
-    """_KNOWN_GENOTYPES gates HPV(genotype=...) for all four M03 keys."""
+    """_KNOWN_GENOTYPES gates HPV(genotype=...) for all four genotype keys."""
     for key in ('hpv16', 'hpv18', 'hi5', 'ohr'):
         mod = hpv.HPV(genotype=key)
         assert mod.genotype == key

@@ -1,4 +1,4 @@
-"""Unit tests for M05 vaccination components."""
+"""Unit tests for vaccination intervention components."""
 import numpy as np
 import pytest
 import sciris as sc

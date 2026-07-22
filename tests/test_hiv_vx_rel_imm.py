@@ -1,9 +1,9 @@
-"""M08 Task 6: vaccine / txvx products scale conferred immunity by hiv_rel_imm.
+"""Vaccine / txvx products scale conferred immunity by hiv_rel_imm.
 
 When a prophylactic (hpv.vx) or therapeutic (hpv.txvx) vaccine confers immunity
 to an HIV+ agent, the conferred vax_imm / txvx_imm must be reduced by the
 hpv_hiv_connector's per-agent hiv_rel_imm factor. Gated no-op without an HIV
-connector (covered by the M05/M06 vaccine guards, which run without HIV).
+connector (covered by the no-HIV vaccine guards, which run without HIV).
 """
 import numpy as np
 import starsim as ss
@@ -17,7 +17,7 @@ def _coinfection_sim(product=None):
 
     If ``product`` is given it is attached via a stub treat_num intervention
     (prob=0.0) so the full sim.init() initializes the product's internal Dists,
-    exactly like the M06 unit tests. Returns the LIVE post-init product copy.
+    exactly like the product unit tests. Returns the LIVE post-init product copy.
     """
     interventions = [ss.treat_num(product=product, prob=0.0)] if product is not None else None
     sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25, location='nigeria',

@@ -98,7 +98,7 @@ def test_get_cross_immunity_custom_keys():
 
 
 def test_genotype_pars_imm_init_is_distribution():
-    """GenotypePars.imm_init becomes a beta-mean distribution (M03 conversion)."""
+    """GenotypePars.imm_init becomes a beta-mean distribution."""
     gp = hpv.get_genotype_pars('hpv16')
     assert hasattr(gp.imm_init, 'rvs'), \
         f'imm_init should be a Dist, got {type(gp.imm_init)}'

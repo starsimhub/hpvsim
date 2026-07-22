@@ -1,4 +1,4 @@
-"""Unit tests for M02 progression math + GenotypePars defaults."""
+"""Unit tests for progression math + GenotypePars defaults."""
 import numpy as np
 import pytest
 

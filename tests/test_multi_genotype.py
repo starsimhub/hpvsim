@@ -213,7 +213,7 @@ def test_hpvtotal_sum_age_at_cancer_equals_sum_across_genotypes():
 
 
 # ---------------------------------------------------------------------------
-# M03 init_seeding tests
+# init_seeding tests
 # ---------------------------------------------------------------------------
 
 def test_exclusive_init_seeding_matches_v2_semantics():
