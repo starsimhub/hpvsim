@@ -35,13 +35,30 @@ import hpvsim as hpv  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
 from hpvsim.hiv import HIV  # noqa: E402
 from tests.regression.rwanda_calib import build_rwanda_sim  # noqa: E402
-from tests.regression.baseline_hiv_v2 import published_target, load_hiv_baseline  # noqa: E402
 
 _DATA = Path(__file__).resolve().parent / 'data'
 _FIGDIR = Path(__file__).resolve().parent / 'figures'
 _AGE_EDGES = [25, 35, 45, 55, 200]          # 4 published bins
 _AGE_LABELS = ['25-35', '35-45', '45-55', '55+']
 _SCALE = 1e5
+_AGE_TO_LABEL = {25: '25-35', 35: '35-45', 45: '45-55', 55: '55+'}
+
+
+def _published_target():
+    """Published 2017 Rwanda HIV-stratified registry data points.
+
+    Reads the committed CSVs under ``data/`` (real-world published data, not
+    model output). Returns aggregate and by-age values keyed by HIV status.
+    """
+    out = {'aggregate': {}, 'by_age': {}}
+    for status in ('no_hiv', 'with_hiv'):
+        key = f'cancer_incidence_{status}'
+        agg = pd.read_csv(_DATA / f'rwanda_cancer_incidence_{status}.csv')
+        out['aggregate'][key] = float(agg['value'].iloc[0])
+        by_age = pd.read_csv(_DATA / f'rwanda_cancer_incidence_by_age_{status}.csv')
+        out['by_age'][key] = {_AGE_TO_LABEL[int(r.age)]: float(r.value)
+                              for r in by_age.itertuples()}
+    return out
 
 
 class CalibProbe(ss.Analyzer):
@@ -176,8 +193,7 @@ def _hpv_prev(probes, status):
 
 def main(n_seeds=6, n_agents=15000):
     probes = run(n_seeds, n_agents)
-    pub = published_target()
-    base = load_hiv_baseline()
+    pub = _published_target()
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 9))
     x = np.arange(len(_AGE_LABELS))
@@ -201,12 +217,7 @@ def main(n_seeds=6, n_agents=15000):
         ax.fill_between(yrs, np.percentile(ts, 25, axis=1), np.percentile(ts, 75, axis=1), color=col, alpha=0.2)
     ax.scatter([2017], [pub['aggregate']['cancer_incidence_no_hiv']], color='#228833', marker='D', s=60, zorder=5)
     ax.scatter([2017], [pub['aggregate']['cancer_incidence_with_hiv']], color='#ee6677', marker='D', s=60, zorder=5)
-    # v2 model band (load_hiv_baseline) at 2017
-    for status, metric, col in [('neg', 'cancer_incidence_no_hiv', '#228833'), ('pos', 'cancer_incidence_with_hiv', '#ee6677')]:
-        v = base['aggregate'][metric]
-        ax.errorbar([2018.5], [v['value']], yerr=[[v['value'] - v['low']], [v['high'] - v['value']]],
-                    fmt='s', color=col, alpha=0.5, capsize=3)
-    ax.set_title('Cancer incidence over time (D=registry 2017, sq=v2 band)'); ax.set_ylabel('per 100k'); ax.set_xlim(1990, 2020); ax.legend(fontsize=8)
+    ax.set_title('Cancer incidence over time (D=registry 2017)'); ax.set_ylabel('per 100k'); ax.set_xlim(1990, 2020); ax.legend(fontsize=8)
 
     # Panel 4: HIV prevalence 15-49 vs target
     ax = axes[1, 0]
