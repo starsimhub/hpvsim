@@ -1,11 +1,11 @@
 """HIV–HPV co-infection: transmission-based HIV plus the CD4-stratified
-HIV→HPV effects ported (by value) from v2's HIVsim.
+HIV→HPV effects.
 
 Three components:
   - ``HIV`` (``sti.HIV`` subclass): continuous-CD4 transmission-based HIV,
     re-targeted onto ``hpv.SexualNetwork`` and seeded from a per-location init-prev curve.
   - ``hpv_hiv_connector`` (``ss.Connector``): bins CD4 into discrete strata and
-    applies v2's rel_sus / rel_sev / rel_imm effects to every HPV module.
+    applies CD4-stratified rel_sus / rel_sev / rel_imm effects to every HPV module.
   - ``HIVStratifiedResults`` (``ss.Analyzer``): HPV/cancer outcomes by HIV status.
 """
 
@@ -21,14 +21,14 @@ __all__ = ['HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector',
            'HIVStratifiedResults']
 
 
-# CD4-stratified HIV→HPV effect multipliers. Copied by value from HPVsim v2's
-# HIVsim defaults. v2's CD4 strata are 'lt200' = [0, 200) and 'gt200' = [200, 500); agents
-# with CD4 >= 500 fall in NEITHER stratum and so receive NO HIV→HPV effect
-# (factor 1.0, biological). This is load-bearing: HIV+ agents start at CD4~594
-# and ART reconstitutes CD4 above 500, so most HIV+ person-time is CD4 >= 500 —
-# applying gt200 there (as an earlier draft did) over-amplifies HIV+ cancer ~10x.
+# CD4-stratified HIV→HPV effect multipliers. The CD4 strata are 'lt200' =
+# [0, 200) and 'gt200' = [200, 500); agents with CD4 >= 500 fall in NEITHER
+# stratum and so receive NO HIV→HPV effect (factor 1.0, biological). This is
+# load-bearing: HIV+ agents start at CD4~594 and ART reconstitutes CD4 above
+# 500, so most HIV+ person-time is CD4 >= 500 — applying gt200 there (as an
+# earlier draft did) over-amplifies HIV+ cancer ~10x.
 #
-# These are the generic HIVsim class defaults. A *location calibration* may
+# These are the generic class defaults. A *location calibration* may
 # override them with its own per-stratum values (same
 # ``{effect: {'lt200':.., 'gt200':..}}`` shape) by passing them via
 # ``hpv_hiv_connector(effects=...)``.
@@ -38,7 +38,7 @@ _HIV_EFFECTS = {
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76}, # reduced post-infection/vaccine immunity
 }
 _CD4_THRESHOLD = 200.0   # lt200 / gt200 boundary
-_CD4_UPPER = 500.0       # CD4 >= this -> no HIV→HPV effect (v2's gt200 ceiling)
+_CD4_UPPER = 500.0       # CD4 >= this -> no HIV→HPV effect (gt200 ceiling)
 
 
 class HIV(sti.HIV):
@@ -108,7 +108,7 @@ class HIV(sti.HIV):
 
 
 class hiv_incidence_import(ss.Intervention):
-    """Incidence-driven HIV importer (v2-faithful).
+    """Incidence-driven HIV importer.
 
     Imposes a per-(year, sex, age) HIV incidence curve directly onto STIsim's
     HIV module instead of relying on network transmission. Each step it selects
@@ -118,7 +118,7 @@ class hiv_incidence_import(ss.Intervention):
     AND wires the full CD4 trajectory (acute -> latent -> falling -> AIDS death)
     plus ART/mortality machinery. With HIV ``beta_m2f=0`` and ``init_prev=0`` the
     epidemic is built entirely here, so the prevalence trajectory matches the
-    target incidence curve by construction (as v2 did).
+    target incidence curve by construction.
 
     The incidence DataFrame has columns ``[age, sex, year, incidence]`` (sex
     'f'/'m'; ``incidence`` = the per-year HIV acquisition rate among
@@ -324,7 +324,7 @@ class hiv_art(sti.ART):
 
 
 class hpv_hiv_connector(ss.Connector):
-    """Apply v2's CD4-stratified HIV→HPV effects to every HPV module.
+    """Apply CD4-stratified HIV→HPV effects to every HPV module.
 
     Each step: bin HIV+ agents' CD4 into discrete strata, compute per-agent
     factor arrays (hiv_rel_sus / hiv_rel_sev / hiv_rel_imm; 1.0 for HIV-),
@@ -337,7 +337,7 @@ class hpv_hiv_connector(ss.Connector):
 
     def __init__(self, effects=None, **kwargs):
         super().__init__(**kwargs)
-        # CD4-stratified effect multipliers; defaults to the generic HIVsim
+        # CD4-stratified effect multipliers; defaults to the generic
         # values (_HIV_EFFECTS). A location calibration passes its own dict
         # (same {effect: {'lt200':.., 'gt200':..}} shape) — e.g. a location's
         # rel_sus/rel_sev overrides. Validated for the required keys here so a
@@ -387,7 +387,7 @@ class hpv_hiv_connector(ss.Connector):
 
         This is the lt200/gt200 split only; the CD4>=500 'no effect' band is
         applied separately in ``step`` (such agents are excluded from the
-        effect mask), matching v2's strata [0,200) and [200,500).
+        effect mask), matching the strata [0,200) and [200,500).
         """
         return (np.asarray(cd4) >= _CD4_THRESHOLD).astype(int)
 
@@ -409,9 +409,9 @@ class hpv_hiv_connector(ss.Connector):
         # HIV- agents have NaN cd4 (never initialized); an HIV+ agent whose cd4
         # is still NaN (pre-init edge case) is treated as neutral (factor 1.0)
         # rather than silently binned into a stratum.
-        # v2-faithful: effects apply only to HIV+ agents with an initialized CD4
-        # in [0, 500). CD4 >= 500 (newly infected at ~594, or ART-reconstituted)
-        # falls outside v2's gt200=[200,500) band and gets NO effect (factor 1.0).
+        # Effects apply only to HIV+ agents with an initialized CD4 in [0, 500).
+        # CD4 >= 500 (newly infected at ~594, or ART-reconstituted) falls outside
+        # the gt200=[200,500) band and gets NO effect (factor 1.0).
         infected = np.asarray(self.hiv_module.infected[auids], dtype=bool)
         hiv_pos = infected & ~np.isnan(cd4) & (cd4 < _CD4_UPPER)
         strata = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
@@ -430,7 +430,7 @@ class hpv_hiv_connector(ss.Connector):
 
 
 class HIVStratifiedResults(ss.Analyzer):
-    """HPV/cancer outcomes split by HIV status (mirrors v2's cancer_*_with/no_hiv).
+    """HPV/cancer outcomes split by HIV status.
 
     Adds only the cross-disease stratification HPV needs; HIV's own epidemic
     results come from sti.HIV / sti.ART. Auto-added by hpv.Sim when HIV present.

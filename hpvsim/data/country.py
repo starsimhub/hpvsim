@@ -31,9 +31,9 @@ from . import loaders as _loaders
 def _default_network_pars(location=None):  # noqa: ARG001  (location accepted for API symmetry)
     """Default network parameters consumed by SexualNetwork construction.
 
-    Network calibration is intentionally location-agnostic and matches
-    v2's shipped behavior: HPVsim ships demographic data per country but
-    not network calibration. Analysis scripts override these defaults
+    Network calibration is intentionally location-agnostic: HPVsim ships
+    demographic data per country but not network calibration. Analysis
+    scripts override these defaults
     with their own per-country calibration (see e.g.
     ``hpvsim_methods_manuscript/plot_fig56.py``'s ``make_network``).
     The ``location`` argument is accepted for API symmetry.
@@ -231,7 +231,7 @@ def _network_pars(location, overrides=None):
 
     ``overrides`` is an optional dict whose keys replace entries in the raw
     ``_default_network_pars`` result *before* the Starsim-shaping wrapping
-    (so it carries raw forms: ``debut``/``*_partners`` as v2 dist dicts,
+    (so it carries raw forms: ``debut``/``*_partners`` as distribution dicts,
     ``layer_probs`` as the (3, N) arrays, ``*_cross_layer`` as annual floats).
     Used by analysis scripts to supply a per-location network calibration
     without forking this builder.

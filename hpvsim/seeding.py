@@ -68,7 +68,7 @@ def _make_init_prev_fn(key):
 
 
 class _ExclusiveSeeder(ss.Connector):
-    """Mutually-exclusive initial seeding for multi-genotype HPV (v2-faithful).
+    """Mutually-exclusive initial seeding for multi-genotype HPV.
 
     In ``init_seeding='exclusive'`` each seeded agent starts with AT MOST ONE
     genotype: a per-agent any-HPV draw (the 'total' prevalence curve) picks who

@@ -64,9 +64,9 @@ class CrossImmunity(ss.Connector):
         )
         # Folded normal via abs() in _ensure_rel_sev; with the default
         # loc=1.0, scale=0.2 the negative tail mass is < 1e-6 so the practical
-        # distribution is equivalent to v2's normal_pos(1, 0.2). A location
-        # calibration may lower loc (e.g. to normal_pos(0.87, 0.2)); expose
-        # loc/scale so it is set at construction.
+        # distribution is equivalent to a positive-truncated normal(1, 0.2). A
+        # location calibration may lower loc (e.g. to a positive normal(0.87,
+        # 0.2)); expose loc/scale so it is set at construction.
         self._rel_sev_dist = ss.normal(loc=rel_sev_loc, scale=rel_sev_scale)
 
     def init_pre(self, sim):

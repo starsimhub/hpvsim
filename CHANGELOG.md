@@ -37,9 +37,7 @@ walkthrough.
   rather than one flat dict; `sim.short_summary` and the top-level
   `hpv.save`/`hpv.load`/`hpv.MultiSim` helpers are removed (use `sim.save()` /
   `ss.load()` / `ss.MultiSim`).
-- Not ported to v3.0: waning immunity, v2's incidence-based HIV (superseded by
-  the transmission-based HIV module above; a v2-style imposed incidence curve is
-  still available via `hpv.hiv_incidence_import`), `EventSchedule`, and custom
+- Not ported to v3.0: waning immunity, `EventSchedule`, and custom
   `settings.py` (superseded by `ss.options`).
 
 ## Version 2.3.0 (2026-04-20)
