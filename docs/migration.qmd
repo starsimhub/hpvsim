@@ -410,8 +410,5 @@ These v2 features are intentionally not in the v3.0 release:
   targeting a flat/declining prevalence-by-age profile may not be reproducible on
   v3 by parameter tuning alone (confirmed: `sero_prob`/`imm_init` shift the level
   but not the rising age-shape).
-- **v2's incidence-based HIV** — superseded by the transmission-based HIV module
-  described above (v2's incidence-driven epidemic can still be reproduced via
-  `hpv.hiv_incidence_import`).
 - **`EventSchedule`** — rarely used.
 - **Custom `settings.py`** — superseded by `ss.options`.
