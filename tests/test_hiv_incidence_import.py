@@ -5,7 +5,7 @@ the Rwanda HIV incidence curve: each step it selects HIV-negative susceptibles
 per the (year, sex, age) incidence rate and calls ``hiv.set_prognoses`` on them
 (which flips them to infected AND wires the full CD4 trajectory). With HIV
 ``beta_m2f=0`` and ``init_prev_data=0``, the epidemic is built entirely by the
-importer, matching v2's incidence-based approach.
+importer, following an incidence-based approach.
 """
 
 import numpy as np

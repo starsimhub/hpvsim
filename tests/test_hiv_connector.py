@@ -63,7 +63,7 @@ def test_rel_sus_gt200_stratum():
 
 
 def test_cd4_above_500_gets_no_effect():
-    """v2-faithful: HIV+ agents with CD4 >= 500 fall outside v2's gt200=[200,500)
+    """HIV+ agents with CD4 >= 500 fall outside the gt200=[200,500)
     band and receive NO HIV->HPV effect (factor 1.0). HIV+ agents START at
     CD4 ~594 and ART reconstitutes above 500, so this band is the majority of
     HIV+ person-time; applying gt200 there over-amplifies HIV+ cancer ~10x."""

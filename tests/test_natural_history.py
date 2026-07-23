@@ -24,11 +24,11 @@ def test_hpv_has_progression_pars():
         assert name in p, f'HPV.pars missing {name!r}'
 
 
-def test_hpv_progression_pars_match_v2_hpv16():
-    """Spot-check that the lognormal mean/std and severity-fn dicts match v2."""
+def test_hpv_progression_pars_hpv16():
+    """Spot-check the lognormal mean/std and severity-fn dicts."""
     mod = hpv.HPV(genotype='hpv16')
     p = mod.pars
-    # cin_fn matches v2 _v2_legacy/parameters.py:338
+    # cin_fn parameters
     assert p.cin_fn == dict(form='logf2', k=0.3, x_infl=0, ttc=50)
     # cancer_fn includes the cin_fn keys (so _compute_severity's cin_integral
     # branch can call _compute_severity_integral internally without re-merging).
@@ -174,7 +174,7 @@ def test_hpv_has_raw_immunity_states():
 def test_cleared_agents_have_reduced_susceptibility():
     """After running a sim, female agents who seroconverted after clearance
     have rel_sus < 1.0 (Connector-derived from running-max nab_imm samples).
-    Males are excluded: v2 never updates male immunity on clearance, so males
+    Males are excluded: male immunity is never updated on clearance, so males
     retain rel_sus = 1.0.  Only females with nab_imm > 0 are checked here.
     """
     sim = hpv.Sim(n_agents=500, location='nigeria',
@@ -235,8 +235,8 @@ def test_hpv18_specific_v2_values():
     assert float(gp.sero_prob) == pytest.approx(0.56)
 
 
-def test_hi5_specific_v2_values():
-    """hi5 has v2's cancer_fn transform_prob=1.5e-3."""
+def test_hi5_specific_values():
+    """hi5 has cancer_fn transform_prob=1.5e-3."""
     gp = hpv.get_genotype_pars('hi5')
     assert gp.cancer_fn['transform_prob'] == pytest.approx(1.5e-3)
     assert float(gp.rel_beta) == pytest.approx(0.9)
@@ -287,7 +287,7 @@ def test_clearance_sero_prob_gates_first_immunity():
 
 
 def test_clearance_males_get_no_immunity():
-    """Males never get post-clearance immunity (matches v2 f_cleared_inds gate)."""
+    """Males never get post-clearance immunity (gated to cleared females)."""
     sim = hpv.Sim(n_agents=5000, location='nigeria',
                   start=1990, stop=2010, dt=0.5, rand_seed=0)
     sim.run()
@@ -297,7 +297,7 @@ def test_clearance_males_get_no_immunity():
     nab_male = np.asarray(mod.nab_imm[male_uids])
     cell_male = np.asarray(mod.cell_imm[male_uids])
     assert (nab_male == 0).all(), \
-        f'{int((nab_male > 0).sum())} males have nab_imm > 0; expected zero (v2 only updates females)'
+        f'{int((nab_male > 0).sum())} males have nab_imm > 0; expected zero (only females are updated)'
     assert (cell_male == 0).all(), \
         f'{int((cell_male > 0).sum())} males have cell_imm > 0'
 
@@ -305,7 +305,7 @@ def test_clearance_males_get_no_immunity():
 def test_network_acts_are_per_step_not_per_year():
     """Edge.acts is in per-step units (already divided by dt at formation).
 
-    v2 default marital acts is neg_binomial(par1=80, par2=40) per year.
+    Default marital acts is neg_binomial(par1=80, par2=40) per year.
     With dt=0.25, per-step mean is ~20. Casual is ~12.5. Combined network
     mean should be in the 10-30 range, not 50-90 (which would indicate the
     per-year value is being used per step).
@@ -366,7 +366,7 @@ def test_network_acts_age_modulated():
 def test_directional_beta_sets_per_network_pair():
     """HPV.pars.beta is a dict keyed by network with [transf2m, transm2f] pair.
 
-    Verifies the v2 sex-asymmetric transmission rates flow into Starsim's
+    Verifies the sex-asymmetric transmission rates flow into Starsim's
     betamap as the per-direction values it uses inside Infection.infect.
     """
     sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)

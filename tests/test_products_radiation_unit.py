@@ -56,7 +56,7 @@ def test_radiation_empty_uids_noop():
     assert len(out) == 0
 
 
-def test_radiation_default_duration_v2_match():
+def test_radiation_default_duration():
     """Default duration is normal(18 months, 2 months) converted to years."""
     r = hpv_radiation()
     assert r.pars.dur['par1'] == 18 / 12  # mean: 1.5 years

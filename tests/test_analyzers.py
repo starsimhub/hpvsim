@@ -211,7 +211,7 @@ def test_age_causal_infection_grow_unbiased():
 
 def test_dalys_basic_and_av_disutility(base_sim):
     a = base_sim.analyzers['dalys']
-    # av_disutility matches the v2 GBD2017 constant exactly.
+    # av_disutility matches the GBD2017 constant exactly.
     expected = 0.288*0.05 + 0.049*0.85 + 0.451*0.09 + 0.54*0.01
     assert np.isclose(a.av_disutility, expected)
     # DALYs decompose into YLL + YLD, all non-negative, indexed by year.

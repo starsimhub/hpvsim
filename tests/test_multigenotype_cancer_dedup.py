@@ -1,9 +1,8 @@
 """Regression test for multi-genotype cancer dedup.
 
 When an agent has CIN with multiple HPV genotypes simultaneously, exactly
-ONE genotype must fire cancer for that agent — not one per genotype. v2's
-``check_cancer`` enforces this via cross-genotype cancellation; v3's
-``HPV.step_state`` must do the equivalent.
+ONE genotype must fire cancer for that agent — not one per genotype.
+``HPV.step_state`` enforces this via cross-genotype cancellation.
 """
 import numpy as np
 import pytest

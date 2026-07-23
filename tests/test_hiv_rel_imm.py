@@ -55,6 +55,6 @@ def test_clearance_immunity_scaled_by_hiv_rel_imm():
     nab_pos, cell_pos = _build(seed=1, make_positive=True)
     assert nab_neg > 0   # seroconversion fired (sero_prob=1.0)
     assert cell_neg > 0  # cell_imm always set for first-clearance females
-    factor = _HIV_EFFECTS['rel_imm']['lt200']  # == 0.36 (v2 lt200 immunity multiplier)
+    factor = _HIV_EFFECTS['rel_imm']['lt200']  # == 0.36 (lt200 immunity multiplier)
     assert np.isclose(nab_pos, nab_neg * factor, rtol=1e-6)
     assert np.isclose(cell_pos, cell_neg * factor, rtol=1e-6)

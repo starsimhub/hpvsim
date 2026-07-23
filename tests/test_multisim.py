@@ -1,7 +1,7 @@
 """Verification tests: ss.MultiSim works with hpv.Sim.
 
 These tests confirm Starsim's MultiSim machinery composes correctly with
-hpv.Sim. They are NOT parity gates against v2 — they pin down behavior
+hpv.Sim. They pin down behavior
 hpvsim depends on so future Starsim upgrades that change the contract
 break here loudly.
 

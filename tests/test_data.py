@@ -52,7 +52,7 @@ def test_death_rate_shape():
 
 
 def test_network_pars_shape():
-    """network_pars carries layer_pars for v2 layers (m, c) plus shared debut."""
+    """network_pars carries layer_pars for the two layers (m, c) plus shared debut."""
     out = hpvsim.data.load_country('nigeria')
     np_pars = out['network_pars']
     assert set(np_pars.keys()) == {'layer_pars', 'debut'}, \

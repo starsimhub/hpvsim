@@ -216,7 +216,7 @@ def test_hpvtotal_sum_age_at_cancer_equals_sum_across_genotypes():
 # init_seeding tests
 # ---------------------------------------------------------------------------
 
-def test_exclusive_init_seeding_matches_v2_semantics():
+def test_exclusive_init_seeding_semantics():
     """init_seeding='exclusive' (default) gives each agent at most one genotype."""
     sim = hpv.Sim(
         n_agents=5000, location='nigeria',

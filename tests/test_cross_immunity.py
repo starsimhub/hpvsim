@@ -60,7 +60,7 @@ def test_get_cross_immunity_default_shape_and_diagonal():
 
 
 def test_get_cross_immunity_default_values():
-    """Defaults match v2 scalars: cross_imm_sus_med=0.3, cross_imm_sus_high=0.5,
+    """Defaults: cross_imm_sus_med=0.3, cross_imm_sus_high=0.5,
     cross_imm_sev_med=0.5, cross_imm_sev_high=0.7, own_imm_hr=0.9."""
     m_sus, m_sev = get_cross_immunity()
     keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
@@ -79,7 +79,7 @@ def test_get_cross_immunity_default_values():
 
 
 def test_get_cross_immunity_own_imm_hr_override():
-    """own_imm_hr kwarg overrides the v2 0.9 default for non-canonical genotypes."""
+    """own_imm_hr kwarg overrides the 0.9 default for non-canonical genotypes."""
     m_sus, _ = get_cross_immunity(own_imm_hr=0.7)
     keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
     idx = {k: i for i, k in enumerate(keys)}
@@ -133,7 +133,7 @@ def test_cross_immunity_connector_default_matrices():
 def test_cross_immunity_connector_rejects_diagonal_outside_unit_interval():
     """Diagonal entries must be in [0, 1] (own-immunity is a probability);
     init_pre raises if outside that range. Per-key diagonal values < 1.0
-    (e.g. v2's own_imm_hr=0.9 for hi5/ohr) are now allowed.
+    (e.g. own_imm_hr=0.9 for hi5/ohr) are now allowed.
 
     Drops down to ss.Sim since hpv.Sim appends a default CrossImmunity that
     would mask a user-supplied one.
@@ -150,7 +150,7 @@ def test_cross_immunity_connector_rejects_diagonal_outside_unit_interval():
         sim.init()
 
 
-def test_cross_immunity_connector_accepts_v2_style_diagonal():
+def test_cross_immunity_connector_accepts_per_key_diagonal():
     """Per-key diagonal: hpv16/hpv18=1.0, hi5/ohr=0.9. init_pre must accept this."""
     sim = hpv.Sim(
         n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
@@ -158,7 +158,7 @@ def test_cross_immunity_connector_accepts_v2_style_diagonal():
     )
     sim.init()
     conn = sim.connectors.crossimmunity
-    # Diagonal layout per v2 _v2_legacy/parameters.py:419, 431, 455, 479.
+    # Diagonal layout: hpv16/hpv18 = 1.0, hi5/ohr = 0.9.
     assert np.allclose(np.diag(conn.cross_imm_sus), [1.0, 1.0, 0.9, 0.9])
     assert np.allclose(np.diag(conn.cross_imm_sev), [1.0, 1.0, 0.9, 0.9])
 
@@ -254,8 +254,8 @@ def test_cross_immunity_step_four_genotype_hand_computed():
                          [0.7, 1.0, 0.5, 0.5],
                          [0.5, 0.5, 0.9, 0.5],
                          [0.5, 0.5, 0.5, 0.9]]
-    where row = target, col = source. Convention matches v2 (immunity[target_idx,
-    source_idx] = pars[label_target][label_source] in _v2_legacy/immunity.py:81).
+    where row = target, col = source. Convention: immunity[target_idx,
+    source_idx] = pars[label_target][label_source].
     """
     from hpvsim.cross_genotype import CrossImmunity
     sim = hpv.Sim(
@@ -348,7 +348,7 @@ def test_cross_immunity_step_four_genotype_hand_computed():
 
 
 def test_cross_immunity_step_clips_to_unit_interval():
-    """sus_imm and sev_imm are clipped to [0, 1] (matches v2 np.minimum cap)."""
+    """sus_imm and sev_imm are clipped to [0, 1] (np.minimum cap)."""
     sim = hpv.Sim(
         n_agents=4, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')],

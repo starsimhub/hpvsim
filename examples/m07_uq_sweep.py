@@ -33,8 +33,8 @@ VX_PARS = sc.objdict(
     start=1990, stop=2060,
     n_agents=20_000,
     genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
-    # Integer cohort ages (birth + migration + initial pop), matching v2's
-    # annual demographic cadence — keeps per-cohort vaccination clean.
+    # Integer cohort ages (birth + migration + initial pop) on an annual
+    # demographic cadence — keeps per-cohort vaccination clean.
     v2_compat_demographics=True,
 )
 

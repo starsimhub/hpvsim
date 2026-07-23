@@ -48,10 +48,9 @@ def test_get_genotype_pars_factory():
 
 
 def test_logf2_pinned_outputs():
-    """logf2 reproduces v2's logistic-2 outputs at canonical points.
+    """logf2 reproduces its logistic-2 outputs at canonical points.
 
-    Generated from hpvsim._v2_legacy.utils.logf2 with the HPV16 cin_fn
-    parameters (k=0.3, x_infl=0, ttc=50).
+    Pinned with the HPV16 cin_fn parameters (k=0.3, x_infl=0, ttc=50).
     """
     expected = {
         0.5:  0.07485973648701938,
@@ -73,10 +72,9 @@ def test_logf2_array_input():
 
 
 def test_logf2_pinned():
-    """logf2 reproduces its established (v2-equivalent) outputs.
+    """logf2 reproduces its established outputs.
 
-    Frozen from the native logf2, which was verified bit-identical to v2's
-    logf2 over a parameter sweep before the legacy code was removed.
+    Frozen from the native logf2 over a parameter sweep.
     """
     out = logf2(np.array([1.0, 5.0, 25.0, 50.0]), k=0.3, x_infl=0, ttc=50)
     expected = np.array([0.14888512471190052, 0.6351493409744831, 0.998895053854596, 1.0])
@@ -84,10 +82,7 @@ def test_logf2_pinned():
 
 
 def test_transform_prob_pinned():
-    """transform_prob reproduces v2's transform_prob outputs.
-
-    Generated from hpvsim._v2_legacy.utils.transform_prob.
-    """
+    """transform_prob reproduces its pinned outputs."""
     out = transform_prob(2e-3, np.array([0.1, 0.5, 1.0, 2.0]))
     expected = np.array([0.00010009512368247542, 0.012434560635623426, 0.09525318199596433, 0.55103083492734])
     assert np.allclose(out, expected, rtol=1e-9)
@@ -103,7 +98,7 @@ def test_transform_prob_monotone_in_dysp():
 
 
 def test_intlogf2_pinned():
-    """intlogf2 reproduces v2's intlogf2."""
+    """intlogf2 reproduces its pinned outputs."""
     out = intlogf2(np.array([1.0, 5.0, 10.0]), k=0.3, x_infl=0, ttc=50)
     expected = [1.0747210835763568, 6.721778095232491, 15.70294408055644]
     assert np.allclose(out, expected, rtol=1e-9)
@@ -112,7 +107,7 @@ def test_intlogf2_pinned():
 
 
 def test_compute_severity_logf2_branch_pinned():
-    """compute_severity(form='logf2') reproduces v2."""
+    """compute_severity(form='logf2') reproduces its pinned outputs."""
     pars = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
     out = compute_severity(np.array([1.0, 5.0, 10.0]), pars=pars)
     expected = [0.14888512471190052, 0.6351493409744831, 0.9051488074189387]
@@ -120,7 +115,7 @@ def test_compute_severity_logf2_branch_pinned():
 
 
 def test_compute_severity_cin_integral_branch_pinned():
-    """compute_severity(method='cin_integral') reproduces v2's cancer prob."""
+    """compute_severity(method='cin_integral') reproduces its pinned cancer prob."""
     pars = dict(method='cin_integral', transform_prob=2e-3,
                 form='logf2', k=0.3, x_infl=0, ttc=50)
     out = compute_severity(np.array([1.0, 5.0, 10.0]), pars=pars)
@@ -129,8 +124,8 @@ def test_compute_severity_cin_integral_branch_pinned():
 
 
 def test_compute_severity_does_not_mutate_pars():
-    """Caller's pars dict must not be modified (regression: v2 actually
-    DOES mutate; the v3 port should make a defensive deepcopy at entry)."""
+    """Caller's pars dict must not be modified (compute_severity makes a
+    defensive deepcopy at entry)."""
     pars = dict(method='cin_integral', transform_prob=2e-3,
                 form='logf2', k=0.3, x_infl=0, ttc=50)
     snapshot = dict(pars)

@@ -35,10 +35,9 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     ablate_prob = 0.9
     start_year = 2025
 
-    # v3 note: screening is delivered at `prob` each active year. A re-screen
-    # interval (e.g. skip anyone screened in the last 5 years) can be built from
-    # the screening module's `ti_screened` state; the v2 people-level
-    # `date_screened` attribute is gone.
+    # Screening is delivered at `prob` each active year. A re-screen interval
+    # (e.g. skip anyone screened in the last 5 years) can be built from the
+    # screening module's `ti_screened` state.
 
     def union(*uid_arrays):
         ''' Combine outcome uid arrays into a single deduplicated ss.uids '''

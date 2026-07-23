@@ -1,6 +1,6 @@
 """T10b: coverage-based ART shortcut.
 
-v2/Rwanda has no HIV testing cascade — ART is assigned directly to hit an
+Rwanda has no HIV testing cascade — ART is assigned directly to hit an
 age/sex/year coverage curve. These tests check that hpv.hiv_art drives
 sti.ART from the Rwanda ART-coverage data so that (a) a plausible nonzero
 fraction of HIV+ agents end up on_art in the ART era, and (b) STIsim's CD4

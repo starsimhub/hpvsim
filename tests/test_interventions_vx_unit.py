@@ -10,7 +10,7 @@ from hpvsim.products import _load_vx_products
 def test_load_vx_products_returns_dict_of_genotype_to_rel_imm():
     """_load_vx_products() returns {product_name: {genotype: rel_imm}} from CSV."""
     products = _load_vx_products()
-    # Three default products from v2's CSV
+    # Three default products from the CSV
     assert set(products.keys()) >= {'bivalent', 'quadrivalent', 'nonavalent'}
     # Bivalent has full protection against hpv16 and hpv18
     assert products['bivalent']['hpv16'] == pytest.approx(1.0)
@@ -299,7 +299,7 @@ def test_compose_vaccine_eligibility_combines_age_sex_extra():
     assert np.all(sim.people.female[uids])
 
 
-def test_base_vaccination_accepts_v2_args():
+def test_base_vaccination_accepts_targeting_args():
     """hpv.BaseVaccination accepts age_range, sex, eligibility as kwargs."""
     from hpvsim.interventions import BaseVaccination, routine_vx
     from hpvsim.products import vx
