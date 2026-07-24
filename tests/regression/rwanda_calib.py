@@ -207,12 +207,12 @@ def rwanda_network_overrides():
 def make_rwanda_network():
     """A v3 ``SexualNetwork`` carrying the Rwanda network calibration.
 
-    Merge the raw Rwanda overrides onto the location defaults, then shape the
-    merged dict into SexualNetwork inputs (reusing ``_shape_network_pars`` so
-    the annual->ss.prob / dist wrapping isn't duplicated here).
+    Pass the raw Rwanda overrides through the standard ``pars=`` override on
+    ``_default_network_pars``, then shape the merged dict into SexualNetwork
+    inputs (reusing ``_shape_network_pars`` so the annual->ss.prob / dist
+    wrapping isn't duplicated here).
     """
-    raw = _default_network_pars('rwanda')
-    raw.update(rwanda_network_overrides())
+    raw = _default_network_pars('rwanda', pars=rwanda_network_overrides())
     return hpv.SexualNetwork(**_shape_network_pars(raw))
 
 

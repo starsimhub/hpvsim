@@ -22,21 +22,28 @@ Reshaping summary:
 
 import numpy as np
 import pandas as pd
+import sciris as sc
 import starsim as ss
 
 from ..migration_utils import _v2_dist_to_starsim
 from . import loaders as _loaders
 
 
-def _default_network_pars(location=None):  # noqa: ARG001  (location accepted for API symmetry)
+def _default_network_pars(location=None, pars=None, **kwargs):  # noqa: ARG001  (location accepted for API symmetry)
     """Default network parameters consumed by SexualNetwork construction.
 
     Network calibration is intentionally location-agnostic: HPVsim ships
-    demographic data per country but not network calibration. Analysis
-    scripts override these defaults
-    with their own per-country calibration (see e.g.
-    ``hpvsim_methods_manuscript/plot_fig56.py``'s ``make_network``).
-    The ``location`` argument is accepted for API symmetry.
+    demographic data per country but not network calibration. The ``location``
+    argument is accepted for API symmetry.
+
+    Overrides follow the Starsim ``update_pars`` convention: pass a ``pars``
+    dict and/or keyword arguments, which are merged over the defaults via
+    ``sc.mergedicts`` (later values win). Keys carry the raw pre-shaping forms
+    (``debut``/``*_partners`` as distribution dicts, ``layer_probs`` as the
+    (3, N) arrays, ``*_cross_layer`` as annual floats), so an analysis script
+    supplies its per-country calibration in the same shape as the defaults::
+
+        raw = _default_network_pars('rwanda', pars=rwanda_network_overrides())
 
     Keys returned:
         debut, f_cross_layer, m_cross_layer,
@@ -129,7 +136,7 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location accepted fo
         ], dtype=float),
     )
 
-    return dict(
+    defaults = dict(
         debut=debut,
         f_cross_layer=f_cross_layer,
         m_cross_layer=m_cross_layer,
@@ -141,6 +148,9 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location accepted fo
         mixing=mixing,
         layer_probs=layer_probs,
     )
+    # Merge overrides over the defaults, matching Starsim's update_pars
+    # (sc.mergedicts(pars, kwargs) — later values win).
+    return sc.mergedicts(defaults, pars, kwargs)
 
 
 def load_country(location, year=None):
