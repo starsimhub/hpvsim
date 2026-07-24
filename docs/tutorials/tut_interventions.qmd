@@ -15,7 +15,7 @@ Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftre
 
 ## Products and interventions
 
-HPVsim contains *products*, which can be thought of as the actual test, diagnostic, treatment, or vaccine product being used, as well as *interventions*, which are responsible for delivering the products to the population.
+HPVsim contains *products*, which can be thought of as the actual test, diagnostic, treatment, or vaccine product being used, as well as *interventions*, which deliver those products to the people in the simulation.
 Information about the default products included with HPVsim (e.g. attributes like test positivity and efficacy) are available in the `hpvsim/data/products_*.csv` files. Specifically:
 
 * Screening products (VIA, Pap smears, liquid-based cytology, HPV testing, and HPV16/18 testing): `hpvsim/data/products_dx.csv`
@@ -85,7 +85,7 @@ The script `examples/t05_screen_algorithms.py` shows how to set up each of the s
 
 ## Prophylactic vaccination
 
-Prophylactic vaccination within HPVsim simply targets a vaccine product towards a subset of the population.
+Prophylactic vaccination protects people before they are exposed to HPV by offering a vaccine to a chosen group — typically to girls within a target age range, before sexual debut.
 
 ```{python}
 vx = hpv.routine_vx(prob=prob, start_year=2015, age_range=[9,10], product='bivalent', name='vaccination')
@@ -107,12 +107,12 @@ Note that probabilities passed to interventions are annual probabilities, not to
 
 ## Therapeutic vaccination
 
-Therapeutic vaccination can be included in a few different formats/use cases:
+Therapeutic vaccination can be delivered in a couple of ways:
 
-* As a mass vaccination without screening, and
-* as a part of a screen & treat algorithm.
+* as a mass campaign that reaches women in a target age range regardless of whether they have been screened, and
+* as part of a screen-and-treat pathway that reaches the women who screen positive.
 
-The following example illustrates both. Mass therapeutic vaccination delivers a product to an age range directly (here a campaign dose plus an ongoing routine dose); screen-linked therapeutic vaccination uses `hpv.linked_txvx`, whose eligibility draws on the positives from an upstream screening intervention.
+The following example illustrates both. Mass therapeutic vaccination delivers a product to women within a given age range directly (here a campaign dose plus an ongoing routine dose); screen-linked therapeutic vaccination uses `hpv.linked_txvx`, which offers the vaccine to the women who screened positive in an upstream screening intervention.
 
 ```{python}
 # Mass therapeutic vaccination: a one-off campaign dose plus an ongoing routine dose
