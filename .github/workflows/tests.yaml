@@ -32,7 +32,9 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run all tests
         working-directory: ./tests
-        run: pytest test_*.py -n auto -m "not slow" --durations=0 --junitxml=test-results.xml # Run actual tests
+        # --dist loadscope keeps each module's tests on one worker so module-scoped
+        # sim fixtures build once per module instead of once per worker.
+        run: pytest test_*.py -n auto --dist loadscope -m "not slow" --durations=0 --junitxml=test-results.xml # Run actual tests
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails

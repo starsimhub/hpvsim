@@ -5,6 +5,21 @@ import pytest
 import hpvsim as hpv
 
 
+@pytest.fixture(scope='module')
+def nathist_sim():
+    """One long single-genotype run (n=5000, 1990-2050, dt=0.25) that reaches
+    every natural-history stage — clearance -> CIN -> cancer -> cancer death.
+
+    The progression tests below only inspect scheduled/realized state, so they
+    share this one run rather than each building a sim sized to the specific
+    stage they check (this longest window is a superset of all of them).
+    """
+    sim = hpv.Sim(n_agents=5000, location='nigeria',
+                  start=1990, stop=2050, dt=0.25, rand_seed=0)
+    sim.run()
+    return sim
+
+
 def test_hpv_has_progression_states():
     """HPV defines precin/cin/cancerous BoolStates and ti_* FloatArrs."""
     sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)
@@ -43,11 +58,9 @@ def test_hpv_progression_pars_hpv16():
     assert np.all(durs >= 0)
 
 
-def test_set_prognoses_assigns_ti_clearance_or_ti_cin():
+def test_set_prognoses_assigns_ti_clearance_or_ti_cin(nathist_sim):
     """Every newly-infected agent has either ti_clearance or ti_cin set."""
-    sim = hpv.Sim(n_agents=500, location='nigeria',
-                  start=1990, stop=1992, dt=0.25, rand_seed=0)
-    sim.run()
+    sim = nathist_sim
     mod = sim.diseases.hpv16
     ever_infected = mod.ti_first_infection.notnan
     has_clearance = mod.ti_clearance.notnan
@@ -55,11 +68,9 @@ def test_set_prognoses_assigns_ti_clearance_or_ti_cin():
     assert (has_clearance | has_cin)[ever_infected].all()
 
 
-def test_set_prognoses_cancer_only_in_females():
+def test_set_prognoses_cancer_only_in_females(nathist_sim):
     """Males never progress to CIN; only females reach ti_cin / ti_cancerous."""
-    sim = hpv.Sim(n_agents=2000, location='nigeria',
-                  start=1990, stop=2000, dt=0.25, rand_seed=0)
-    sim.run()
+    sim = nathist_sim
     mod = sim.diseases.hpv16
     has_cin = mod.ti_cin.notnan
     has_cancer = mod.ti_cancerous.notnan
@@ -68,11 +79,9 @@ def test_set_prognoses_cancer_only_in_females():
     assert not (has_cancer & males).any()
 
 
-def test_set_prognoses_chain_consistency():
+def test_set_prognoses_chain_consistency(nathist_sim):
     """For agents with cancer scheduled: ti_cin <= ti_cancerous <= ti_dead_cancer."""
-    sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2000, dt=0.25, rand_seed=0)
-    sim.run()
+    sim = nathist_sim
     mod = sim.diseases.hpv16
     has_cancer_sched = mod.ti_cancerous.notnan
     if has_cancer_sched.any():
@@ -85,11 +94,9 @@ def test_set_prognoses_chain_consistency():
         assert (ti_cancerous <= ti_dead).all()
 
 
-def test_step_state_progresses_precin_to_cin():
+def test_step_state_progresses_precin_to_cin(nathist_sim):
     """An agent whose ti_cin <= ti flips precin→cin."""
-    sim = hpv.Sim(n_agents=2000, location='nigeria',
-                  start=1990, stop=2010, dt=0.25, rand_seed=0)
-    sim.run()
+    sim = nathist_sim
     mod = sim.diseases.hpv16
     has_cin_sched = mod.ti_cin.notnan
     if has_cin_sched.any():
@@ -98,11 +105,9 @@ def test_step_state_progresses_precin_to_cin():
         assert passed.any(), 'No CIN-scheduled agent ever had ti >= ti_cin by sim end'
 
 
-def test_step_state_progresses_cin_to_cancerous():
+def test_step_state_progresses_cin_to_cancerous(nathist_sim):
     """An agent whose ti_cancerous <= ti flips cin→cancerous and stops transmitting."""
-    sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2030, dt=0.25, rand_seed=0)
-    sim.run()
+    sim = nathist_sim
     mod = sim.diseases.hpv16
     cancerous_now = mod.cancerous.uids
     if len(cancerous_now):
@@ -114,11 +119,9 @@ def test_step_state_progresses_cin_to_cancerous():
         assert (rel_trans_arr == 0).all()
 
 
-def test_step_state_cancer_death_removes_agents():
+def test_step_state_cancer_death_removes_agents(nathist_sim):
     """Agents whose ti_dead_cancer <= ti are no longer alive."""
-    sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2050, dt=0.25, rand_seed=0)
-    sim.run()
+    sim = nathist_sim
     mod = sim.diseases.hpv16
     has_dead_sched = mod.ti_dead_cancer.notnan
     if has_dead_sched.any():

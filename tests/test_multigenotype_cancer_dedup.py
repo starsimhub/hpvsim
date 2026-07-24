@@ -10,7 +10,9 @@ import pytest
 import hpvsim as hpv
 
 
-def _run_multigenotype_sim():
+@pytest.fixture(scope='module')
+def multigenotype_sim():
+    """One 4-genotype run shared (read-only) by both dedup tests below."""
     sim = hpv.Sim(
         location='nigeria',
         start=1990, stop=2050,
@@ -22,7 +24,7 @@ def _run_multigenotype_sim():
     return sim
 
 
-def test_no_double_counting_of_multigenotype_cancers():
+def test_no_double_counting_of_multigenotype_cancers(multigenotype_sim):
     """No agent may have cancerous=True on more than one HPV module simultaneously.
 
     Without cross-genotype cancellation, an agent with CIN in two
@@ -30,7 +32,7 @@ def test_no_double_counting_of_multigenotype_cancers():
     in multiple ``cancerous`` flags for the same agent. With the fix,
     each agent has at most one cancerous flag across all modules.
     """
-    sim = _run_multigenotype_sim()
+    sim = multigenotype_sim
 
     genotypes = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
     # Use .raw (all ever-created agent slots) so all modules have the same shape.
@@ -48,7 +50,7 @@ def test_no_double_counting_of_multigenotype_cancers():
     )
 
 
-def test_hpvtotal_new_cancers_equals_per_module_sum():
+def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
     """hpvtotal.new_cancers is consistent with per-module new_cancers sums.
 
     The hpvtotal aggregator accumulates each HPV module's new_cancers at
@@ -64,7 +66,7 @@ def test_hpvtotal_new_cancers_equals_per_module_sum():
     Together with test_no_double_counting_of_multigenotype_cancers, these
     confirm that each cancer event is counted at most once in hpvtotal.
     """
-    sim = _run_multigenotype_sim()
+    sim = multigenotype_sim
 
     genotypes = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
     per_module_sums = {

@@ -4,6 +4,29 @@ sys.path.insert(0, WT)
 import hpvsim as hpv
 import starsim as ss
 import numpy as np
+import pytest
+
+
+# Module-scoped shared runs. The multiscale-grow invariant tests below are
+# read-only on post-run state, so they share one expensive run each instead of
+# rebuilding it per test. (For these to share under ``pytest -n auto``, the CI
+# command uses ``--dist loadscope`` so a module's tests stay on one worker.)
+@pytest.fixture(scope='module')
+def grown_sim():
+    """One ms_agent_ratio=10 run (n=6000, 1980-2025) with fine agents grown."""
+    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
+                  ms_agent_ratio=10, rand_seed=7)
+    sim.run()
+    return sim
+
+
+@pytest.fixture(scope='module')
+def ratio1_sim():
+    """One ms_agent_ratio==1 run (n=4000, 1990-2020) — no fine agents."""
+    sim = hpv.Sim(location='nigeria', n_agents=4000, start=1990, stop=2020,
+                  ms_agent_ratio=1, rand_seed=1)
+    sim.run()
+    return sim
 
 def test_ratio_param_and_fine_state_exist():
     assert hpv.__file__.startswith(WT), f'wrong hpvsim loaded: {hpv.__file__}'
@@ -22,11 +45,9 @@ def test_ratio_param_and_fine_state_exist():
         if isinstance(dis, hpv.HPV):
             assert int(dis.pars.ms_agent_ratio) == 10
 
-def test_results_are_float_and_scale_weighted_noop_at_ratio1():
+def test_results_are_float_and_scale_weighted_noop_at_ratio1(ratio1_sim):
     # ratio==1: scale_flows == len, so counts are unchanged but dtype is float.
-    sim = hpv.Sim(location='nigeria', n_agents=2000, start=1990, stop=2020,
-                  ms_agent_ratio=1, rand_seed=1)
-    sim.run()
+    sim = ratio1_sim
     for dis in sim.diseases.values():
         if isinstance(dis, hpv.HPV):
             r = dis.results
@@ -59,12 +80,9 @@ def test_clone_agents_copies_people_and_module_state():
             assert np.array_equal(np.asarray(dis.susceptible[new]),
                                   np.asarray(dis.susceptible[src]))
 
-def test_grow_creates_fine_cancer_agents_at_ratio():
+def test_grow_creates_fine_cancer_agents_at_ratio(grown_sim):
     import numpy as np
-    n0 = 6000
-    sim = hpv.Sim(location='nigeria', n_agents=n0, start=1980, stop=2025,
-                  ms_agent_ratio=10, rand_seed=3)
-    sim.run()
+    sim = grown_sim
     ppl = sim.people
     # multiscale grew real fine agents...
     assert ppl.fine.values.any(), 'no fine agents were grown'
@@ -80,10 +98,8 @@ def test_grow_creates_fine_cancer_agents_at_ratio():
             flagged |= (np.asarray(dis.cancerous[fine_uids]) | sched)
     assert flagged.all()
 
-def test_fine_agents_excluded_from_network():
-    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
-                  ms_agent_ratio=10, rand_seed=4)
-    sim.run()
+def test_fine_agents_excluded_from_network(grown_sim):
+    sim = grown_sim
     ppl = sim.people
     fine_uids = ppl.auids[ppl.fine[ppl.auids]]
     assert len(fine_uids) > 0
@@ -217,7 +233,7 @@ def test_fine_agents_do_not_drive_births():
         assert not np.asarray(ppl.fine[uids]).any()
 
 
-def test_stock_prevalence_scale_weighted():
+def test_stock_prevalence_scale_weighted(grown_sim):
     """Fine agents (scale=1/ratio) must count as 1/ratio in n_* stock results.
 
     Checks dtype==float AND that scale_flows-recomputed values match the stored
@@ -225,9 +241,7 @@ def test_stock_prevalence_scale_weighted():
     Also checks HPVTotal union-based stocks are similarly scale-weighted.
     Ratio==1 is covered by the regression gate tests (scale_flows==count).
     """
-    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
-                  ms_agent_ratio=10, rand_seed=7)
-    sim.run()
+    sim = grown_sim
 
     ppl = sim.people
     # Must have grown some fine agents for the test to be non-vacuous.
@@ -293,7 +307,7 @@ def test_stock_prevalence_scale_weighted():
     )
 
 
-def test_per_genotype_prevalence_scale_weighted():
+def test_per_genotype_prevalence_scale_weighted(grown_sim):
     """Per-genotype prevalence must be re-derived from the scale-weighted n_infected.
 
     At ms_agent_ratio=10, fine agents (scale=1/10) are grown for cancer-bound
@@ -311,9 +325,7 @@ def test_per_genotype_prevalence_scale_weighted():
     for population-turnover drift), AND significantly less than plain_n_infected.
     Both checks must be non-vacuous (fine agents actually infected).
     """
-    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
-                  ms_agent_ratio=10, rand_seed=7)
-    sim.run()
+    sim = grown_sim
 
     ppl = sim.people
     auids = ppl.auids
@@ -364,16 +376,14 @@ def test_per_genotype_prevalence_scale_weighted():
         )
 
 
-def test_per_genotype_prevalence_ratio1_unchanged():
+def test_per_genotype_prevalence_ratio1_unchanged(ratio1_sim):
     """At ms_agent_ratio==1 the prevalence re-derive is a no-op.
 
     At ratio=1 all agents have scale=1.0, so scale_flows == plain count and
     n_infected_sw == n_infected. The back-calculated numerator from stored
     prevalence must match n_infected_sw closely (within 5% for population drift).
     """
-    sim = hpv.Sim(location='nigeria', n_agents=4000, start=1990, stop=2020,
-                  ms_agent_ratio=1, rand_seed=1)
-    sim.run()
+    sim = ratio1_sim
 
     ppl = sim.people
     assert not ppl.fine.values.any(), 'unexpected fine agents at ratio==1'
