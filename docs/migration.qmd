@@ -6,8 +6,12 @@ HPVsim v3 is rebuilt on [Starsim](https://docs.starsim.org). The disease
 model, sexual network, demographics, interventions, and analyzers are now
 Starsim modules, and `hpv.Sim` is a thin wrapper around `starsim.Sim`. The
 science is the same — the same natural-history model, genotypes, and
-interventions — but the API surface changed in ways that will break most v2
-scripts. This guide covers what changed and how to update your code.
+interventions — but the way you set up and run a model has changed, so most v2
+scripts will need some edits before they run on v3.
+
+This guide walks through those changes one task at a time, with before-and-after
+code you can copy. It is written for people migrating their own scripts, and is
+also laid out so an AI coding assistant can work through it change by change.
 
 ::: {.callout-important}
 v3 uses Starsim's random-number framework, which does **not** share a stream
@@ -29,16 +33,21 @@ v3 requires Python ≥ 3.10 and pulls in `starsim>=3.5`.
 The single most common breaking change: **v2 passed a parameter dict as the
 first positional argument; v3's first positional argument is `location`.**
 
+**Before (v2):**
+
 ```python
-# v2 — breaks in v3 (the dict is interpreted as `location`)
+# breaks in v3 (the dict would be interpreted as `location`)
 pars = dict(n_agents=10e3, genotypes=[16, 18, 'hr'], start=1980, end=2030)
 sim = hpv.Sim(pars)
+```
 
-# v3 — pass parameters as keyword arguments
+**After (v3)** — pass parameters as keyword arguments:
+
+```python
 sim = hpv.Sim(n_agents=10_000, genotypes=[16, 18, 'hi5', 'ohr'],
               start=1980, stop=2030)
 
-# v3 — or splat a dict of keyword arguments
+# or, if you keep your parameters in a dict, unpack it with **
 pars = dict(n_agents=10_000, genotypes=[16, 18, 'hi5', 'ohr'],
             start=1980, stop=2030)
 sim = hpv.Sim(**pars)
@@ -48,7 +57,7 @@ Note the other changes in that example:
 
 | v2 | v3 | Notes |
 |---|---|---|
-| `end=2030` | `stop=2030` | The simulation end is `stop`. Passing `end` raises `KeyNotFoundError`. |
+| `end=2030` | `stop=2030` | The simulation end year is now `stop`. `end` still works as a deprecated alias (it sets `stop` and prints a warning), so old scripts keep running, but new code should use `stop`. |
 | `genotypes=[16, 18, 'hr']` | `genotypes=[16, 18, 'hi5', 'ohr']` | The pooled `'hr'` shorthand is gone. Valid names are `hpv16`, `hpv18`, `hi5`, `ohr` (integers `16`/`18` are accepted and normalized). |
 | `hpv.Sim(pars)` | `hpv.Sim(**pars)` | `pars` is no longer positional. |
 
@@ -75,7 +84,7 @@ calibration:
 
 **Durations must carry time units.** Duration parameters (`dur_precin`,
 `dur_cin`, `dur_cancer`, `dur_inf_male`) are `starsim` distributions whose
-parameters are `ss.years` time-pars. v2 stored them as
+parameters carry explicit time units (`ss.years`). v2 stored them as
 `{'dist': 'lognormal', 'par1': 3, 'par2': 9}`; the v3 equivalent is
 
 ```python
@@ -170,16 +179,21 @@ Results are now organized by module (Starsim style) rather than as one flat
 dictionary. Per-genotype results live under the genotype's key, and an
 aggregate `hpv` view sums across genotypes:
 
+**Before (v2):**
+
 ```python
-# v2
 sim.results['infections']
 sim.results['cancers']
+```
 
-# v3 — per genotype
+**After (v3):**
+
+```python
+# per genotype
 sim.results.hpv16.cum_infections
 sim.results.hpv16.new_cancers
 
-# v3 — aggregate across genotypes
+# aggregate across all genotypes
 sim.results.hpv.cum_infections
 ```
 
@@ -199,12 +213,16 @@ There is no longer a `sim.short_summary` attribute. A few other renames:
 The top-level `hpv.save` / `hpv.load` convenience functions are gone. Use the
 sim's own `save` method and Starsim's `load`:
 
+**Before (v2):**
+
 ```python
-# v2
 hpv.save('mysim.sim', sim)
 sim = hpv.load('mysim.sim')
+```
 
-# v3
+**After (v3):**
+
+```python
 sim.save('mysim.sim')
 import starsim as ss
 sim = ss.load('mysim.sim')
@@ -233,7 +251,7 @@ HPVsim's intervention classes; age-stratified results use `hpv.AgeResults`, and
 the aggregate `hpv.HPVTotal` analyzer is added automatically. See the
 [interventions](tutorials/tut_interventions.qmd) and
 [analyzers](tutorials/tut_analyzers.qmd) tutorials for the full v3 API. The
-mechanical changes that break most v2 cascade code:
+practical changes that break most v2 cascade code:
 
 - **Look-ups by name, not label.** `sim.interventions` and `sim.analyzers` are
   keyed by each module's `name` (which defaults to the class name), not by
@@ -392,8 +410,9 @@ storage are gone — re-run selected parameter sets to draw uncertainty bands.
   (Windows).** `hpv.Calibration(...).calibrate()` with `n_workers > 1` (and any
   `ss.MultiSim` / `sc.parallelize`) uses process *spawn* on Windows, so each
   worker re-imports your driver module. Without the `__main__` guard the workers
-  re-launch the calibration recursively — a fork-bomb that saturates the CPU.
-  Also budget ~a two-minute numba warmup per fresh worker process.
+  re-launch the calibration recursively, spawning ever more processes until the
+  CPU is saturated. Also budget ~a two-minute numba warmup per fresh worker
+  process.
 - **Windows console encoding.** HPVsim prints a `⚙` glyph on startup that can
   crash redirected stdout under the default `cp1252` codepage. Set
   `PYTHONIOENCODING=utf-8` when piping output to a file.
