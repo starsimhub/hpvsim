@@ -5,13 +5,13 @@ Miscellaneous functions that do not belong anywhere else
 import re
 import inspect
 import warnings
+import functools
 import numpy as np
 import pandas as pd
 import pylab as pl
 import sciris as sc
 import collections as co
 from pathlib import Path
-from distutils.version import LooseVersion # TODO: deprecated, remove
 from . import version as hpv
 from . import data as hpdata
 from .settings import options as hpo
@@ -352,7 +352,7 @@ def get_version_pars(version, verbose=True):
     # Construct a sorted list of available parameters based on the files in the regression folder
     regression_folder = sc.thisdir(__file__, 'regression', aspath=True)
     available_versions = [x.stem.replace('pars_v','') for x in regression_folder.iterdir() if x.suffix=='.json']
-    available_versions = sorted(available_versions, key=LooseVersion)
+    available_versions = sorted(available_versions, key=functools.cmp_to_key(sc.compareversions))
 
     # Find the highest parameter version that is <= the requested version
     version_comparison = [sc.compareversions(version, v)>=0 for v in available_versions]
