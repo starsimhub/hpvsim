@@ -98,7 +98,7 @@ def _plot_coverage_sweep(by_cov, out_png):
         # are flattened to top-level keys after .median().
         # Try a few candidate result keys to be robust to API drift.
         candidates = [
-            'hpvtotal_cum_cancers',
+            'hpv_cum_cancers',
             'hpv16_cum_cancers',
         ]
         result_key = next(

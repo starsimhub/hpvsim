@@ -69,7 +69,7 @@ def test_higher_rel_beta_raises_prevalence():
         sim = hpv.Sim(genotypes=[16], genotype_pars={'hpv16': {'rel_beta': rb}},
                       n_agents=2000, start=1990, stop=2010, dt=0.5, rand_seed=1)
         sim.run()
-        return float(sim.results.hpvtotal.cum_infections[-1])
+        return float(sim.results.hpv.cum_infections[-1])
     assert prev(1.0) > prev(0.3)
 
 

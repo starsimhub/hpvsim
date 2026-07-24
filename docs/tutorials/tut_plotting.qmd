@@ -42,14 +42,14 @@ sim.disp()
 
 ## Plotting options
 
-While a sim can be plotted using default settings simply by `sim.plot()`, this is just a small fraction of what's available. First, note that results can be plotted directly using e.g. Matplotlib. Results are organized by module: you can see the top-level keys with `sim.results.keys()`, and each disease genotype (e.g. `hpv16`) and the aggregate `hpvtotal` view has its own set of results. The shared time axis is `sim.results.timevec`. A simple example of plotting using Matplotlib is:
+While a sim can be plotted using default settings simply by `sim.plot()`, this is just a small fraction of what's available. First, note that results can be plotted directly using e.g. Matplotlib. Results are organized by module: you can see the top-level keys with `sim.results.keys()`, and each disease genotype (e.g. `hpv16`) and the aggregate `hpv` view has its own set of results. The shared time axis is `sim.results.timevec`. A simple example of plotting using Matplotlib is:
 
 ```{python}
 import pylab as plt # Shortcut for import matplotlib.pyplot as plt
-plt.plot(sim.results.timevec, sim.results.hpvtotal.cum_infections);
+plt.plot(sim.results.timevec, sim.results.hpv.cum_infections);
 ```
 
-Each result is a `Result` object rather than a plain NumPy array; like a pandas column, you can get the underlying array via slicing (`sim.results.hpvtotal.cum_infections[:]`) or the `.values` attribute.
+Each result is a `Result` object rather than a plain NumPy array; like a pandas column, you can get the underlying array via slicing (`sim.results.hpv.cum_infections[:]`) or the `.values` attribute.
 
 The built-in `sim.plot()` produces a multi-panel overview of the key results:
 
@@ -121,8 +121,8 @@ import pandas as pd
 
 df = pd.DataFrame({
     'year': sim.results.timevec,
-    'cum_infections': sim.results.hpvtotal.cum_infections[:],
-    'new_cancers': sim.results.hpvtotal.new_cancers[:],
+    'cum_infections': sim.results.hpv.cum_infections[:],
+    'new_cancers': sim.results.hpv.new_cancers[:],
 })
 df.to_csv('my-sim.csv', index=False)
 print(df.head())

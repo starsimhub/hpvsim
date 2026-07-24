@@ -23,7 +23,7 @@ def test_stratified_cancers_sum_matches_total():
     res = sim.results.hivstratifiedresults
     strat_total = res['cancers_with_hiv'].sum() + res['cancers_no_hiv'].sum()
     # Per-genotype modules each record new_cancers; HPVTotal sums them.
-    hpv_total = sim.results.hpvtotal['new_cancers'].sum()
+    hpv_total = sim.results.hpv['new_cancers'].sum()
     assert strat_total > 0
     # HIVStratifiedResults runs after step_die, so an agent who turns cancerous
     # and dies from background demographics in the same step is counted by
@@ -48,6 +48,6 @@ def test_stratified_cancers_scale_weighted_at_ms_gt_1():
     res = sim.results.hivstratifiedresults
     assert np.issubdtype(res['cancers_with_hiv'].dtype, np.floating)
     strat_total = res['cancers_with_hiv'].sum() + res['cancers_no_hiv'].sum()
-    hpv_total = sim.results.hpvtotal['new_cancers'].sum()
+    hpv_total = sim.results.hpv['new_cancers'].sum()
     assert strat_total > 0
     assert strat_total <= hpv_total * 1.001  # float tolerance; raw counts would exceed

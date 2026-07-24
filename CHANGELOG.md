@@ -33,7 +33,7 @@ walkthrough.
   parameters as keyword arguments or `hpv.Sim(**pars)`. `end` is now `stop`; the
   pooled `'hr'` genotype shorthand is replaced by `hi5`/`ohr`.
 - *Regression information*: results are organized by module
-  (`sim.results.hpv16.cum_infections`, aggregate `sim.results.hpvtotal.*`)
+  (`sim.results.hpv16.cum_infections`, aggregate `sim.results.hpv.*`)
   rather than one flat dict; `sim.short_summary` and the top-level
   `hpv.save`/`hpv.load`/`hpv.MultiSim` helpers are removed (use `sim.save()` /
   `ss.load()` / `ss.MultiSim`).

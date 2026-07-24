@@ -57,7 +57,7 @@ sim = hpv.Sim(**pars)
 sim.run()
 ```
 
-This generates results stored in `sim.results`, organized by module. Each genotype has its own results group — for example `sim.results.hpv16.cum_infections` and `sim.results.hpv16.new_cancers` — and the `hpvtotal` group aggregates across genotypes, e.g. `sim.results.hpvtotal.cum_infections`. The simulation time axis is `sim.results.timevec`.
+This generates results stored in `sim.results`, organized by module. Each genotype has its own results group — for example `sim.results.hpv16.cum_infections` and `sim.results.hpv16.new_cancers` — and the `hpv` group aggregates across genotypes, e.g. `sim.results.hpv.cum_infections`. The simulation time axis is `sim.results.timevec`.
 
 Any valid parameter can also be passed to the sim directly as a keyword argument. For example, exactly equivalent to the above (minus the genotypes) is:
 

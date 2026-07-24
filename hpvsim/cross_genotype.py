@@ -12,7 +12,8 @@ Two modules that operate across HPV genotypes:
 
   - ``HPVTotal`` (``ss.Analyzer``): post-hoc, pools per-genotype results
     into Sim-level totals. Auto-added by ``hpv.Sim`` whenever HPV modules
-    are present; accessible at ``sim.results.hpvtotal``.
+    are present; accessible at ``sim.results.hpv`` (the analyzer's ``name``
+    defaults to ``'hpv'``).
 """
 
 import numpy as np
@@ -161,7 +162,7 @@ class HPVTotal(ss.Analyzer):
     """Analyzer that pools per-genotype HPV results into Sim-level totals.
 
     Schema is mirrored from the per-genotype HPV modules at init time, so
-    HPVTotal automatically gains a matching ``hpvtotal.<metric>`` entry for
+    HPVTotal automatically gains a matching ``hpv.<metric>`` entry for
     each per-genotype result. Three aggregation strategies are applied:
 
       - **People-level union** for per-agent state counts listed in
@@ -178,6 +179,15 @@ class HPVTotal(ss.Analyzer):
 
     Auto-added by ``hpv.Sim`` whenever HPV modules are present.
     """
+
+    def __init__(self, *args, **kwargs):
+        # Results land under ``sim.results[self.name]``. Default the name to
+        # 'hpv' so the pooled totals read as ``sim.results.hpv.cum_infections``
+        # (the class name would otherwise give the clunkier 'hpvtotal'). The
+        # per-genotype disease modules are named by genotype ('hpv16', ...), so
+        # 'hpv' does not collide with any disease result group.
+        kwargs.setdefault('name', 'hpv')
+        super().__init__(*args, **kwargs)
 
     # Per-agent state counts aggregated by boolean OR across modules.
     # Maps result key on the HPV module -> BoolState attribute name.

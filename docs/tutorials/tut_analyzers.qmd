@@ -16,7 +16,7 @@ Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftre
 
 ## Results by age
 
-By far the most common reason to use an analyzer is to report results by age. The per-genotype and aggregate results in `sim.results` (e.g. `sim.results.hpvtotal.cancers`) use standardized age bins which may not match the age bins for available data on cervical cancers. The `AgeResults` analyzer lets you record any HPV result at the exact age bins and years you choose. You configure it with a `result_args` dictionary whose keys are the results you want by age; each entry lists the `years` to snapshot and the bin `edges`:
+By far the most common reason to use an analyzer is to report results by age. The per-genotype and aggregate results in `sim.results` (e.g. `sim.results.hpv.cancers`) use standardized age bins which may not match the age bins for available data on cervical cancers. The `AgeResults` analyzer lets you record any HPV result at the exact age bins and years you choose. You configure it with a `result_args` dictionary whose keys are the results you want by age; each entry lists the `years` to snapshot and the bin `edges`:
 
 ```{python}
 #| collapsed: false

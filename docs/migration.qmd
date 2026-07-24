@@ -168,7 +168,7 @@ seed independently.
 
 Results are now organized by module (Starsim style) rather than as one flat
 dictionary. Per-genotype results live under the genotype's key, and an
-aggregate `hpvtotal` view sums across genotypes:
+aggregate `hpv` view sums across genotypes:
 
 ```python
 # v2
@@ -180,7 +180,7 @@ sim.results.hpv16.cum_infections
 sim.results.hpv16.new_cancers
 
 # v3 — aggregate across genotypes
-sim.results.hpvtotal.cum_infections
+sim.results.hpv.cum_infections
 ```
 
 Plotting is unchanged in spirit:
@@ -324,11 +324,11 @@ Notes:
   `.sum()` at `ms_agent_ratio > 1`) and, for absolute counts, by the population
   scale factor.
 - **Measuring prevalence under multiscale — mind the metric.** Two obvious
-  choices are both wrong in different setups. `hpvtotal.n_infected / n_alive`
+  choices are both wrong in different setups. `hpv.n_infected / n_alive`
   is **ms-dependent**: the numerator is scale-weighted but the top-level
   `n_alive` result is a *plain* agent count, so spawned fine agents pad the
   denominator (e.g. one country read 0.107 at `ms=3` but 0.049 at `ms=100`).
-  And `hpvtotal.prevalence` is **`total_pop`-scaled** — a proper 0–1 fraction
+  And `hpv.prevalence` is **`total_pop`-scaled** — a proper 0–1 fraction
   only when `total_pop = n_agents`; if you set `total_pop` to a national
   population it comes back ≫ 1. The robust, ms- and `total_pop`-invariant
   prevalence is the **non-fine (level0) infected fraction**: infected-and-alive

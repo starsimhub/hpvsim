@@ -265,7 +265,7 @@ def test_stock_prevalence_scale_weighted():
             )
 
     # ---- HPVTotal union-based stocks ----
-    hpvt = sim.results.get('hpvtotal', None)
+    hpvt = sim.results.get('hpv', None)
     assert hpvt is not None, 'HPVTotal analyzer result block missing'
     for key in ('n_infected', 'n_precin', 'n_cin', 'n_cancerous'):
         assert hpvt[key].dtype == float, (
