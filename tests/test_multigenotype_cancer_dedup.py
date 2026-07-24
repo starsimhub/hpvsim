@@ -72,7 +72,7 @@ def test_hpvtotal_new_cancers_equals_per_module_sum():
         for mod in genotypes
     }
     total_from_modules = sum(per_module_sums.values())
-    total_hpvtotal = int(sim.results.hpv.new_cancers[:].sum())
+    total_hpvtotal = int(sim.results.all_hpv.new_cancers[:].sum())
 
     # 1. Aggregation invariant.
     assert total_from_modules == total_hpvtotal, (

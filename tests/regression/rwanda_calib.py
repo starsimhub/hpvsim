@@ -44,7 +44,7 @@ import starsim as ss
 
 import hpvsim as hpv
 from hpvsim.cross_genotype import CrossImmunity
-from hpvsim.data.country import _default_network_pars, _shape_network_pars
+from hpvsim.data.country import _network_pars
 from hpvsim.hiv import hpv_hiv_connector
 from hpvsim.parameters import get_genotype_pars
 
@@ -208,12 +208,10 @@ def make_rwanda_network():
     """A v3 ``SexualNetwork`` carrying the Rwanda network calibration.
 
     Pass the raw Rwanda overrides through the standard ``pars=`` override on
-    ``_default_network_pars``, then shape the merged dict into SexualNetwork
-    inputs (reusing ``_shape_network_pars`` so the annual->ss.prob / dist
-    wrapping isn't duplicated here).
+    ``_network_pars``, which merges them over the location defaults and shapes
+    the result into SexualNetwork inputs.
     """
-    raw = _default_network_pars('rwanda', pars=rwanda_network_overrides())
-    return hpv.SexualNetwork(**_shape_network_pars(raw))
+    return hpv.SexualNetwork(**_network_pars('rwanda', pars=rwanda_network_overrides()))
 
 
 def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,

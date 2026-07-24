@@ -46,10 +46,10 @@ While a sim can be plotted using default settings simply by `sim.plot()`, this i
 
 ```{python}
 import pylab as plt # Shortcut for import matplotlib.pyplot as plt
-plt.plot(sim.results.timevec, sim.results.hpv.cum_infections);
+plt.plot(sim.results.timevec, sim.results.all_hpv.cum_infections);
 ```
 
-Each result is a `Result` object rather than a plain NumPy array; like a pandas column, you can get the underlying array via slicing (`sim.results.hpv.cum_infections[:]`) or the `.values` attribute.
+Each result is a `Result` object rather than a plain NumPy array; like a pandas column, you can get the underlying array via slicing (`sim.results.all_hpv.cum_infections[:]`) or the `.values` attribute.
 
 The built-in `sim.plot()` produces a multi-panel overview of the key results:
 
@@ -121,8 +121,8 @@ import pandas as pd
 
 df = pd.DataFrame({
     'year': sim.results.timevec,
-    'cum_infections': sim.results.hpv.cum_infections[:],
-    'new_cancers': sim.results.hpv.new_cancers[:],
+    'cum_infections': sim.results.all_hpv.cum_infections[:],
+    'new_cancers': sim.results.all_hpv.new_cancers[:],
 })
 df.to_csv('my-sim.csv', index=False)
 print(df.head())

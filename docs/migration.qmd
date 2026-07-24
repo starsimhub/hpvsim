@@ -127,7 +127,7 @@ In v3 they belong to the network module. Build it from a location's defaults
 import hpvsim as hpv
 from hpvsim.data import country
 
-net = hpv.SexualNetwork(**country._network_pars('india', overrides={...}))
+net = hpv.SexualNetwork(**country._network_pars('india', pars={...}))
 sim = hpv.Sim(location='india', genotypes=[16, 18], networks=[net])
 ```
 
@@ -194,7 +194,7 @@ sim.results.hpv16.cum_infections
 sim.results.hpv16.new_cancers
 
 # aggregate across all genotypes
-sim.results.hpv.cum_infections
+sim.results.all_hpv.cum_infections
 ```
 
 Plotting is unchanged in spirit:

@@ -231,9 +231,14 @@ def _death_rate(location):
     })
 
 
-def _network_pars(location):
-    """Build ``hpv.SexualNetwork`` parameters from a location's defaults."""
-    return _shape_network_pars(_default_network_pars(location))
+def _network_pars(location, pars=None, **kwargs):
+    """Build ``hpv.SexualNetwork`` parameters from a location's defaults.
+
+    ``pars``/``kwargs`` are network overrides in the raw ``_default_network_pars``
+    form; they are merged over the defaults (Starsim ``update_pars`` convention)
+    before the result is shaped into SexualNetwork inputs.
+    """
+    return _shape_network_pars(_default_network_pars(location, pars=pars, **kwargs))
 
 
 def _shape_network_pars(default_pars):
