@@ -16,6 +16,9 @@ auto-defaults entirely, drop down to vanilla ``ss.Sim``.
 Other slots (``diseases``, ``networks``, ``demographics``, ``people``) retain
 override semantics. ``diseases=`` is mutually exclusive with ``genotypes=``.
 
+The final sim year is ``stop`` (Starsim's name). ``end`` is accepted as a
+deprecated v2 alias — if supplied it overrides ``stop`` and emits a warning.
+
 Kwargs:
   ``init_seeding`` (str, default ``'exclusive'``):
     ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
@@ -79,7 +82,13 @@ class Sim(ss.Sim):
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, ms_agent_ratio=1, pars=None, v2_compat_demographics=False,
-                 **kwargs):
+                 end=None, **kwargs):
+        # Legacy alias: HPVsim v2 used ``end`` for the final sim year; Starsim
+        # renamed it ``stop``. Accept ``end`` so v2 scripts keep running, but
+        # nudge toward ``stop``. If given, ``end`` wins over ``stop``.
+        if end is not None:
+            ss.warn("hpv.Sim: `end` is a deprecated alias for `stop`; use `stop=` instead.")
+            stop = end
         # Pass start year so the age pyramid matches sim.start (loader
         # defaults to year 2000 with a materially different distribution).
         country = hpv.load_country(location, year=int(start))
