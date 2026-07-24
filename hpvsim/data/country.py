@@ -221,24 +221,25 @@ def _death_rate(location):
     })
 
 
-def _network_pars(location, overrides=None):
-    """Build network parameters for ``hpv.SexualNetwork``.
+def _network_pars(location):
+    """Build ``hpv.SexualNetwork`` parameters from a location's defaults."""
+    return _shape_network_pars(_default_network_pars(location))
 
-    Returns ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ...,
-    'm': ...}}``. Each layer dict carries: partners, mixing, layer_probs,
-    cross_layer, duration, acts. ``debut`` is shared across layers (one
-    per-agent sample).
 
-    ``overrides`` is an optional dict whose keys replace entries in the raw
-    ``_default_network_pars`` result *before* the Starsim-shaping wrapping
-    (so it carries raw forms: ``debut``/``*_partners`` as distribution dicts,
-    ``layer_probs`` as the (3, N) arrays, ``*_cross_layer`` as annual floats).
-    Used by analysis scripts to supply a per-location network calibration
-    without forking this builder.
+def _shape_network_pars(default_pars):
+    """Shape a raw network-pars dict into ``hpv.SexualNetwork`` inputs.
+
+    ``default_pars`` is a raw dict shaped like the ``_default_network_pars``
+    result: ``debut``/``*_partners`` as distribution dicts, ``layer_probs`` as
+    the (3, N) arrays, ``*_cross_layer`` as annual floats. Returns
+    ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ..., 'm': ...}}``.
+    Each layer dict carries: partners, mixing, layer_probs, cross_layer,
+    duration, acts. ``debut`` is shared across layers (one per-agent sample).
+
+    An analysis script supplying a per-location network calibration merges its
+    raw overrides onto ``_default_network_pars(location)`` and passes the merged
+    dict here, reusing this shaping rather than reimplementing it.
     """
-    default_pars = _default_network_pars(location)
-    if overrides:
-        default_pars = {**default_pars, **overrides}
     annual = ss.years(1)  # unit shared by all annual probability params
 
     # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` for a

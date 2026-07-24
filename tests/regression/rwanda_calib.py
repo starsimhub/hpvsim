@@ -25,7 +25,7 @@ PER-TIMESTEP vs ANNUAL.  v2 calibrates the probability-like network params in
 to *annual* before building the network
 (``run_sim._to_annual_prob``: ``annual = 1 - (1 - p)**(1/dt)``).  v3's
 ``SexualNetwork`` wraps ``layer_probs``/``cross_layer`` in ``ss.prob(.., annual)``
-(see ``hpvsim/data/country._network_pars``), so this module supplies the ANNUAL
+(see ``hpvsim/data/country._shape_network_pars``), so this module supplies the ANNUAL
 forms.  ``beta``, ``partners`` (counts), genotype durations, and ``sev_dist`` are
 NOT rate-converted.
 
@@ -44,7 +44,7 @@ import starsim as ss
 
 import hpvsim as hpv
 from hpvsim.cross_genotype import CrossImmunity
-from hpvsim.data.country import _network_pars
+from hpvsim.data.country import _default_network_pars, _shape_network_pars
 from hpvsim.hiv import hpv_hiv_connector
 from hpvsim.parameters import get_genotype_pars
 
@@ -188,7 +188,7 @@ def rwanda_genotype_pars():
 
 
 def rwanda_network_overrides():
-    """Raw network overrides consumed by ``country._network_pars(overrides=)``.
+    """Raw network overrides in ``_default_network_pars`` form.
 
     All probability-like entries are ANNUAL (v3 re-wraps them in
     ``ss.prob(.., annual)``); partners are counts and debut is an age dist.
@@ -205,8 +205,15 @@ def rwanda_network_overrides():
 
 
 def make_rwanda_network():
-    """A v3 ``SexualNetwork`` carrying the Rwanda network calibration."""
-    return hpv.SexualNetwork(**_network_pars('rwanda', rwanda_network_overrides()))
+    """A v3 ``SexualNetwork`` carrying the Rwanda network calibration.
+
+    Merge the raw Rwanda overrides onto the location defaults, then shape the
+    merged dict into SexualNetwork inputs (reusing ``_shape_network_pars`` so
+    the annual->ss.prob / dist wrapping isn't duplicated here).
+    """
+    raw = _default_network_pars('rwanda')
+    raw.update(rwanda_network_overrides())
+    return hpv.SexualNetwork(**_shape_network_pars(raw))
 
 
 def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,
