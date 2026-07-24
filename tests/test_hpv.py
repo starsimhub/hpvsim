@@ -70,7 +70,7 @@ def test_set_prognoses_flips_state():
 def test_step_state_clears_at_ti_clearance():
     """Cleared agents return to susceptible=True, infected=False.
     Post-clearance immunity (nab_imm > 0) is only granted to females who
-    seroconvert (v2 match: males get no immunity; first-clearance is gated
+    seroconvert (males get no immunity; first-clearance is gated
     on sero_prob). This test infects a batch of female agents to verify the
     state transitions; some will seroconvert (nab_imm > 0)."""
     sim, hpv = _minimal_sim(init_prev=0.0, n_agents=200)

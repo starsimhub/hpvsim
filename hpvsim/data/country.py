@@ -22,20 +22,28 @@ Reshaping summary:
 
 import numpy as np
 import pandas as pd
+import sciris as sc
 import starsim as ss
 
 from ..migration_utils import _v2_dist_to_starsim
 from . import loaders as _loaders
 
 
-_KNOWN_LOCATIONS = ['nigeria']
-
-
-def _default_network_pars(location=None):  # noqa: ARG001  (location reserved for future per-country data)
+def _default_network_pars(location=None, pars=None, **kwargs):  # noqa: ARG001  (location accepted for API symmetry)
     """Default network parameters consumed by SexualNetwork construction.
 
-    The ``location`` argument is accepted for API symmetry and future
-    per-country extension; current defaults are location-agnostic.
+    Network calibration is intentionally location-agnostic: HPVsim ships
+    demographic data per country but not network calibration. The ``location``
+    argument is accepted for API symmetry.
+
+    Overrides follow the Starsim ``update_pars`` convention: pass a ``pars``
+    dict and/or keyword arguments, which are merged over the defaults via
+    ``sc.mergedicts`` (later values win). Keys carry the raw pre-shaping forms
+    (``debut``/``*_partners`` as distribution dicts, ``layer_probs`` as the
+    (3, N) arrays, ``*_cross_layer`` as annual floats), so an analysis script
+    supplies its per-country calibration in the same shape as the defaults::
+
+        raw = _default_network_pars('rwanda', pars=rwanda_network_overrides())
 
     Keys returned:
         debut, f_cross_layer, m_cross_layer,
@@ -128,7 +136,7 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
         ], dtype=float),
     )
 
-    return dict(
+    defaults = dict(
         debut=debut,
         f_cross_layer=f_cross_layer,
         m_cross_layer=m_cross_layer,
@@ -140,13 +148,25 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
         mixing=mixing,
         layer_probs=layer_probs,
     )
+    # Merge overrides over the defaults, matching Starsim's update_pars
+    # (sc.mergedicts(pars, kwargs) — later values win).
+    return sc.mergedicts(defaults, pars, kwargs)
 
 
 def load_country(location, year=None):
     """Return Starsim-shaped data for ``location``.
 
+    Any country in the bundled UN WPP 2024 data is valid; see
+    ``hpv.data.get_country_aliases()`` for accepted name variants. The
+    underlying loaders raise ``ValueError`` with suggestion-based
+    diagnostics for unknown names.
+
+    Network calibration is location-agnostic (see
+    ``_default_network_pars``). Analysis scripts supply per-country
+    network pars as needed.
+
     Args:
-        location (str): country name; must be one of ``_KNOWN_LOCATIONS``.
+        location (str): country name (case-insensitive).
         year (int): year to load the initial age distribution for.
 
     Returns:
@@ -160,10 +180,6 @@ def load_country(location, year=None):
             - 'pop_by_age': DataFrame [year, age, male, female] (age pyramid over time)
     """
     location = location.lower()
-    if location not in _KNOWN_LOCATIONS:
-        raise ValueError(
-            f"Unknown location {location!r}. Supported locations: {_KNOWN_LOCATIONS}."
-        )
 
     return dict(
         age_data=_age_data(location, year=year),
@@ -215,15 +231,30 @@ def _death_rate(location):
     })
 
 
-def _network_pars(location):
-    """Build network parameters for ``hpv.SexualNetwork``.
+def _network_pars(location, pars=None, **kwargs):
+    """Build ``hpv.SexualNetwork`` parameters from a location's defaults.
 
-    Returns ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ...,
-    'm': ...}}``. Each layer dict carries: partners, mixing, layer_probs,
-    cross_layer, duration, acts. ``debut`` is shared across layers (one
-    per-agent sample).
+    ``pars``/``kwargs`` are network overrides in the raw ``_default_network_pars``
+    form; they are merged over the defaults (Starsim ``update_pars`` convention)
+    before the result is shaped into SexualNetwork inputs.
     """
-    default_pars = _default_network_pars(location)
+    return _shape_network_pars(_default_network_pars(location, pars=pars, **kwargs))
+
+
+def _shape_network_pars(default_pars):
+    """Shape a raw network-pars dict into ``hpv.SexualNetwork`` inputs.
+
+    ``default_pars`` is a raw dict shaped like the ``_default_network_pars``
+    result: ``debut``/``*_partners`` as distribution dicts, ``layer_probs`` as
+    the (3, N) arrays, ``*_cross_layer`` as annual floats. Returns
+    ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ..., 'm': ...}}``.
+    Each layer dict carries: partners, mixing, layer_probs, cross_layer,
+    duration, acts. ``debut`` is shared across layers (one per-agent sample).
+
+    An analysis script supplying a per-location network calibration merges its
+    raw overrides onto ``_default_network_pars(location)`` and passes the merged
+    dict here, reusing this shaping rather than reimplementing it.
+    """
     annual = ss.years(1)  # unit shared by all annual probability params
 
     # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` for a

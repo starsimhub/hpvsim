@@ -2,9 +2,6 @@
 
 Public API: ``Sim``, ``HPV``, ``SexualNetwork``, ``AgeMigration``,
 ``SimPars``, ``GenotypePars``, ``get_genotype_pars``, ``data``.
-
-Quarantined modules awaiting port live in ``hpvsim/_v2_legacy/``;
-active code must not import from there.
 """
 
 import sciris as sc
@@ -25,6 +22,7 @@ from .seeding import _ExclusiveSeeder
 from .sim import Sim
 from .demographics import AgeMigration, AnnualBirths, Births
 from .cross_genotype import CrossImmunity, HPVTotal
+from .hiv import HIV, hiv_incidence_import, hiv_art, hpv_hiv_connector, HIVStratifiedResults
 from .analyzers import AgeResults, snapshot, age_pyramid, age_causal_infection, dalys, results_by_genotype
 from .calibration import Calibration
 from . import calibration
@@ -44,6 +42,7 @@ rootdir = sc.thispath(__file__).parent
 
 __all__ = [
     'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'AnnualBirths', 'CrossImmunity', 'HPVTotal',
+    'HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector', 'HIVStratifiedResults',
     'AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys', 'results_by_genotype',
     'Calibration', 'calibration',
     'plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim', 'plot_intervention_impact', 'plot_calibration',

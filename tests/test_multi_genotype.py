@@ -41,7 +41,7 @@ def test_sim_genotypes_sugar_two():
 
 def test_sim_rejects_diseases_plus_genotypes():
     """Passing both diseases= and genotypes= raises early."""
-    with pytest.raises(ValueError, match='diseases.*genotypes'):
+    with pytest.raises(ValueError, match='genotypes='):
         hpv.Sim(
             n_agents=200, start=1990, stop=1991, dt=1.0, rand_seed=0,
             diseases=[hpv.HPV(genotype='hpv16')],
@@ -108,7 +108,7 @@ def test_hpvtotal_cum_infections():
         genotypes=[16, 18],
     )
     sim.run()
-    total = sim.results['hpvtotal']
+    total = sim.results['all_hpv']
     any_cum = float(np.asarray(total['cum_infections']).max())
     h16_cum = float(np.asarray(sim.results['hpv16'].new_infections).sum())
     h18_cum = float(np.asarray(sim.results['hpv18'].new_infections).sum())
@@ -125,7 +125,7 @@ def test_hpvtotal_cum_cancers():
         genotypes=[16, 18],
     )
     sim.run()
-    total = sim.results['hpvtotal']
+    total = sim.results['all_hpv']
     any_c = float(np.asarray(total['cum_cancers'])[-1])
     sum_c = sum(float(np.asarray(sim.results[k].cum_cancers)[-1])
                 for k in ('hpv16', 'hpv18'))
@@ -141,7 +141,7 @@ def test_hpvtotal_n_susceptible_plus_n_infected_equals_n_alive():
     sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
                   dt=1.0, rand_seed=0)
     sim.run()
-    total = sim.results.hpvtotal
+    total = sim.results.all_hpv
     n_inf = np.asarray(total.n_infected)
     n_sus = np.asarray(total.n_susceptible)
     n_alive = np.asarray(sim.results.n_alive)
@@ -154,7 +154,7 @@ def test_hpvtotal_prevalence_matches_n_infected_over_n_alive():
     sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
                   dt=1.0, rand_seed=0)
     sim.run()
-    total = sim.results.hpvtotal
+    total = sim.results.all_hpv
     n_inf = np.asarray(total.n_infected, dtype=float)
     n_alive = np.asarray(sim.results.n_alive, dtype=float)
     prev = np.asarray(total.prevalence)
@@ -178,7 +178,7 @@ def test_hpvtotal_cum_infections_unique_bounded_by_sum_of_flows_end_of_sim():
     sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
                   dt=1.0, rand_seed=0)
     sim.run()
-    total = sim.results.hpvtotal
+    total = sim.results.all_hpv
     unique_end = float(np.asarray(total.cum_infections_unique)[-1])
     sof_end = float(np.asarray(total.cum_infections)[-1])
     assert unique_end > 0, 'no infections — test is vacuous'
@@ -190,7 +190,7 @@ def test_hpvtotal_n_infected_union_bounded_by_per_genotype_sum():
     sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
                   dt=1.0, rand_seed=0)
     sim.run()
-    union = np.asarray(sim.results.hpvtotal.n_infected)
+    union = np.asarray(sim.results.all_hpv.n_infected)
     per_g_sum = sum(np.asarray(sim.results[k].n_infected)
                     for k in ('hpv16', 'hpv18'))
     assert union.max() > 0, 'no infections — test is vacuous'
@@ -205,7 +205,7 @@ def test_hpvtotal_sum_age_at_cancer_equals_sum_across_genotypes():
         genotypes=[16, 18],
     )
     sim.run()
-    total_arr = np.asarray(sim.results.hpvtotal.sum_age_at_cancer, dtype=float)
+    total_arr = np.asarray(sim.results.all_hpv.sum_age_at_cancer, dtype=float)
     per_g_sum = sum(np.asarray(sim.results[k].sum_age_at_cancer, dtype=float)
                     for k in ('hpv16', 'hpv18'))
     assert total_arr.max() > 0, 'no cancers — test is vacuous'
@@ -213,10 +213,10 @@ def test_hpvtotal_sum_age_at_cancer_equals_sum_across_genotypes():
 
 
 # ---------------------------------------------------------------------------
-# M03 init_seeding tests
+# init_seeding tests
 # ---------------------------------------------------------------------------
 
-def test_exclusive_init_seeding_matches_v2_semantics():
+def test_exclusive_init_seeding_semantics():
     """init_seeding='exclusive' (default) gives each agent at most one genotype."""
     sim = hpv.Sim(
         n_agents=5000, location='nigeria',

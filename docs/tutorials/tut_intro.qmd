@@ -18,9 +18,9 @@ This tutorial walks you through how to do these things.
 
 
 <div class="alert alert-info">
-    
-Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_intro.ipynb) to open an interactive version of this notebook.
-    
+
+Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_intro.ipynb) to open an interactive version of this notebook.
+
 </div>
 
 ## Getting started
@@ -37,40 +37,39 @@ fig = sim.plot()
 
 ## Defining parameters and genotypes, and running simulations
 
-Parameters are defined as a dictionary.
+Parameters can be collected in a dictionary.
 Some common parameters to modify are the number of agents in the simulation, the genotypes to simulate, and the start and end dates of the simulation.
 We can define those as:
 
 ```{python}
 pars = dict(
     n_agents = 10e3,
-    genotypes = [16, 18, 'hr'], # Simulate genotypes 16 and 18, plus all other high-risk HPV genotypes pooled together
+    genotypes = [16, 18, 'hi5', 'ohr'], # HPV16 and HPV18 individually, plus two pooled high-risk genotype groups
     start = 1980,
-    end = 2030,
+    stop = 2030,
 )
 ```
 
-Running a simulation is pretty easy. In fact, running a sim with the parameters we defined above is just:
+Parameters are passed to the sim as keyword arguments, so a dictionary of parameters is applied by splatting it with `**`:
 
 ```{python}
-sim = hpv.Sim(pars)
+sim = hpv.Sim(**pars)
 sim.run()
 ```
 
-This will generate a results dictionary `sim.results`.
-Results by genotype are named things like `sim.results['infections']` and stored as arrays where each row corresponds to a genotype, while totals across all genotypes have names like `sim.results['infections']` or `sim.results['cancers']`.
+This generates results stored in `sim.results`, organized by module. Each genotype has its own results group — for example `sim.results.hpv16.cum_infections` and `sim.results.hpv16.new_cancers` — and the `all_hpv` group aggregates across genotypes, e.g. `sim.results.all_hpv.cum_infections`. The simulation time axis is `sim.results.timevec`.
 
-Rather than creating a parameter dictionary, any valid parameter can also be passed to the sim directly. For example, exactly equivalent to the above is:
+Any valid parameter can also be passed to the sim directly as a keyword argument. For example, exactly equivalent to the above (minus the genotypes) is:
 
 ```{python}
-sim = hpv.Sim(n_agents=10e3, start=1980, end=2030)
+sim = hpv.Sim(n_agents=10e3, start=1980, stop=2030)
 sim.run()
 ```
 
-You can mix and match too – pass in a parameter dictionary with default options, and then include other parameters as keywords (including overrides; keyword arguments take precedence). For example:
+Because every parameter is a keyword argument, you can splat a dictionary of defaults and override individual entries. For example, to reuse the parameters above but run through 2050 instead:
 
 ```{python}
-sim = hpv.Sim(pars, end=2050) # Use parameters defined above, except set the end data to 2050
+sim = hpv.Sim(**{**pars, 'stop': 2050}) # Use the parameters defined above, but set stop to 2050
 sim.run()
 ```
 
@@ -84,32 +83,27 @@ fig = sim.plot()
 
 ## Full usage example
 
-Many of the details of this example will be explained in later tutorials, but to give you a taste, here's an example of how you would run two simulations to determine the impact of a custom intervention aimed at protecting the elderly.
+Many of the details of this example will be explained in later tutorials, but to give you a taste, here's how you would run two simulations to compare the impact of a routine HPV vaccination program.
 
 ```{python}
 import hpvsim as hpv
-
-# Custom vaccination intervention
-def custom_vx(sim):
-    if sim.yearvec[sim.t] == 2000:
-        target_group = (sim.people.age>9) * (sim.people.age<14)
-        sim.people.peak_imm[0, target_group] = 1
+import starsim as ss
 
 pars = dict(
-    location = 'tanzania', # Use population characteristics for Japan
-    n_agents = 10e3, # Have 50,000 people total in the population
-    start = 1980, # Start the simulation in 1980
-    n_years = 50, # Run the simulation for 50 years
-    burnin = 10, # Discard the first 20 years as burnin period
-    verbose = 0, # Do not print any output
+    location = 'nigeria', # Use population characteristics for Nigeria
+    n_agents = 10e3,      # Model 10,000 agents
+    start = 1980,         # Start the simulation in 1980
+    stop = 2030,          # Run through 2030
+    verbose = 0,          # Do not print output while running
 )
 
-# Running with multisims -- see Tutorial 3
-s1 = hpv.Sim(pars, label='Default')
-s2 = hpv.Sim(pars, interventions=custom_vx, label='Custom vaccination')
-msim = hpv.MultiSim([s1, s2])
-msim.run()
-fig = msim.plot(['cancers', 'cins'])
+# Compare no vaccination against a routine HPV vaccination program
+vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 14], sex='f', start_year=2000)
+s1 = hpv.Sim(**pars, label='No vaccine')
+s2 = hpv.Sim(**pars, interventions=[vx], label='Routine vaccination')
+
+# Run both together as a MultiSim -- see Tutorial 3
+msim = ss.MultiSim([s1, s2])
+msim.run(verbose=0)
+fig = msim.plot()
 ```
-
-

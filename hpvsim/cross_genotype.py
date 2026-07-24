@@ -12,7 +12,8 @@ Two modules that operate across HPV genotypes:
 
   - ``HPVTotal`` (``ss.Analyzer``): post-hoc, pools per-genotype results
     into Sim-level totals. Auto-added by ``hpv.Sim`` whenever HPV modules
-    are present; accessible at ``sim.results.hpvtotal``.
+    are present; accessible at ``sim.results.all_hpv`` (the analyzer's ``name``
+    defaults to ``'all_hpv'``).
 """
 
 import numpy as np
@@ -49,7 +50,8 @@ class CrossImmunity(ss.Connector):
     genotypes read the same per-agent draw from ``set_prognoses``.
     """
 
-    def __init__(self, cross_imm_sus=None, cross_imm_sev=None, **kwargs):
+    def __init__(self, cross_imm_sus=None, cross_imm_sev=None,
+                 rel_sev_loc=1.0, rel_sev_scale=0.2, **kwargs):
         super().__init__(**kwargs)
         self.cross_imm_sus = cross_imm_sus
         self.cross_imm_sev = cross_imm_sev
@@ -61,10 +63,12 @@ class CrossImmunity(ss.Connector):
             ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
             ss.BoolState('rel_sev_sampled', default=False),
         )
-        # Folded normal via abs() in _ensure_rel_sev; with loc=1.0, scale=0.2
-        # the negative tail mass is < 1e-6 so the practical distribution is
-        # effectively a positive-truncated normal(1, 0.2).
-        self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
+        # Folded normal via abs() in _ensure_rel_sev; with the default
+        # loc=1.0, scale=0.2 the negative tail mass is < 1e-6 so the practical
+        # distribution is equivalent to a positive-truncated normal(1, 0.2). A
+        # location calibration may lower loc (e.g. to a positive normal(0.87,
+        # 0.2)); expose loc/scale so it is set at construction.
+        self._rel_sev_dist = ss.normal(loc=rel_sev_loc, scale=rel_sev_scale)
 
     def init_pre(self, sim):
         super().init_pre(sim)
@@ -158,7 +162,7 @@ class HPVTotal(ss.Analyzer):
     """Analyzer that pools per-genotype HPV results into Sim-level totals.
 
     Schema is mirrored from the per-genotype HPV modules at init time, so
-    HPVTotal automatically gains a matching ``hpvtotal.<metric>`` entry for
+    HPVTotal automatically gains a matching ``all_hpv.<metric>`` entry for
     each per-genotype result. Three aggregation strategies are applied:
 
       - **People-level union** for per-agent state counts listed in
@@ -175,6 +179,15 @@ class HPVTotal(ss.Analyzer):
 
     Auto-added by ``hpv.Sim`` whenever HPV modules are present.
     """
+
+    def __init__(self, *args, **kwargs):
+        # Results land under ``sim.results[self.name]``. Default the name to
+        # 'all_hpv' so the pooled totals read as
+        # ``sim.results.all_hpv.cum_infections`` (cleaner than the class name's
+        # 'hpvtotal'). Note 'hpv' itself is taken — the HPV DNA screening test
+        # is a product module named 'hpv', so an 'hpv' analyzer would collide.
+        kwargs.setdefault('name', 'all_hpv')
+        super().__init__(*args, **kwargs)
 
     # Per-agent state counts aggregated by boolean OR across modules.
     # Maps result key on the HPV module -> BoolState attribute name.

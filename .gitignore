@@ -9,7 +9,7 @@ _inv/
 api/
 .jupyter_cache/
 
-# Regression baselines (regenerate via tests/generate_v2_baselines.py)
+# Regression baselines (local-only artifacts)
 tests/regression_baselines/
 
 # Diagnostic outputs from regression instrumentation

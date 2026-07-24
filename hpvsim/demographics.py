@@ -54,7 +54,7 @@ class AgeMigration(ss.Demographics):
         super().__init__(dt=ss.year)
         self.update_pars(pars, **kwargs)
         self._pop_total = pop_total                 # [year, pop_size] DataFrame; sets _scale and the data-year window.
-        self._pop_by_age = pop_by_age               # [year, age, male, female] DataFrame; the per-step target pyramid.
+        self._pop_by_age = pop_by_age               # [year, age, male, female] DataFrame; source for _pop_by_year, released after init_pre builds it.
         # Sim agents per real-world person at sim.start (n_agents / pop_total
         # at start year). Used to scale target_counts each step so the pyramid
         # is matched in agent-space, not person-space.
@@ -94,41 +94,66 @@ class AgeMigration(ss.Demographics):
         sim_start_year = float(
             sim_start.year if hasattr(sim_start, 'year') else sim_start
         )
+        sim_stop = sim.pars.stop
+        sim_stop_year = float(
+            sim_stop.year if hasattr(sim_stop, 'year') else sim_stop
+        )
 
-        # Pull from country data if not explicitly supplied.
-        if self._pop_total is None or self._pop_by_age is None:
-            from .data.country import load_country
-            # hpv.Sim stores location on the sim; fall back to pars if a
-            # caller wired it there instead.
-            location = (
-                getattr(sim, 'location', None)
-                or getattr(sim.pars, 'location', None)
-            )
-            if location is None:
-                raise AttributeError(
-                    'AgeMigration could not find a location on the sim. '
-                    'Either pass pop_total/pop_by_age explicitly, or use '
-                    'hpv.Sim which stores sim.location.'
+        # Pull from country data if not explicitly supplied, then build a
+        # {year: {age, male, female}} lookup of compact numpy arrays so step()
+        # can do an O(1) lookup instead of an O(rows) mask + sort every year.
+        # Guarding on _pop_by_year makes this idempotent: a second init_pre
+        # finds the lookup already built and the raw table already released.
+        if self._pop_by_year is None:
+            if self._pop_total is None or self._pop_by_age is None:
+                from .data.country import load_country
+                # hpv.Sim stores location on the sim; fall back to pars if a
+                # caller wired it there instead.
+                location = (
+                    getattr(sim, 'location', None)
+                    or getattr(sim.pars, 'location', None)
                 )
-            cd = load_country(location, year=int(sim_start_year))
-            if self._pop_total is None:
-                self._pop_total = cd['pop_total']
-            if self._pop_by_age is None:
-                self._pop_by_age = cd['pop_by_age']
+                if location is None:
+                    raise AttributeError(
+                        'AgeMigration could not find a location on the sim. '
+                        'Either pass pop_total/pop_by_age explicitly, or use '
+                        'hpv.Sim which stores sim.location.'
+                    )
+                cd = load_country(location, year=int(sim_start_year))
+                if self._pop_total is None:
+                    self._pop_total = cd['pop_total']
+                if self._pop_by_age is None:
+                    self._pop_by_age = cd['pop_by_age']
 
-        # Scale factor: n_agents / data_population_at_sim_start.
+            # The raw table spans ~1950-2101; step() only looks up years within
+            # the sim window, so trim to [start, stop] (+/-1yr pad). Store each
+            # year as plain numpy arrays rather than a DataFrame: the DataFrame
+            # carried redundant per-row 'year' (== the key) and 'age' (== the
+            # index) columns and heavy pandas overhead, inflating the lookup
+            # ~5x over its numeric payload. Counts stay float64 so the target
+            # values step() rounds are bit-identical to the DataFrame path.
+            lo = int(np.floor(sim_start_year)) - 1
+            hi = int(np.ceil(sim_stop_year)) + 1
+            pba = self._pop_by_age
+            pba = pba[(pba['year'] >= lo) & (pba['year'] <= hi)]
+            self._pop_by_year = {}
+            for y, grp in pba.groupby('year'):
+                g = grp.sort_values('age')
+                self._pop_by_year[int(y)] = dict(
+                    age=g['age'].to_numpy(dtype=np.int32),
+                    male=g['male'].to_numpy(dtype=np.float64),
+                    female=g['female'].to_numpy(dtype=np.float64),
+                )
+            # Release the raw table: it is only needed to build the lookup above.
+            self._pop_by_age = None
+
+        # Scale factor: n_agents / data_population_at_sim_start. Recomputed
+        # each init_pre since n_agents / start may change.
         pt = self._pop_total
         data_pop_at_start = float(
             np.interp(sim_start_year, pt['year'].values, pt['pop_size'].values)
         )
         self._scale = float(sim.pars.n_agents) / data_pop_at_start
-
-        # Group pop_by_age once into a {year: DataFrame} dict so step() can
-        # do an O(1) lookup instead of an O(rows) mask + sort every year.
-        self._pop_by_year = {
-            int(y): grp.sort_values('age')
-            for y, grp in self._pop_by_age.groupby('year')
-        }
         return
 
     def init_results(self):
@@ -159,7 +184,7 @@ class AgeMigration(ss.Demographics):
         if pat_year is None:
             return
 
-        ages_data = pat_year['age'].values.astype(int)
+        ages_data = pat_year['age']
 
         people = sim.people
         # Snapshot alive UIDs at the start of the step, EXCLUDING fine
@@ -207,7 +232,7 @@ class AgeMigration(ss.Demographics):
             ('female',  female),
         ):
             sex_is_female = (sex_label == 'female')
-            target_counts = pat_year[sex_label].values * self._scale
+            target_counts = pat_year[sex_label] * self._scale
 
             for age, target in zip(ages_data, target_counts):
                 in_band = sex_mask & (ages == age)

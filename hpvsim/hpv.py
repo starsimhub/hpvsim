@@ -143,6 +143,28 @@ class HPV(ss.Infection):
         )
         self.update_pars(pars=pars, **kwargs)
         self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
+
+        # The directional transmission `beta` dict above was built from the
+        # genotype DEFAULTS. Recompute it from the resolved pars so a `rel_beta`
+        # override (via genotype_pars= / pars=) actually changes transmission;
+        # without this it is silently ignored (the dict keeps the default
+        # rel_beta). Skip if the caller supplied an explicit `beta` — then they
+        # own the dict. With no override the recompute is byte-identical to the
+        # value set in define_pars.
+        _beta_overridden = ('beta' in kwargs) or (pars is not None and 'beta' in pars)
+        if not _beta_overridden:
+            self.pars.beta = {
+                'sexualnetwork': [
+                    gpars.beta * self.pars.rel_beta * gpars.transf2m,
+                    gpars.beta * self.pars.rel_beta * gpars.transm2f,
+                ],
+            }
+
+        # Guard against unit-less duration distributions: a duration given
+        # without ss.years(...) is read in timesteps, not years, so at dt<1 the
+        # infectious period is ~1/dt too short and the epidemic silently
+        # collapses. Fail loudly rather than run wrong science.
+        self._validate_duration_units()
         # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
         # ti_infected. We add the natural-history states below.
         self.define_states(
@@ -227,6 +249,41 @@ class HPV(ss.Infection):
         self._extra_cancer_unif = ss.random()
         return
 
+    def _validate_duration_units(self):
+        """Raise if a duration par lost its time units.
+
+        Duration distributions must carry ``ss.years`` (an ``ss.dur``): starsim
+        converts duration TimePars to timesteps by dividing by ``dt``, so a
+        unit-less value (e.g. ``ss.lognorm_ex(mean=3, std=9)``) is treated as
+        timesteps and, at ``dt<1``, makes the infectious period ~``1/dt`` too
+        short — the epidemic silently collapses. Only the public module duration
+        pars are checked (the private ``_extra_dur_*`` dists are intentionally
+        unit-less for the grow multiscale path).
+        """
+        for key in ('dur_precin', 'dur_cin', 'dur_cancer', 'dur_inf_male'):
+            dist = self.pars.get(key, None)
+            if dist is None or isinstance(dist, ss.dur):
+                continue  # a bare ss.dur constant is fine
+            if isinstance(dist, ss.Dist):
+                vals = list(getattr(dist, 'pars', {}).values())
+                has_dur = any(isinstance(v, ss.dur) for v in vals)
+                has_plain = any(isinstance(v, (int, float)) and not isinstance(v, bool)
+                                for v in vals)
+                bad = has_plain and not has_dur
+            else:
+                # A plain scalar (not a Dist, not an ss.dur) is unit-less too.
+                bad = isinstance(dist, (int, float)) and not isinstance(dist, bool)
+            if bad:
+                raise ValueError(
+                    f"HPV genotype {self.genotype!r}: duration parameter {key!r} "
+                    f"was given without time units. A unit-less duration is read "
+                    f"in timesteps, not years, so at dt<1 the infectious period is "
+                    f"~1/dt too short and the epidemic silently collapses. Wrap the "
+                    f"magnitude in ss.years(...), e.g. "
+                    f"ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))."
+                )
+        return
+
     def init_post(self):
         # Ensure CrossImmunity has sampled rel_sev for the starting population
         # BEFORE super().init_post() runs init_prev seeding (which triggers
@@ -258,6 +315,15 @@ class HPV(ss.Infection):
     # scale-weighted (fine agents carry scale 1/ratio, not 1).
     _STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin',
                      'cancerous', 'latent')
+
+    def _hiv_connector(self):
+        """Locate the hpv_hiv_connector on the sim, if any (None when no HIV)."""
+        # Avoid circular import at module load (hiv.py imports HPV from this module).
+        from .hiv import hpv_hiv_connector
+        for c in self.sim.connectors.values():
+            if isinstance(c, hpv_hiv_connector):
+                return c
+        return None
 
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
@@ -419,6 +485,10 @@ class HPV(ss.Infection):
             rel_sev_uids = cross.rel_sev[uids]
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
+        # HIV co-infection scales progression severity (gated no-op when no HIV).
+        hivc = self._hiv_connector()
+        if hivc is not None:
+            rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
         sev_imm_uids = self.sev_imm[uids]
 
         # 1. Sample precin durations.
@@ -702,6 +772,18 @@ class HPV(ss.Infection):
                 nab_all  = p.imm_init.rvs(f_cleared)
                 cell_all = p.cell_imm_init.rvs(f_cleared)
 
+                # HIV co-infection reduces conferred immunity (gated no-op).
+                # Note: step_state runs before the connector's step(), so this
+                # reads hiv_rel_imm from the PREVIOUS timestep (a one-dt lag,
+                # immaterial since CD4 moves slowly). Contrast set_prognoses,
+                # which reads hiv_rel_sev fresh because step_infect runs after
+                # the connector.
+                hivc = self._hiv_connector()
+                if hivc is not None:
+                    imm_factor = hivc.hiv_rel_imm[f_cleared]
+                    nab_all = nab_all * imm_factor
+                    cell_all = cell_all * imm_factor
+
                 if len(first_uids):
                     self._sero_bern.set(p=float(p.sero_prob))
                     seroconvert = self._sero_bern.rvs(first_uids)
@@ -716,6 +798,9 @@ class HPV(ss.Infection):
                     self.nab_imm[first_uids]  = seroconvert * nab_all[first_mask]
                     self.cell_imm[first_uids] = cell_all[first_mask]
 
+                # For repeat clearances the running max may retain a higher value
+                # from a prior clearance; the HIV-reduced increment only fails to
+                # boost immunity, it never erases existing antibodies.
                 if len(repeat_uids):
                     self.nab_imm[repeat_uids] = np.maximum(
                         self.nab_imm[repeat_uids], nab_all[has_prior_imm])

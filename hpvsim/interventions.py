@@ -211,8 +211,49 @@ class BaseTest(ss.BaseTest):
 
 
 class BaseScreening(BaseTest, ss.BaseScreening):
-    """HPV-specific BaseScreening — composes HPV eligibility with Starsim's screening step."""
-    pass
+    """HPV-specific BaseScreening.
+
+    Mirrors ``ss.BaseScreening.step`` exactly, except it records ``n_dx``
+    through :meth:`_count_diagnosed` instead of hardcoding
+    ``self.outcomes['positive']``. Upstream assumes every screening product has
+    a ``'positive'`` outcome, which KeyErrors for products whose result
+    hierarchy uses other labels (cytology's ``ascus``/``abnormal``, or
+    ``hpv_type``'s ``positive_1618``/``positive_ohr``) when they are used as a
+    *primary* screen. Behaviour for ``via``/``hpv`` (which do define
+    ``'positive'``) is unchanged.
+    """
+
+    # Result labels that do not represent a positive diagnosis.
+    _NEGATIVE_OUTCOMES = ('negative', 'normal', 'inadequate')
+
+    def step(self):
+        sim = self.sim
+        accept_uids = ss.uids()
+        if sim.ti in self.timepoints:
+            accept_uids = self.deliver()
+            if len(accept_uids):
+                self.screened[accept_uids] = True
+                self.screens[accept_uids] += 1
+                self.ti_screened[accept_uids] = sim.ti
+                self.results['n_screened'][sim.ti] = len(accept_uids)
+                self.results['n_dx'][sim.ti] = self._count_diagnosed()
+        return accept_uids
+
+    def _count_diagnosed(self):
+        """Number diagnosed this step.
+
+        Uses the ``'positive'`` outcome when the product defines one; otherwise
+        counts every screened agent whose result was not negative/normal/
+        inadequate (deduplicated across genotype-specific positive labels).
+        """
+        outcomes = self.outcomes
+        if 'positive' in outcomes:
+            return len(outcomes['positive'])
+        dx = np.array([], dtype=int)
+        for key, uids in outcomes.items():
+            if key not in self._NEGATIVE_OUTCOMES:
+                dx = np.union1d(dx, np.asarray(uids))
+        return len(dx)
 
 
 class BaseTriage(BaseTest, ss.BaseTriage):

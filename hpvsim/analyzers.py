@@ -60,8 +60,9 @@ class AgeResults(ss.Analyzer):
     }
 
     # Result-name -> (event-time attr, in-state attr) on each HPV module.
-    # Incidence numerator = agents whose ti_<event> == sim.ti and in-state.
-    # Denominator = at-risk alive females (per 100k convention).
+    # Incidence numerator = new in-state events (ti_<event> == sim.ti), summed
+    # across every sub-step of the calendar year. Denominator = at-risk alive
+    # females at the year-end tick (per 100k convention).
     _INC_TO_ATTRS = {
         'cancer_incidence':  ('ti_cancerous', 'cancerous'),
         'cin_incidence':     ('ti_cin',       'cin'),
@@ -82,6 +83,10 @@ class AgeResults(ss.Analyzer):
         # Per-year per-result output storage; populated by step().
         # Layout: self.outputs[result_key][year] = np.ndarray of length nbins.
         self.outputs = sc.objdict()
+        # Per-incidence-result annual numerator accumulators, keyed
+        # [result_key][year]; summed across a calendar year's sub-steps by
+        # step(). Populated by init_pre.
+        self._inc_accum = {}
         # Populated by init_pre.
         self.hpv_modules = None
         return
@@ -103,8 +108,21 @@ class AgeResults(ss.Analyzer):
             rdict.bins = rdict.edges[:-1]
             rdict.age_labels = self._make_age_labels(rdict.edges)
             # Each requested year maps to the last sim tick within that
-            # calendar year, so annual flows are captured at year-end.
+            # calendar year, so the rate is finalized at year-end.
             rdict.year_to_ti = self._resolve_year_ticks(sim, rdict.years)
+            # For incidence, annual flows must be summed across every sub-step
+            # of the calendar year (at dt<1 a single tick is only one
+            # sub-step). Precompute each year's full tick set + a numerator
+            # accumulator.
+            if rkey in self._INC_TO_ATTRS:
+                tvy = sim.timevec.years
+                rdict.year_ticks = {
+                    float(y): set(np.where((tvy >= y) & (tvy < y + 1))[0].tolist())
+                    for y in rdict.years
+                }
+                self._inc_accum[rkey] = {
+                    float(y): np.zeros(len(rdict.bins)) for y in rdict.years
+                }
             # Per-year output arrays:
             #   - Type-distribution: (n_bins, n_genotypes) raw counts.
             #   - Prevalence: (n_bins, 2) — [:, 0] = num, [:, 1] = denom.
@@ -151,11 +169,26 @@ class AgeResults(ss.Analyzer):
         return rkey in cls._TYPE_DIST_TO_STATE
 
     def step(self):
-        """At each scheduled year, snapshot age-binned counts."""
+        """Accumulate annual incidence flows; snapshot stocks at year-end."""
         sim = self.sim
         ti = sim.ti
         for rkey, rdict in self.result_args.items():
-            # Is this tick the recorded snapshot tick for any of the years?
+            # Incidence: sum new events across every sub-step of the calendar
+            # year (so dt<1 captures the whole year, not just the last
+            # sub-step), then finalize the per-100k rate at the year-end tick.
+            if rkey in self._INC_TO_ATTRS:
+                date_attr, state_attr = self._INC_TO_ATTRS[rkey]
+                for year, ticks in rdict.year_ticks.items():
+                    if ti in ticks:
+                        self._inc_accum[rkey][year] += self._incidence_numerator(
+                            rdict, date_attr, state_attr)
+                        if ti == rdict.year_to_ti[year]:
+                            denom = self._incidence_denominator(rdict)
+                            self.outputs[rkey][year] = np.divide(
+                                self._inc_accum[rkey][year], denom,
+                                out=np.zeros(len(rdict.bins)), where=denom > 0) * 1e5
+                continue
+            # Stocks / prevalence / type-distribution: snapshot at year-end.
             year_match = [y for y, ti_y in rdict.year_to_ti.items() if ti_y == ti]
             if not year_match:
                 continue
@@ -166,10 +199,6 @@ class AgeResults(ss.Analyzer):
                     attr, female_only = self._PREV_TO_STATE[rkey]
                     self.outputs[rkey][year] = self._bin_prevalence(
                         rdict, attr=attr, female_only=female_only)
-                elif rkey in self._INC_TO_ATTRS:
-                    date_attr, state_attr = self._INC_TO_ATTRS[rkey]
-                    self.outputs[rkey][year] = self._bin_incidence(
-                        rdict, date_attr=date_attr, state_attr=state_attr)
                 elif rkey in self._TYPE_DIST_TO_STATE:
                     self.outputs[rkey][year] = self._bin_type_distribution(
                         rdict, attr=self._TYPE_DIST_TO_STATE[rkey])
@@ -217,28 +246,27 @@ class AgeResults(ss.Analyzer):
         out[:, 1] = self._histogram(ages, denom_mask, rdict.edges, weights)
         return out
 
-    def _bin_incidence(self, rdict, date_attr, state_attr):
-        """Age-bin new-events-this-year / at-risk-female-denominator (per 100k).
+    def _incidence_numerator(self, rdict, date_attr, state_attr):
+        """Age-binned new in-state events at the current sub-step (counts).
 
-        Numerator: agents whose ti_<event> equals sim.ti and who are in-state.
-        At dt=1 this captures one full year of events per snapshot. With
-        dt<1 only the final sub-step's events are captured; a multi-substep
-        accumulator is a separate enhancement.
+        Numerator for incidence: agents whose ti_<event> equals sim.ti and who
+        are in-state. step() sums this across every sub-step of a calendar year
+        so the annual flow is captured at any dt (not just the final sub-step).
         """
-        people, alive, ages, weights = self._pop_arrays()
-        female = people.female.values
+        _, alive, ages, weights = self._pop_arrays()
         new_event = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            new_event |= (getattr(mod, date_attr).values == self.sim.ti) & getattr(mod, state_attr).values
+        return self._histogram(ages, new_event & alive, rdict.edges, weights)
+
+    def _incidence_denominator(self, rdict):
+        """Age-binned at-risk denominator: alive females not already cancerous."""
+        people, alive, ages, weights = self._pop_arrays()
         cancerous_any = np.zeros_like(alive)
         for mod in self.hpv_modules:
-            ti_arr = getattr(mod, date_attr).values
-            state = getattr(mod, state_attr).values
-            new_event |= (ti_arr == self.sim.ti) & state
             cancerous_any |= mod.cancerous.values
-        at_risk = alive & female & ~cancerous_any
-        num = self._histogram(ages, new_event & alive, rdict.edges, weights)
-        denom = self._histogram(ages, at_risk, rdict.edges, weights)
-        return np.divide(num, denom, out=np.zeros_like(num, dtype=float),
-                         where=denom > 0) * 1e5
+        at_risk = alive & people.female.values & ~cancerous_any
+        return self._histogram(ages, at_risk, rdict.edges, weights)
 
     def _bin_type_distribution(self, rdict, attr):
         """Per-genotype age-binned raw counts; ``to_dataframe`` normalizes."""

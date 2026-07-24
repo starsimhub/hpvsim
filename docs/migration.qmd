@@ -1,0 +1,433 @@
+---
+title: "Migrating from HPVsim v2 to v3"
+---
+
+HPVsim v3 is rebuilt on [Starsim](https://docs.starsim.org). The disease
+model, sexual network, demographics, interventions, and analyzers are now
+Starsim modules, and `hpv.Sim` is a thin wrapper around `starsim.Sim`. The
+science is the same — the same natural-history model, genotypes, and
+interventions — but the way you set up and run a model has changed, so most v2
+scripts will need some edits before they run on v3.
+
+This guide walks through those changes one task at a time, with before-and-after
+code you can copy. It is written for people migrating their own scripts, and is
+also laid out so an AI coding assistant can work through it change by change.
+
+::: {.callout-important}
+v3 uses Starsim's random-number framework, which does **not** share a stream
+with v2. Results are therefore not bit-identical to v2 even with the same
+seed; equivalence is at the level of overlapping uncertainty intervals, not
+exact reproduction.
+:::
+
+## Installation
+
+```bash
+pip install hpvsim==3.0.0
+```
+
+v3 requires Python ≥ 3.10 and pulls in `starsim>=3.5`.
+
+## Constructing a Sim
+
+The single most common breaking change: **v2 passed a parameter dict as the
+first positional argument; v3's first positional argument is `location`.**
+
+**Before (v2):**
+
+```python
+# breaks in v3 (the dict would be interpreted as `location`)
+pars = dict(n_agents=10e3, genotypes=[16, 18, 'hr'], start=1980, end=2030)
+sim = hpv.Sim(pars)
+```
+
+**After (v3)** — pass parameters as keyword arguments:
+
+```python
+sim = hpv.Sim(n_agents=10_000, genotypes=[16, 18, 'hi5', 'ohr'],
+              start=1980, stop=2030)
+
+# or, if you keep your parameters in a dict, unpack it with **
+pars = dict(n_agents=10_000, genotypes=[16, 18, 'hi5', 'ohr'],
+            start=1980, stop=2030)
+sim = hpv.Sim(**pars)
+```
+
+Note the other changes in that example:
+
+| v2 | v3 | Notes |
+|---|---|---|
+| `end=2030` | `stop=2030` | The simulation end year is now `stop`. `end` still works as a deprecated alias (it sets `stop` and prints a warning), so old scripts keep running, but new code should use `stop`. |
+| `genotypes=[16, 18, 'hr']` | `genotypes=[16, 18, 'hi5', 'ohr']` | The pooled `'hr'` shorthand is gone. Valid names are `hpv16`, `hpv18`, `hi5`, `ohr` (integers `16`/`18` are accepted and normalized). |
+| `hpv.Sim(pars)` | `hpv.Sim(**pars)` | `pars` is no longer positional. |
+
+The `pars=` keyword still exists, but it only accepts **base Starsim sim
+parameters** (`n_agents`, `start`, `stop`, `dt`, `total_pop`, …). HPVsim-specific
+arguments — `genotypes`, `location`, `genotype_pars`, `init_seeding`,
+`ms_agent_ratio` — must be passed as their own keyword arguments, not inside
+`pars`.
+
+## Genotype parameters
+
+Per-genotype overrides move from nested parameter dicts to the `genotype_pars`
+argument, keyed by genotype name:
+
+```python
+sim = hpv.Sim(
+    genotypes=[16, 18],
+    genotype_pars={'hpv16': {'sero_prob': 0.8}},
+)
+```
+
+Three things about `genotype_pars` overrides bite hard when porting a
+calibration:
+
+**Durations must carry time units.** Duration parameters (`dur_precin`,
+`dur_cin`, `dur_cancer`, `dur_inf_male`) are `starsim` distributions whose
+parameters carry explicit time units (`ss.years`). v2 stored them as
+`{'dist': 'lognormal', 'par1': 3, 'par2': 9}`; the v3 equivalent is
+
+```python
+genotype_pars={'hpv16': {'dur_precin': ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))}}
+```
+
+If you pass a *unit-less* distribution — `ss.lognorm_ex(mean=3, std=9)` — the
+value is interpreted in timesteps rather than years, so at `dt=0.25` the
+infectious period is ~4× too short and **the epidemic silently collapses to
+near-zero prevalence with no error**. Always wrap duration means/stds in
+`ss.years(...)`.
+
+**`rel_beta` (and `transf2m`/`transm2f`) overrides do not take effect.** The
+per-genotype transmission `beta` is a *directional dict*, computed once at
+module construction:
+
+```python
+beta = {'sexualnetwork': [gpars.beta * gpars.rel_beta * gpars.transf2m,   # female→male
+                          gpars.beta * gpars.rel_beta * gpars.transm2f]}  # male→female
+```
+
+Overriding `rel_beta` via `genotype_pars` sets the stored `rel_beta` par but
+**does not recompute this dict**, so transmission is unchanged. To scale
+transmissibility, override the `beta` dict directly (or bake the factor into
+it). See "Known issues" below.
+
+**Shape functions replace whole, not merge.** `cin_fn` / `cancer_fn` are dicts
+carrying shape params (`form`, `k`, `x_infl`, `ttc`). A partial override drops
+the missing keys and raises `KeyError: 'form'` at run time — pass the complete
+dict.
+
+## Sexual network
+
+v2's sexual-behavior parameters — `layer_probs`, `m_partners`/`f_partners`,
+`debut`, `mixing`, and the cross-layer probabilities — were passed on the sim.
+In v3 they belong to the network module. Build it from a location's defaults
+(with overrides) and pass it via `networks=`:
+
+```python
+import hpvsim as hpv
+from hpvsim.data import country
+
+net = hpv.SexualNetwork(**country._network_pars('india', pars={...}))
+sim = hpv.Sim(location='india', genotypes=[16, 18], networks=[net])
+```
+
+Watch these differences:
+
+- **Participation rates are ANNUAL and must carry that convention.** In v3 the
+  network treats `layer_probs` *and* the cross-layer probabilities as annual and
+  converts them to per-timestep internally (`ss.prob(...).to_prob(dt)`, i.e.
+  `1-(1-p)^dt`). **This is the single biggest source of a silently-collapsing
+  epidemic when porting a v2.2.x calibration.** v2.2.x (before the dt-fix,
+  hpvsim issue #13 / commit `2091467f`) applied these rates *per timestep as-is*,
+  so at `dt=0.25` it formed ~4× more partnerships/year than the nominal value.
+  If your calibrated `layer_probs`/`cross_layer` values came from v2.2.x, they
+  are effectively *per-timestep* numbers — pass them through
+  `1-(1-p)^(1/dt)` to annualize before handing them to v3, or the network will
+  be ~`dt`× too sparse, drop below R=1, and HPV will die out with no error. (A
+  quick check: v3 results are **dt-invariant** by construction — if your ported
+  results shift when you change `dt`, you have an unconverted per-timestep rate.)
+- **Behavior/degree metrics move to the edge table.** The per-agent partner
+  arrays (`people.n_rships`, `people.current_partners`, `people.contacts`) are
+  gone. Reconstruct from `net`:
+  - *Age at first sex* → `net.debut` (an agent is sexually active where
+    `people.age >= net.debut`; there is no `n_rships > 0` flag).
+  - *"In a partnership of layer L now"* → membership in
+    `net.edges_for_layer(L)` endpoints (`p1` female, `p2` male).
+  - *Lifetime/cumulative partner counts* → edges dissolve every step, so there
+    is no running counter; **accumulate with an analyzer** that records new
+    formations each step (`edges_for_layer('c')` where `edges.start_ti ==
+    sim.ti`). This is the standard degree-extraction pattern.
+  - Exclude multiscale stand-ins (`people.fine`) from behavior denominators —
+    the v2 `level0` filter maps to `~people.fine`.
+- **`sim.shrink()` deletes the edge table.** If you need post-run partner/edge
+  extraction, run with `do_shrink=False` (note: `sim.run()` does not auto-shrink).
+- **NaN debut ages behave differently.** v2 sampled a NaN debut distribution as
+  0 (agent always active); v3 samples NaN (agent never active). Missing debut
+  data therefore silently removes those agents from transmission in v3 — map it
+  to ~0 explicitly if that was the v2 intent.
+
+## Seeding
+
+v3 defaults to `init_seeding='exclusive'`: at initialization each infected
+agent carries exactly one genotype (matching v2's no-co-infection-at-init
+behavior). Pass `init_seeding='independent'` to let each genotype's `init_prev`
+seed independently.
+
+## Results
+
+Results are now organized by module (Starsim style) rather than as one flat
+dictionary. Per-genotype results live under the genotype's key, and an
+aggregate `hpv` view sums across genotypes:
+
+**Before (v2):**
+
+```python
+sim.results['infections']
+sim.results['cancers']
+```
+
+**After (v3):**
+
+```python
+# per genotype
+sim.results.hpv16.cum_infections
+sim.results.hpv16.new_cancers
+
+# aggregate across all genotypes
+sim.results.all_hpv.cum_infections
+```
+
+Plotting is unchanged in spirit:
+
+```python
+sim.plot()
+```
+
+There is no longer a `sim.short_summary` attribute. A few other renames:
+`sim.initialize()` → `sim.init()`; `sim.yearvec[sim.t]` → `sim.t.now('year')`;
+`datafile=` is not a `hpv.Sim` argument (calibration targets go to
+`hpv.Calibration`).
+
+## Saving and loading
+
+The top-level `hpv.save` / `hpv.load` convenience functions are gone. Use the
+sim's own `save` method and Starsim's `load`:
+
+**Before (v2):**
+
+```python
+hpv.save('mysim.sim', sim)
+sim = hpv.load('mysim.sim')
+```
+
+**After (v3):**
+
+```python
+sim.save('mysim.sim')
+import starsim as ss
+sim = ss.load('mysim.sim')
+```
+
+`sim.save()` shrinks the sim (freeing RNG and back-references) before writing;
+the saved sim reloads ready to inspect. `sciris` also round-trips a sim
+directly (`sc.save` / `sc.load`).
+
+## Running many sims
+
+There is no `hpv.MultiSim`; use Starsim's `MultiSim` with an `hpv.Sim`:
+
+```python
+import starsim as ss
+msim = ss.MultiSim(hpv.Sim(genotypes=[16, 18]), n_runs=10).run()
+msim.median()
+```
+
+## Interventions and analyzers
+
+Interventions and analyzers are passed to the sim as before, via the
+`interventions=` and `analyzers=` arguments, but they are now Starsim modules.
+Vaccination, screening, and test-and-treat cascades are configured through
+HPVsim's intervention classes; age-stratified results use `hpv.AgeResults`, and
+the aggregate `hpv.HPVTotal` analyzer is added automatically. See the
+[interventions](tutorials/tut_interventions.qmd) and
+[analyzers](tutorials/tut_analyzers.qmd) tutorials for the full v3 API. The
+practical changes that break most v2 cascade code:
+
+- **Look-ups by name, not label.** `sim.interventions` and `sim.analyzers` are
+  keyed by each module's `name` (which defaults to the class name), not by
+  `label`. Give an explicit `name=` to anything you cross-reference. There is
+  **no `sim.get_intervention()` / `sim.get_analyzer()`** — use
+  `sim.interventions[name]` / `sim.analyzers[name]`. Iterating the collection
+  yields *keys*, not modules (`for a in sim.analyzers` → strings), so an
+  `isinstance` filter over it is silently always-false; index by name instead.
+- **`hpv.Sim` deep-copies interventions/analyzers at construction.** The objects
+  you pass in are never populated by the run — always read results back from
+  `sim.interventions[name]` / `sim.analyzers[name]` *after* `sim.run()`, not from
+  the references you constructed. (A common cause of "my analyzer collected
+  nothing.")
+- **Products are modules and need unique names.** Diagnostics, treatments,
+  vaccines (`hpv.dx`, `hpv.tx`, `hpv.vx`) are all People modules. Two products
+  sharing a name — or a treatment whose `name` equals its `product` name —
+  raise `Module <x> already added`. Use distinct names (e.g. `product='ablation'`
+  with `name='ablation_rx'`). A `df`-built `hpv.dx`/`hpv.tx` starts with
+  `name=None` and must be named before the run; its `hierarchy` is
+  most-severe-first.
+- **Renamed constructors:** `hpv.default_dx`/`default_tx`/`default_vx` →
+  `hpv.dx`/`hpv.tx`/`hpv.vx`. Vaccine efficacy that v2 set via the product's
+  `imm_init` is now `hpv.vx(sterilizing_p=...)`. A v2 *therapeutic* vaccine with
+  per-state efficacy maps to a state-flipping `hpv.tx(df=...)`, not the
+  immunity-based `hpv.txvx`.
+- **`campaign_*` signatures:** they no longer accept `annual_prob`, and
+  `campaign_vx`'s default `sex` changed from female-only (v2) to both — pass
+  `sex='f'` to reproduce v2. Eligibility callbacks must return `ss.uids` or a
+  `BoolArr`, not a Python `list`.
+- **Screening/eligibility state** moved off `people`: `sim.people.date_screened`
+  is gone; read the screening module's `screened` (BoolArr) and `ti_screened`
+  (integer timestep, NaN = never) to rebuild "never, or >N years since screened".
+- **Custom analyzers:** subclass `ss.Analyzer` (was `hpv.Analyzer`); the hooks
+  are `init_pre(sim)` and `step()` (were `initialize`/`apply`). `ss.Module`
+  **reserves the attribute names** `results`, `pars`, `t`, `sim`, `dists` — store
+  your own collected data under a different name. For age-at-event and dwell-time
+  work, prefer the built-in `hpv.age_causal_infection` analyzer, which is already
+  scale-weighted and multiscale-invariant, over a hand-rolled per-agent tracker.
+
+## HIV–HPV co-infection
+
+HIV–HPV co-infection is available via a transmission-based HIV module (built on
+STIsim). Adding an `hpv.HIV` disease auto-wires the `hpv_hiv_connector` (which
+raises HPV susceptibility/severity for HIV-positive agents by CD4 stratum) and
+an `HIVStratifiedResults` analyzer:
+
+```python
+sim = hpv.Sim(
+    location='rwanda',
+    genotypes=[16, 18, 'hi5', 'ohr'],
+    diseases=[hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)],
+    interventions=[hpv.hiv_incidence_import.from_location('rwanda'),  # v2-faithful
+                   hpv.hiv_art.from_location('rwanda')],              # coverage shortcut
+)
+```
+
+Notes:
+
+- Set the HIV epidemic by transmission (`beta_m2f`) or, matching v2, by imposing
+  an observed incidence curve with `hpv.hiv_incidence_import` (transmission off).
+- ART is a data-driven coverage shortcut (`hpv.hiv_art`), not STIsim's
+  test→treat cascade.
+- HIV-stratified cancer/prevalence live on `HIVStratifiedResults`
+  (`cancers_with_hiv`, `cancers_no_hiv`, …). The HIV module's own `prevalence`
+  result is **all-ages** and understates the adult (15–49) figure by ~2×;
+  restrict to adults when validating against a national prevalence target.
+- HIV results run on the HIV module's own (finer) time axis — index via
+  `sim.diseases.hiv.results.timevec`, not `sim.results.timevec`.
+
+## Behavioral differences to expect
+
+- **RNG / seeds.** Different framework, different stream — see the note at the
+  top. Compare on intervals, not exact values.
+- **Multiscale cancer.** With `ms_agent_ratio > 1`, v3 grows real fine agents
+  and tracks an *unbiased* cancer level. v2.3's default (`ms_agent_ratio=10`)
+  deflated cancer incidence; v3 corrects this, so absolute cancer counts can
+  differ from an old v2.3 run.
+- **Demographics.** Age-specific migration pins the age pyramid to the target
+  population trajectory each year; small immigration/emigration flows appear in
+  `results.agemigration` that v2 did not report separately.
+- **Population scaling.** v2 auto-scaled `n_agents` up to the location's
+  national population. v3's `total_pop` defaults to `n_agents` (population scale
+  factor 1), so absolute counts (cancers, deaths) are in simulated-agent units
+  unless you pass `total_pop`. Note `people.scale` is only the *multiscale*
+  weight (`1/ms_agent_ratio` for spawned fine agents) — it is distinct from the
+  population scale factor. Built-in `sim.results.*` already apply both; a custom
+  probe that sums over agents must weight by `people.scale` (never a raw
+  `.sum()` at `ms_agent_ratio > 1`) and, for absolute counts, by the population
+  scale factor.
+- **Measuring prevalence under multiscale — mind the metric.** Two obvious
+  choices are both wrong in different setups. `hpv.n_infected / n_alive`
+  is **ms-dependent**: the numerator is scale-weighted but the top-level
+  `n_alive` result is a *plain* agent count, so spawned fine agents pad the
+  denominator (e.g. one country read 0.107 at `ms=3` but 0.049 at `ms=100`).
+  And `hpv.prevalence` is **`total_pop`-scaled** — a proper 0–1 fraction
+  only when `total_pop = n_agents`; if you set `total_pop` to a national
+  population it comes back ≫ 1. The robust, ms- and `total_pop`-invariant
+  prevalence is the **non-fine (level0) infected fraction**: infected-and-alive
+  agents with `~people.fine`, over alive `~people.fine` agents.
+- **Annual / age-standardized incidence.** `hpv.AgeResults` accumulates
+  `cancer_incidence` / `cin_incidence` across the sub-steps of each calendar
+  year (v2 reports annually). A sim ending `stop=YYYY` leaves the final year
+  with a single `dt`-tick, so its last-year incidence is under-counted ~`1/dt`.
+  When comparing annual or age-standardized rates against v2, run `stop=YYYY+1`
+  and use fully-covered calendar years.
+
+## Recalibrating a ported v2 calibration
+
+A v2 calibration will **not** reproduce its outputs by re-running on v3 — expect
+to recalibrate, not just port parameters. Two changes break the transfer (both
+detailed above): multiscale cancer is now unbiased, so a v2.3 fit (default
+`ms_agent_ratio=10`, which deflated cancer) tends to **over-predict** cancer on
+v3; and partnership formation is now dt-correct (the v2.2.x→v2.3 dt-fix removed a
+~`1/dt` inflation), so a v2.2.x network tends to **under-predict** transmission —
+a sparse, marital-dominated one can fall below R=1 and collapse.
+
+Choosing the lever:
+
+- **Cancer level → `transform_prob`** (the CIN→cancer transition in `cancer_fn`),
+  which is roughly *linear* in ASR. `beta` is a poor lever here: prevalence
+  saturates, so ASR is nearly insensitive to it — a flat `beta` sweep means
+  you're on the wrong knob.
+- **Prevalence / transmission → the network** (participation + concurrency).
+  `beta` cannot rescue a network already below R=1. A collapsing epidemic
+  (prevalence → 0) is almost always the network: first annualize
+  `layer_probs`/`cross_layer` (see "Sexual network"), then raise casual
+  formation.
+- **The right casual lever depends on the *age* of casual partnerships** —
+  restoring formation only helps if the partnerships land at HPV-transmitting
+  prime ages (~15–40). If casual `layer_probs` peak at prime ages, raise
+  concurrency (`cross_layer`); if they're concentrated at older ages (a common
+  calibration artifact), concurrency just adds non-transmitting old-age
+  partnerships — raise prime-age `layer_probs['c']` (15–40 bins) directly.
+  Diagnose from the median age of casual edges.
+- **Compare against a matching-convention baseline** — patched v2.3.1 for
+  cancer-level, original v2.2.x for whether a network target is recoverable (the
+  multiscale-CIN-regate patch is cancer-side only). And v3 is never bit-identical
+  to v2 (different RNG) — compare on intervals/trends, never exact values.
+
+**Calibration API.** v3 uses Starsim's `ss.Calibration` (via `hpv.Calibration`):
+`calib_pars` are `{name: {low, high, guess, suggest_type}}` specs (the `build_fn`
+receives each as `{'value': …}`); targets go through `data=` (per-key t-indexed
+frames, `AgeResults` keys only, type-distribution keys compare *raw counts*) or a
+custom `eval_fn`. Results live in `calib.df` / `calib.best_pars`. The v2
+`analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim
+storage are gone — re-run selected parameter sets to draw uncertainty bands.
+
+## Known issues and tips
+
+- **Scaling transmissibility.** Because the per-genotype `beta` dict is built at
+  construction (see "Genotype parameters"), a `rel_beta` override does not change
+  transmission. Override the `beta` dict directly, e.g.
+  `genotype_pars={'hpv16': {'beta': {'sexualnetwork': [b_f2m, b_m2f]}}}`, or set
+  it after building and before running.
+- **Guard multi-worker calibration/parallel with `if __name__ == '__main__':`
+  (Windows).** `hpv.Calibration(...).calibrate()` with `n_workers > 1` (and any
+  `ss.MultiSim` / `sc.parallelize`) uses process *spawn* on Windows, so each
+  worker re-imports your driver module. Without the `__main__` guard the workers
+  re-launch the calibration recursively, spawning ever more processes until the
+  CPU is saturated. Also budget ~a two-minute numba warmup per fresh worker
+  process.
+- **Windows console encoding.** HPVsim prints a `⚙` glyph on startup that can
+  crash redirected stdout under the default `cp1252` codepage. Set
+  `PYTHONIOENCODING=utf-8` when piping output to a file.
+- A harmless `RuntimeWarning: divide by zero encountered in log` is emitted when
+  a network probability entry equals exactly `1.0`; it does not affect results.
+
+## Not ported to v3.0
+
+These v2 features are intentionally not in the v3.0 release:
+
+- **Waning immunity** — never used in published analyses. One consequence to
+  expect: v3's clearance-conferred immunity is partial and non-waning, so HPV
+  prevalence *rises* with age rather than plateauing/declining. A v2 calibration
+  targeting a flat/declining prevalence-by-age profile may not be reproducible on
+  v3 by parameter tuning alone (confirmed: `sero_prob`/`imm_init` shift the level
+  but not the rising age-shape).
+- **`EventSchedule`** — rarely used.
+- **Custom `settings.py`** — superseded by `ss.options`.

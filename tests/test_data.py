@@ -9,7 +9,7 @@ def test_load_country_returns_expected_keys():
     out = hpvsim.data.load_country('nigeria')
     expected = {
         'age_data', 'birth_rate', 'death_rate', 'network_pars',
-        'pop_total', 'pop_by_age',  # added in M02 for AgeMigration
+        'pop_total', 'pop_by_age',  # added for AgeMigration
     }
     assert set(out.keys()) == expected, f'unexpected keys: {set(out.keys())}'
 
@@ -52,7 +52,7 @@ def test_death_rate_shape():
 
 
 def test_network_pars_shape():
-    """network_pars carries layer_pars for v2 layers (m, c) plus shared debut."""
+    """network_pars carries layer_pars for the two layers (m, c) plus shared debut."""
     out = hpvsim.data.load_country('nigeria')
     np_pars = out['network_pars']
     assert set(np_pars.keys()) == {'layer_pars', 'debut'}, \
@@ -67,7 +67,7 @@ def test_network_pars_shape():
 
 
 def test_unknown_location_raises():
-    """Unknown location raises ValueError listing supported locations."""
+    """Unknown location raises ValueError with a suggestion-based message."""
     import pytest
-    with pytest.raises(ValueError, match='nigeria'):
+    with pytest.raises(ValueError, match='not recognized'):
         hpvsim.data.load_country('atlantis')

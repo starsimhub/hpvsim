@@ -36,8 +36,7 @@ def test_cancer_incidence_flat_across_ratio():
 def _intervention_factory():
     """Construct a fresh HPV screen -> colposcopy triage -> excision treatment cascade.
 
-    Copied verbatim from tests/regression/anchor_screen_treat.py (_build_interventions),
-    which is the M06 canonical screen+treat construction verified for parity with v2.
+    The canonical screen+treat construction.
     Coverage: routine_screening prob=0.7 (30-50 yo females), triage prob=0.9,
     treatment prob=0.8. Interventions start 2000 and run to sim stop, giving
     ~30+ years of program activity over the 1970-2040 horizon.

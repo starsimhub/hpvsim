@@ -23,20 +23,26 @@ import sciris as sc
 import starsim as ss
 import hpvsim as hpv
 
-from tests.regression.anchor_vx_routine import PARS as VX_PARS
-
 
 COVERAGES = [0.0, 0.3, 0.6, 0.9]
 N_SEEDS = 20
+
+# Nigeria 4-genotype base scenario for the sweep.
+VX_PARS = sc.objdict(
+    location='nigeria',
+    start=1990, stop=2060,
+    n_agents=20_000,
+    genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
+    # Integer cohort ages (birth + migration + initial pop) on an annual
+    # demographic cadence — keeps per-cohort vaccination clean.
+    v2_compat_demographics=True,
+)
 
 
 def make_sim(seed, coverage):
     """Build one sim for the (seed, coverage) point.
 
-    Mirrors M05's anchor PARS but builds a fresh hpv.routine_vx with the
-    swept coverage. The M05 PARS field `intervention` (a serializable
-    config dict) is NOT forwarded as a kwarg — we build the intervention
-    explicitly here.
+    Builds a fresh hpv.routine_vx with the swept coverage.
 
     Sim deep-copies inputs at __init__, so post-run inspection must go
     through sim.interventions, not the local reference.
@@ -92,7 +98,7 @@ def _plot_coverage_sweep(by_cov, out_png):
         # are flattened to top-level keys after .median().
         # Try a few candidate result keys to be robust to API drift.
         candidates = [
-            'hpvtotal_cum_cancers',
+            'all_hpv_cum_cancers',
             'hpv16_cum_cancers',
         ]
         result_key = next(

@@ -1,5 +1,7 @@
 """Integration tests for hpvsim.sim.Sim."""
 
+import warnings
+
 from hpvsim.sim import Sim
 from hpvsim.hpv import HPV
 from hpvsim.network import SexualNetwork
@@ -57,3 +59,22 @@ def test_sim_pop_scale_default_one_when_total_pop_none():
     sim = hpv.Sim(n_agents=1000, start=1990, stop=1991, dt=1.0, rand_seed=0)
     sim.init()
     assert sim.pars.pop_scale == 1.0
+
+
+def test_end_is_legacy_alias_for_stop():
+    """v2 scripts pass ``end=``; it should set ``stop`` and warn."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        sim_end = Sim(n_agents=200, start=2000, end=2005, dt=1.0)
+    sim_stop = Sim(n_agents=200, start=2000, stop=2005, dt=1.0)
+    assert sim_end.pars.stop == sim_stop.pars.stop
+    assert any('deprecated alias' in str(w.message) for w in caught), \
+        'passing end= should emit a deprecation warning'
+
+
+def test_stop_without_end_does_not_warn():
+    """Using the canonical ``stop=`` must not emit the legacy-alias warning."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        Sim(n_agents=200, start=2000, stop=2005, dt=1.0)
+    assert not any('deprecated alias' in str(w.message) for w in caught)

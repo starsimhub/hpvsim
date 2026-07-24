@@ -202,57 +202,27 @@ def test_age_results_type_distribution_per_genotype_sums_match_total():
 
 
 @pytest.mark.slow
-def test_age_results_v2_parity_cancers():
-    """v3 AgeResults vs v2 age_results: per-bin cancer counts agree within +/- 30%.
+def test_cancer_incidence_accumulates_over_full_year_at_subannual_dt():
+    """Incidence sums new events across all sub-steps of a calendar year.
 
-    Note: v2 and v3 do NOT share an RNG stream (different framework). The
-    parity gate is that the two implementations bin the same simulated
-    population the same way; we match the simulation closely enough that
-    the per-bin counts agree within calibration tolerance. Sim configs are
-    matched on n_agents, location, start/stop, dt, and rand_seed.
+    Regression guard for the dt<1 undercount: at dt=0.25 a fully-covered year
+    (2019, 4 sub-steps) must report ~4x the incidence of the terminal year
+    (2020, only its first tick, since the sim stops at 2020). The old code
+    captured a single sub-step per year, giving a ratio near 1. Comparing two
+    years within one run isolates the accumulation from dt-dependent dynamics.
     """
     edges = np.array([0., 30., 50., 70., 100.])
-    seed = 0
-    n_agents = 2000
-
-    # ----- v3 run -----
-    sim_v3 = hpv.Sim(n_agents=n_agents, start=1990, stop=2021, dt=1.0,
-                     rand_seed=seed, analyzers=[hpv.AgeResults(
-                         result_args=sc.objdict(
-                             cancers=sc.objdict(years=[2020], edges=edges),
-                         ),
-                     )])
-    sim_v3.run()
-    ar_v3 = sim_v3.analyzers['ageresults']
-    v3_counts = ar_v3.outputs['cancers'][2020.0]
-
-    # ----- v2 run -----
-    # Allowed: tests may import from _v2_legacy/ as regression anchors.
-    from hpvsim._v2_legacy import sim as v2_sim_mod
-    from hpvsim._v2_legacy import analysis as v2_analysis
-
-    v2_ar = v2_analysis.age_results(
-        result_args=sc.objdict(
-            cancers=sc.objdict(years=[2020], edges=edges),
-        ),
-    )
-    sim_v2 = v2_sim_mod.Sim(n_agents=n_agents, start=1990, end=2020,
-                            dt=1.0, rand_seed=seed,
-                            analyzers=[v2_ar])
-    sim_v2.run()
-    # v2 Sim also deep-copies analyzers; retrieve the live instance.
-    live_v2_ar = sim_v2['analyzers'][0]
-    v2_counts = live_v2_ar.results['cancers'][2020]
-
-    # Compare per-bin counts. Allow per-bin abs(rel error) <= 0.30 with a
-    # floor of 5 agents (small bins are noisy at n_agents=2000).
-    tol = 0.30
-    floor = 5.0
-    for i in range(len(edges) - 1):
-        a, b = float(v3_counts[i]), float(v2_counts[i])
-        denom = max(abs(b), floor)
-        rel = abs(a - b) / denom
-        assert rel <= tol, (
-            f'AgeResults v2 parity failure in bin '
-            f'{edges[i]}-{edges[i+1]}: v3={a}, v2={b}, rel={rel:.3f}'
-        )
+    az = hpv.AgeResults(result_args=sc.objdict(
+        cancer_incidence=sc.objdict(years=[2019, 2020], edges=edges)))
+    sim = hpv.Sim(n_agents=5000, location='nigeria', genotypes=[16, 18],
+                  start=1985, stop=2020, dt=0.25, ms_agent_ratio=50,
+                  rand_seed=0, analyzers=[az], verbose=0)
+    sim.run()
+    ar = sim.analyzers['ageresults']
+    full_year = float(np.sum(ar.outputs['cancer_incidence'][2019.0]))
+    terminal = float(np.sum(ar.outputs['cancer_incidence'][2020.0]))
+    assert terminal > 0, 'expected some cancers at the terminal tick'
+    assert full_year > 2.5 * terminal, (
+        f'full-year 2019 incidence ({full_year:.1f}) should be ~4x the single-tick '
+        f'terminal 2020 ({terminal:.1f}); got ratio {full_year / terminal:.2f} '
+        f'(a ratio near 1 means the annual accumulation regressed)')
