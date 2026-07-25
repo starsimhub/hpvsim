@@ -1,0 +1,725 @@
+"""HPVsim analyzers built on starsim's ss.Analyzer."""
+import numpy as np
+import pandas as pd
+import sciris as sc
+import starsim as ss
+
+
+__all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection',
+           'dalys', 'results_by_genotype']
+
+
+class AgeResults(ss.Analyzer):
+    """Snapshot age-binned simulation outputs at specified years.
+
+    Records counts (e.g. ``cancers``), prevalences (e.g. ``hpv_prevalence``),
+    incidences (e.g. ``cancer_incidence``), and per-genotype distributions
+    (e.g. ``cancerous_genotype_dist``) at each requested year. Observed
+    data and likelihood evaluation live on the ``CalibComponent`` side;
+    this class only produces simulation outputs.
+
+    Args:
+        result_args (dict): nested dict / objdict where each top-level key
+            is a result name (e.g. ``'cancers'``, ``'hpv_prevalence'``,
+            ``'cancerous_genotype_dist'``) and the value is a dict with at
+            minimum ``years`` (scalar or list) and ``edges`` (array of age
+            bin edges).
+        die (bool): whether to raise on configuration / validation errors.
+
+    Example::
+
+        import numpy as np, sciris as sc, hpvsim as hpv
+        ar = hpv.AgeResults(result_args=sc.objdict(
+            cancers=sc.objdict(years=[2015, 2020],
+                               edges=np.arange(0, 101, 5)),
+        ))
+        sim = hpv.Sim(analyzers=[ar])
+        sim.run()
+        df = ar.to_dataframe(key='cancers')   # t-indexed, age-bin columns
+    """
+
+    # Result-name -> per-HPV-module BoolState attribute. Union across modules
+    # ("any genotype with this state").
+    _COUNT_TO_STATE = {
+        'cancers':       'cancerous',
+        'n_cancerous':   'cancerous',
+        'n_cin':         'cin',
+        'n_precin':      'precin',
+        'n_infected':    'infected',
+        'hpv':           'infected',
+    }
+
+    # Result-name -> (BoolState attr, female_only). Prevalence is num/denom
+    # where denom is alive (female-only for sex-specific conditions like CIN
+    # and cancer; whole population for HPV infection prevalence).
+    _PREV_TO_STATE = {
+        'hpv_prevalence':       ('infected',  False),
+        'cin_prevalence':       ('cin',       True),
+        'cancer_prevalence':    ('cancerous', True),
+        'precin_prevalence':    ('precin',    True),
+    }
+
+    # Result-name -> (event-time attr, in-state attr) on each HPV module.
+    # Incidence numerator = new in-state events (ti_<event> == sim.ti), summed
+    # across every sub-step of the calendar year. Denominator = at-risk alive
+    # females at the year-end tick (per 100k convention).
+    _INC_TO_ATTRS = {
+        'cancer_incidence':  ('ti_cancerous', 'cancerous'),
+        'cin_incidence':     ('ti_cin',       'cin'),
+    }
+
+    # Result-name -> per-HPV-module BoolState attribute used as numerator.
+    _TYPE_DIST_TO_STATE = {
+        'cancerous_genotype_dist':  'cancerous',
+        'cin_genotype_dist':        'cin',
+    }
+
+    def __init__(self, result_args=None, die=False, **kwargs):
+        super().__init__(**kwargs)
+        if result_args is None:
+            raise ValueError('AgeResults: result_args is required')
+        self.result_args = sc.objdict(result_args)
+        self.die = die
+        # Per-year per-result output storage; populated by step().
+        # Layout: self.outputs[result_key][year] = np.ndarray of length nbins.
+        self.outputs = sc.objdict()
+        # Per-incidence-result annual numerator accumulators, keyed
+        # [result_key][year]; summed across a calendar year's sub-steps by
+        # step(). Populated by init_pre.
+        self._inc_accum = {}
+        # Populated by init_pre.
+        self.hpv_modules = None
+        return
+
+    def init_pre(self, sim):
+        """Discover HPV modules, validate inputs, and allocate output arrays.
+
+        Sets ``self.hpv_modules`` before ``super().init_pre`` so any setup
+        that depends on the module list (e.g. ``init_results``) sees it.
+        """
+        from .hpv import HPV
+        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        super().init_pre(sim)
+        for rkey, rdict in self.result_args.items():
+            rdict.years = np.atleast_1d(rdict.years).astype(float)
+            if 'edges' not in rdict or rdict.edges is None:
+                raise ValueError(f'AgeResults: result_args[{rkey!r}] missing edges')
+            rdict.edges = np.asarray(rdict.edges, dtype=float)
+            rdict.bins = rdict.edges[:-1]
+            rdict.age_labels = self._make_age_labels(rdict.edges)
+            # Each requested year maps to the last sim tick within that
+            # calendar year, so the rate is finalized at year-end.
+            rdict.year_to_ti = self._resolve_year_ticks(sim, rdict.years)
+            # For incidence, annual flows must be summed across every sub-step
+            # of the calendar year (at dt<1 a single tick is only one
+            # sub-step). Precompute each year's full tick set + a numerator
+            # accumulator.
+            if rkey in self._INC_TO_ATTRS:
+                tvy = sim.timevec.years
+                rdict.year_ticks = {
+                    float(y): set(np.where((tvy >= y) & (tvy < y + 1))[0].tolist())
+                    for y in rdict.years
+                }
+                self._inc_accum[rkey] = {
+                    float(y): np.zeros(len(rdict.bins)) for y in rdict.years
+                }
+            # Per-year output arrays:
+            #   - Type-distribution: (n_bins, n_genotypes) raw counts.
+            #   - Prevalence: (n_bins, 2) — [:, 0] = num, [:, 1] = denom.
+            #     Storing both lets BetaBinomial components pull (x, n)
+            #     per bin without recomputing.
+            #   - Everything else: (n_bins,).
+            nbins = len(rdict.bins)
+            ng = len(self.hpv_modules)
+            if self._is_type_dist(rkey):
+                shape = (nbins, ng)
+            elif rkey in self._PREV_TO_STATE:
+                shape = (nbins, 2)
+            else:
+                shape = (nbins,)
+            self.outputs[rkey] = {float(y): np.zeros(shape) for y in rdict.years}
+        return
+
+    @staticmethod
+    def _make_age_labels(edges):
+        labels = [f'{int(edges[i])}-{int(edges[i+1])}' for i in range(len(edges) - 2)]
+        labels.append(f'{int(edges[-2])}+')
+        return labels
+
+    @staticmethod
+    def _resolve_year_ticks(sim, years):
+        """Map calendar years -> timeline tick indices.
+
+        Picks the last tick whose date falls within each calendar year, so
+        annual flows accumulated through the year are captured.
+        """
+        tv_years = sim.timevec.years
+        out = {}
+        for y in years:
+            mask = (tv_years >= y) & (tv_years < y + 1)
+            ticks = np.where(mask)[0]
+            if len(ticks) == 0:
+                raise ValueError(f'AgeResults: year {y} not in sim timevec '
+                                 f'({tv_years[0]} to {tv_years[-1]})')
+            out[float(y)] = int(ticks[-1])
+        return out
+
+    @classmethod
+    def _is_type_dist(cls, rkey):
+        return rkey in cls._TYPE_DIST_TO_STATE
+
+    def step(self):
+        """Accumulate annual incidence flows; snapshot stocks at year-end."""
+        sim = self.sim
+        ti = sim.ti
+        for rkey, rdict in self.result_args.items():
+            # Incidence: sum new events across every sub-step of the calendar
+            # year (so dt<1 captures the whole year, not just the last
+            # sub-step), then finalize the per-100k rate at the year-end tick.
+            if rkey in self._INC_TO_ATTRS:
+                date_attr, state_attr = self._INC_TO_ATTRS[rkey]
+                for year, ticks in rdict.year_ticks.items():
+                    if ti in ticks:
+                        self._inc_accum[rkey][year] += self._incidence_numerator(
+                            rdict, date_attr, state_attr)
+                        if ti == rdict.year_to_ti[year]:
+                            denom = self._incidence_denominator(rdict)
+                            self.outputs[rkey][year] = np.divide(
+                                self._inc_accum[rkey][year], denom,
+                                out=np.zeros(len(rdict.bins)), where=denom > 0) * 1e5
+                continue
+            # Stocks / prevalence / type-distribution: snapshot at year-end.
+            year_match = [y for y, ti_y in rdict.year_to_ti.items() if ti_y == ti]
+            if not year_match:
+                continue
+            for year in year_match:
+                if rkey in self._COUNT_TO_STATE:
+                    self.outputs[rkey][year] = self._bin_count(rdict, attr=self._COUNT_TO_STATE[rkey])
+                elif rkey in self._PREV_TO_STATE:
+                    attr, female_only = self._PREV_TO_STATE[rkey]
+                    self.outputs[rkey][year] = self._bin_prevalence(
+                        rdict, attr=attr, female_only=female_only)
+                elif rkey in self._TYPE_DIST_TO_STATE:
+                    self.outputs[rkey][year] = self._bin_type_distribution(
+                        rdict, attr=self._TYPE_DIST_TO_STATE[rkey])
+        return
+
+    def _pop_arrays(self):
+        """Cache the alive/ages/weights arrays each binning method needs."""
+        people = self.sim.people
+        alive = people.alive.values
+        ages = people.age.values
+        scale = getattr(people, 'scale', None)
+        weights = scale.values if scale is not None else None
+        return people, alive, ages, weights
+
+    @staticmethod
+    def _histogram(ages, mask, edges, weights):
+        """np.histogram of ages[mask] with optional weights[mask]."""
+        w = weights[mask] if weights is not None else None
+        counts, _ = np.histogram(ages[mask], bins=edges, weights=w)
+        return counts
+
+    def _bin_count(self, rdict, attr):
+        """Bin alive-agent count of (union-across-genotypes) BoolState `attr`."""
+        _, alive, ages, weights = self._pop_arrays()
+        state_any = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            state_any |= getattr(mod, attr).values
+        return self._histogram(ages, state_any & alive, rdict.edges, weights)
+
+    def _bin_prevalence(self, rdict, attr, female_only=False):
+        """Age-bin prevalence as a (nbins, 2) array — [:, 0]=num, [:, 1]=denom.
+
+        Storing (num, denom) per bin lets BetaBinomial components consume
+        raw counts directly. ``to_dataframe(key)`` collapses to the ratio
+        for callers that want point-in-time prevalences.
+        """
+        people, alive, ages, weights = self._pop_arrays()
+        state_any = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            state_any |= getattr(mod, attr).values
+        denom_mask = alive & people.female.values if female_only else alive
+        num_mask = state_any & denom_mask
+        out = np.zeros((len(rdict.bins), 2), dtype=float)
+        out[:, 0] = self._histogram(ages, num_mask, rdict.edges, weights)
+        out[:, 1] = self._histogram(ages, denom_mask, rdict.edges, weights)
+        return out
+
+    def _incidence_numerator(self, rdict, date_attr, state_attr):
+        """Age-binned new in-state events at the current sub-step (counts).
+
+        Numerator for incidence: agents whose ti_<event> equals sim.ti and who
+        are in-state. step() sums this across every sub-step of a calendar year
+        so the annual flow is captured at any dt (not just the final sub-step).
+        """
+        _, alive, ages, weights = self._pop_arrays()
+        new_event = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            new_event |= (getattr(mod, date_attr).values == self.sim.ti) & getattr(mod, state_attr).values
+        return self._histogram(ages, new_event & alive, rdict.edges, weights)
+
+    def _incidence_denominator(self, rdict):
+        """Age-binned at-risk denominator: alive females not already cancerous."""
+        people, alive, ages, weights = self._pop_arrays()
+        cancerous_any = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            cancerous_any |= mod.cancerous.values
+        at_risk = alive & people.female.values & ~cancerous_any
+        return self._histogram(ages, at_risk, rdict.edges, weights)
+
+    def _bin_type_distribution(self, rdict, attr):
+        """Per-genotype age-binned raw counts; ``to_dataframe`` normalizes."""
+        _, alive, ages, weights = self._pop_arrays()
+        out = np.zeros((len(rdict.bins), len(self.hpv_modules)), dtype=float)
+        for gi, mod in enumerate(self.hpv_modules):
+            mask = getattr(mod, attr).values & alive
+            out[:, gi] = self._histogram(ages, mask, rdict.edges, weights)
+        return out
+
+    def to_dataframe(self, key, normalize=True):
+        """Return outputs for `key` as a DataFrame indexed by year.
+
+        For standard age-binned results: columns are age bin labels.
+        For type-distribution results: columns are genotype keys (one row
+        per year). With ``normalize=True`` (default) values are proportions
+        summing to 1 across genotypes; with ``normalize=False`` values are
+        raw counts summed over age bins — the shape that
+        ss.DirichletMultinomial.compute_nll consumes.
+        """
+        if key not in self.outputs:
+            raise KeyError(f'AgeResults: no output for key {key!r}; have {list(self.outputs)}')
+        rdict = self.result_args[key]
+        if self._is_type_dist(key):
+            cols = [m.name for m in self.hpv_modules]
+            data = {col: [] for col in cols}
+            index = []
+            for y, arr in self.outputs[key].items():
+                index.append(y)
+                totals = arr.sum(axis=0)
+                if normalize:
+                    total_sum = totals.sum()
+                    if total_sum > 0:
+                        totals = totals / total_sum
+                for i, col in enumerate(cols):
+                    data[col].append(float(totals[i]))
+            return pd.DataFrame(data, index=pd.Index(index, name='t'))
+        cols = rdict.age_labels
+        rows = []
+        index = []
+        is_prev = key in self._PREV_TO_STATE
+        for y, arr in self.outputs[key].items():
+            index.append(y)
+            if is_prev:
+                # Prev storage is (nbins, 2) = [num, denom]; emit ratio.
+                num, denom = arr[:, 0], arr[:, 1]
+                ratio = np.divide(num, denom, out=np.zeros_like(num),
+                                  where=denom > 0)
+                rows.append(ratio.astype(float))
+            else:
+                rows.append(arr.astype(float))
+        return pd.DataFrame(rows, columns=cols,
+                            index=pd.Index(index, name='t'))
+
+
+def _make_age_labels(edges):
+    """['0-5', '5-10', ..., '95+'] from bin edges."""
+    labels = [f'{int(edges[i])}-{int(edges[i+1])}' for i in range(len(edges) - 2)]
+    labels.append(f'{int(edges[-2])}+')
+    return labels
+
+
+def _histogram(ages, mask, edges, weights):
+    """np.histogram of ages[mask] with optional weights[mask]."""
+    w = weights[mask] if weights is not None else None
+    counts, _ = np.histogram(ages[mask], bins=edges, weights=w)
+    return counts
+
+
+def _resolve_year_ticks(sim, years):
+    """Map calendar years -> timeline tick indices.
+
+    Picks the last tick whose date falls within each calendar year, so annual
+    flows accumulated through the year are captured (year-end semantics, in
+    contrast to _resolve_date_ticks' nearest-tick point-in-time semantics).
+    """
+    tv_years = sim.timevec.years
+    out = {}
+    for y in years:
+        mask = (tv_years >= y) & (tv_years < y + 1)
+        ticks = np.where(mask)[0]
+        if len(ticks) == 0:
+            raise ValueError(f'_resolve_year_ticks: year {y} not in sim timevec '
+                             f'({tv_years[0]} to {tv_years[-1]})')
+        out[float(y)] = int(ticks[-1])
+    return out
+
+
+def _resolve_date_ticks(sim, dates):
+    """Map ss.date-coercible inputs -> nearest timeline tick (instantaneous).
+
+    Returns an sc.odict keyed by the resolved ss.date (``sim.timevec[ti]``),
+    value = tick index. Point-in-time semantics for snapshots/pyramids, in
+    contrast to _resolve_year_ticks' year-end flow capture.
+    Out-of-range dates clamp to the nearest endpoint tick. If two inputs
+    resolve to the same tick, the later one overwrites the earlier in the
+    returned odict.
+    """
+    tv_years = sim.timevec.years
+    out = sc.odict()
+    for d in sc.tolist(dates):
+        dd = ss.date(d)
+        ti = int(np.argmin(np.abs(tv_years - float(dd.years))))
+        out[sim.timevec[ti]] = ti
+    return out
+
+
+class snapshot(ss.Analyzer):
+    """Deep-copy ``sim.people`` at requested timepoints.
+
+    Args:
+        timepoints: ss.date-coercible scalar/list (year ints, floats, strings,
+            or ss.date). Defaults to the sim end date.
+        die (bool): raise if a requested timepoint is past the sim end.
+
+    Example::
+
+        snap = hpv.snapshot(timepoints=['2015', 2020])
+        sim = hpv.Sim(analyzers=[snap]); sim.run()
+        people_2020 = sim.analyzers['snapshot'].get(2020)
+    """
+
+    def __init__(self, timepoints=None, die=True, **kwargs):
+        super().__init__(**kwargs)
+        self.timepoints = timepoints
+        self.die = die
+        self.snapshots = sc.odict()   # ss.date -> deep-copied People
+        self._date_to_ti = None       # ss.date -> tick index
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        tps = sc.tolist(self.timepoints) if self.timepoints is not None else [sim.timevec[-1]]
+        tv_end = sim.timevec.years[-1]
+        kept = []
+        for d in tps:
+            dd = ss.date(d)
+            if float(dd.years) > tv_end + 1e-9:
+                if self.die:
+                    raise ValueError(f'snapshot: requested {dd} is past sim end {sim.timevec[-1]}')
+                continue
+            kept.append(dd)
+        self._date_to_ti = _resolve_date_ticks(sim, kept)
+
+    def step(self):
+        ti = self.sim.ti
+        for date, snap_ti in self._date_to_ti.items():
+            if snap_ti == ti:
+                self.snapshots[date] = sc.dcp(self.sim.people)
+
+    def get(self, key=None):
+        """Retrieve a snapshot by ss.date-coercible key (nearest match).
+
+        If key is None, returns the first recorded snapshot.
+        """
+        keys = list(self.snapshots.keys())
+        if not keys:
+            raise sc.KeyNotFoundError('snapshot: no snapshots recorded')
+        if key is None:
+            return self.snapshots[keys[0]]
+        target = float(ss.date(key).years)
+        yrs = np.array([k.years for k in keys])
+        return self.snapshots[keys[int(np.argmin(np.abs(yrs - target)))]]
+
+
+class age_pyramid(ss.Analyzer):
+    """Age/sex pyramid (scale-weighted histograms) at requested timepoints.
+
+    Args:
+        timepoints: ss.date-coercible scalar/list; defaults to sim end.
+        edges: age bin edges; defaults to ``np.linspace(0, 100, 11)``.
+        age_labels: optional bin labels; auto-generated if omitted.
+        datafile: optional path/dataframe of observed data (stored on
+            ``self.data`` for the later plotting layer; not plotted here).
+        die (bool): raise if a requested timepoint is past the sim end
+            (otherwise it is skipped).
+
+    Output: ``self.age_pyramids`` is an sc.odict keyed by ss.date, each value an
+    ``(nbins, 2)`` array with columns [male, female].
+    """
+
+    def __init__(self, timepoints=None, edges=None, age_labels=None,
+                 datafile=None, die=False, **kwargs):
+        super().__init__(**kwargs)
+        self.timepoints = timepoints
+        self.edges = edges
+        self.age_labels = age_labels
+        self.datafile = datafile
+        self.die = die
+        self.data = None
+        self.bins = None
+        self.age_pyramids = sc.odict()
+        self._date_to_ti = None
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        if self.edges is None:
+            self.edges = np.linspace(0, 100, 11)
+        self.edges = np.asarray(self.edges, dtype=float)
+        self.bins = self.edges[:-1]
+        if self.age_labels is None:
+            self.age_labels = _make_age_labels(self.edges)
+        if self.datafile is not None:
+            self.data = (pd.read_csv(self.datafile) if isinstance(self.datafile, str)
+                         else pd.DataFrame(self.datafile))
+        tps = sc.tolist(self.timepoints) if self.timepoints is not None else [sim.timevec[-1]]
+        tv_end = sim.timevec.years[-1]
+        kept = []
+        for d in tps:
+            dd = ss.date(d)
+            if float(dd.years) > tv_end + 1e-9:
+                if self.die:
+                    raise ValueError(f'age_pyramid: requested {dd} is past sim end {sim.timevec[-1]}')
+                continue
+            kept.append(dd)
+        self._date_to_ti = _resolve_date_ticks(sim, kept)
+
+    def step(self):
+        ti = self.sim.ti
+        for date, snap_ti in self._date_to_ti.items():
+            if snap_ti != ti:
+                continue
+            people = self.sim.people
+            alive = people.alive.values
+            ages = people.age.values
+            female = people.female.values
+            scale = getattr(people, 'scale', None)
+            weights = scale.values if scale is not None else None
+            out = np.zeros((len(self.bins), 2), dtype=float)
+            out[:, 0] = _histogram(ages, alive & ~female, self.edges, weights)
+            out[:, 1] = _histogram(ages, alive & female, self.edges, weights)
+            self.age_pyramids[date] = out
+
+    def to_dataframe(self):
+        """Tidy long-form (date, age_bin, sex, count)."""
+        rows = []
+        for date, arr in self.age_pyramids.items():
+            for bi, label in enumerate(self.age_labels):
+                rows.append(dict(date=date, age_bin=label, sex='male',   count=float(arr[bi, 0])))
+                rows.append(dict(date=date, age_bin=label, sex='female', count=float(arr[bi, 1])))
+        return pd.DataFrame(rows)
+
+    def plot(self, date=None, fig=None):
+        """Plot this age pyramid (see hpvsim.plotting.plot_age_pyramid)."""
+        from .plotting import plot_age_pyramid
+        return plot_age_pyramid(self, date=date, fig=fig)
+
+
+class age_causal_infection(ss.Analyzer):
+    """Age at causal infection / CIN2+ / cancer, and dwell times, per cancer.
+
+    For each cervical-cancer onset, back-traces to the age at the causal
+    (current persistent) HPV infection and at CIN2+, and records the dwell
+    times precin (causal->CIN), cin (CIN->cancer), and total. Reads live agents
+    on the standard code path: on the grow multiscale engine, extra cancers are
+    real fine agents in ``sim.people`` (``fine=True``, ``scale=1/ratio``), so
+    every cancer is captured at any ``ms_agent_ratio`` and weighted by
+    ``people.scale``.
+
+    Args:
+        start: ss.date-coercible; only count cancers at/after this date.
+            Defaults to sim start.
+    """
+
+    def __init__(self, start=None, **kwargs):
+        super().__init__(**kwargs)
+        self.start = start
+
+    def init_pre(self, sim):
+        from .hpv import HPV
+        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        super().init_pre(sim)
+        self.start_year = (float(ss.date(self.start).years) if self.start is not None
+                           else float(sim.timevec.years[0]))
+        self.age_causal = []
+        self.age_cin = []
+        self.age_cancer = []
+        self.weights = []
+        self.dwelltime = {k: [] for k in ('precin', 'cin', 'total')}
+
+    def _record(self, cancer_age, causal_age, cin_age, weight):
+        self.age_cancer.extend(cancer_age.tolist())
+        self.age_causal.extend(causal_age.tolist())
+        self.age_cin.extend(cin_age.tolist())
+        self.weights.extend(weight.tolist())
+        self.dwelltime['precin'].extend((cin_age - causal_age).tolist())
+        self.dwelltime['cin'].extend((cancer_age - cin_age).tolist())
+        self.dwelltime['total'].extend((cancer_age - causal_age).tolist())
+
+    def step(self):
+        sim = self.sim
+        ti = sim.ti
+        if float(sim.timevec[ti].years) < self.start_year:
+            return
+        dt = float(sim.t.dt)
+        people = sim.people
+        scale = getattr(people, 'scale', None)
+        for m in self.hpv_modules:
+            # Gate on cancerous, not just ti_cancerous==ti: a scheduled
+            # ti_cancerous persists on agents who die of other causes before
+            # onset, so the bare time-match overcounts vs realized incidence.
+            # BoolArr.uids returns active (alive) agents only, so the alive
+            # filter is implicit. On the grow engine, fine agents subject to
+            # independent competing mortality are correctly dropped here; this
+            # also drops the rare agent who reaches cancer and dies of a
+            # competing cause on the same tick (~1%).
+            new = ((m.ti_cancerous == ti) & m.cancerous).uids
+            if not len(new):
+                continue
+            ti_inf = m.ti_infected[new]
+            ti_cin = m.ti_cin[new]
+            ok = np.isfinite(ti_inf) & np.isfinite(ti_cin)
+            new, ti_inf, ti_cin = new[ok], ti_inf[ok], ti_cin[ok]
+            cur = people.age[new]
+            w = people.scale[new] if scale is not None else np.ones(len(new))
+            self._record(cur, cur - (ti - ti_inf) * dt, cur - (ti - ti_cin) * dt, w)
+
+    def finalize(self):
+        super().finalize()
+        self.age_causal = np.array(self.age_causal)
+        self.age_cin = np.array(self.age_cin)
+        self.age_cancer = np.array(self.age_cancer)
+        self.weights = np.array(self.weights)
+        for k in self.dwelltime:
+            self.dwelltime[k] = np.array(self.dwelltime[k])
+
+    def plot(self, fig=None):
+        """Plot age-at-causal/CIN/cancer histograms (see plotting.plot_age_causal_infection)."""
+        from .plotting import plot_age_causal_infection
+        return plot_age_causal_infection(self, fig=fig)
+
+
+class dalys(ss.Analyzer):
+    """Incidence-based DALYs (YLL + YLD) from cervical cancer, by calendar year.
+
+    YLL and YLD are attributed at the year of cancer onset (incidence-based),
+    weighted by ``people.scale``. Reads live agents on the standard code path:
+    on the grow multiscale engine, extra cancers are real fine agents
+    (``scale=1/ratio``) in ``sim.people``, so all onsets are captured at any
+    ``ms_agent_ratio``. Absolute population DALYs require multiplying by
+    ``sim.pars.pop_scale``.
+
+    Args:
+        start: ss.date-coercible; only count onsets at/after this year.
+        life_expectancy: reference life expectancy for YLL (default 84;
+            pass a country-specific value where available).
+        disability_weights: objdict/dict with ``weights`` and ``time_fraction``
+            lists (one entry per cancer stage). Defaults to GBD2017; pass your
+            own to use different disability weights.
+    """
+
+    # GBD2017 cervical-cancer disability weights and time fractions per stage.
+    _DEFAULT_DISABILITY_WEIGHTS = dict(
+        weights=[0.288, 0.049, 0.451, 0.54],
+        time_fraction=[0.05, 0.85, 0.09, 0.01],
+    )
+
+    def __init__(self, start=None, life_expectancy=84, disability_weights=None, **kwargs):
+        super().__init__(**kwargs)
+        self.start = start
+        self.life_expectancy = life_expectancy
+        self.disability_weights = sc.objdict(
+            disability_weights if disability_weights is not None
+            else self._DEFAULT_DISABILITY_WEIGHTS
+        )
+
+    @property
+    def av_disutility(self):
+        dw = self.disability_weights
+        return sum(dw.weights[i] * dw.time_fraction[i] for i in range(len(dw.weights)))
+
+    def init_pre(self, sim):
+        from .hpv import HPV
+        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        super().init_pre(sim)
+        tv_years = sim.timevec.years
+        self.start_year = (int(np.floor(ss.date(self.start).years)) if self.start is not None
+                           else int(np.floor(tv_years[0])))
+        self.end_year = int(np.floor(tv_years[-1]))
+        self.years = np.arange(self.start_year, self.end_year + 1)
+        n = len(self.years)
+        self.yll = np.zeros(n)
+        self.yld = np.zeros(n)
+        self.dalys = np.zeros(n)
+
+    def _accumulate(self, year, cancer_age, death_age, weight):
+        if year < self.start_year or year > self.end_year:
+            return
+        idx = year - self.start_year
+        dur = death_age - cancer_age
+        self.yld[idx] += float((weight * dur * self.av_disutility).sum())
+        years_left = np.maximum(0.0, self.life_expectancy - death_age)
+        self.yll[idx] += float((weight * years_left).sum())
+
+    def step(self):
+        sim = self.sim
+        ti = sim.ti
+        year = int(np.floor(sim.timevec[ti].years))
+        if year < self.start_year:
+            return
+        dt = float(sim.t.dt)
+        people = sim.people
+        scale = getattr(people, 'scale', None)
+        for m in self.hpv_modules:
+            # See age_causal_infection.step for the cancerous gate rationale
+            # (drops scheduled-but-not-realized onsets and same-tick competing
+            # deaths; on grow, fine agents with competing mortality). BoolArr.uids
+            # returns active (alive) agents only, so the alive filter is implicit.
+            new = ((m.ti_cancerous == ti) & m.cancerous).uids
+            if not len(new):
+                continue
+            # Defensive isfinite guard (symmetric with age_causal_infection):
+            # a gated agent always has finite ti_dead_cancer today, but a future
+            # non-fatal-cancer or reschedule path could leave it NaN — without
+            # this filter a single NaN death_age would poison the whole onset
+            # year's YLL/YLD sum.
+            ti_dead = m.ti_dead_cancer[new]
+            ok = np.isfinite(ti_dead)
+            new, ti_dead = new[ok], ti_dead[ok]
+            if not len(new):
+                continue
+            cancer_age = people.age[new]
+            death_age = cancer_age + (ti_dead - ti) * dt
+            w = people.scale[new] if scale is not None else np.ones(len(new))
+            self._accumulate(year, cancer_age, death_age, w)
+
+    def finalize(self):
+        super().finalize()
+        self.dalys = self.yll + self.yld
+
+    def plot(self, fig=None):
+        """Plot stacked YLL/YLD over time (see plotting.plot_dalys)."""
+        from .plotting import plot_dalys
+        return plot_dalys(self, fig=fig)
+
+
+def results_by_genotype(sim, key='cum_cancers', normalize=False):
+    """Stack a per-genotype HPV result into a year-indexed DataFrame.
+
+    Columns are genotype names; index is ``sim.timevec.years``. With
+    ``normalize=True``, each row is divided by its total (genotype distribution
+    of `key`), leaving all-zero rows as zeros.
+
+    Args:
+        sim: a run hpv.Sim.
+        key: a result name present on each HPV module (e.g. 'cum_cancers',
+            'new_cancers', 'cum_cancer_deaths').
+        normalize (bool): row-normalize to a distribution.
+    """
+    from .hpv import HPV
+    mods = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+    data = {m.name: np.asarray(m.results[key], dtype=float) for m in mods}
+    df = pd.DataFrame(data, index=pd.Index(sim.timevec.years, name='year'))
+    if normalize:
+        totals = df.sum(axis=1)
+        df = df.div(totals.where(totals > 0, 1.0), axis=0)
+    return df

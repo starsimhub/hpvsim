@@ -1,0 +1,5 @@
+year,name,age,sex,genotype,value
+2017,cancer_incidence_no_hiv,25,female,total,3.13
+2017,cancer_incidence_no_hiv,35,female,total,11.67
+2017,cancer_incidence_no_hiv,45,female,total,14.5
+2017,cancer_incidence_no_hiv,55,female,total,12

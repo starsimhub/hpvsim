@@ -1,5 +1,6 @@
 # HPVsim-generated files
 *.obj
+*.png
 files/
 
 # Quarto
@@ -8,13 +9,32 @@ _inv/
 api/
 .jupyter_cache/
 
-# Regression baselines (regenerate via tests/generate_v2_baselines.py)
+# Regression baselines (local-only artifacts)
 tests/regression_baselines/
+
+# Diagnostic outputs from regression instrumentation
+# (multi-seed JSONs incl. seeds/trajectories, per-step traces, profiling reports)
+tests/regression/v[23]_*.json
+tests/regression/v[23]_trace*.csv
+tests/regression/profile_v3_anchor*
+tests/regression/perf_parity_*.json
+
+# Stale legacy regression artifact
+hpvsim/regression/
 
 # Other files
 .idea
 .vscode
 .DS_Store
+.claude/
+
+# Calibration artifacts emitted by tests
+tests/hpvsim_calib_*.db
+# Calibration / Optuna sqlite DBs anywhere (e.g. repo-root scratch dbs)
+*.db
+
+# uv lockfile (hpvsim is a library, not an app)
+uv.lock
 
 
 # Byte-compiled / optimized / DLL files

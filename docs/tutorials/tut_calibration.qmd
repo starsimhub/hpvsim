@@ -4,89 +4,83 @@ jupyter: python3
 ---
 
 
-Tutorial 2 demonstrated how to run the model and plot the outputs. But it's entirely possible that the model outputs won't look like the data for the country that you wish to model. The default parameter values included in HPVsim are intended as points of departure to be iteratively refined via calibration. The process of model calibration involves finding the model parameters that are the most likely explanation for the observed data. This tutorial gives an introduction to the Fit object and some recipes for optimization approaches.
+Tutorial 2 demonstrated how to run the model and plot the outputs. But it's entirely possible that the model outputs won't look like the data for the country that you wish to model. The default parameter values included in HPVsim are intended as points of departure to be iteratively refined via calibration. The process of model calibration involves finding the model parameters that are the most likely explanation for the observed data. This tutorial gives an introduction to the `Calibration` object and some recipes for optimization approaches.
 
 
 <div class="alert alert-info">
-    
-Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_calibration.ipynb) to open an interactive version of this notebook.
-    
+
+Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_calibration.ipynb) to open an interactive version of this notebook.
+
 </div>
 
 ## Data types supported by HPVsim
 
 Data on HPV and cervical disease comes in many different formats. When using HPVsim, the goal is typically to produce population-level estimates of epidemic outputs like:
-    - age-specific incidence of cancer or high-grade lesions in one or more years;
-    - number of cases of cancer or high-grade lesions reported in one or more years;
-    - HPV prevalence over time;
-    - lifetime incidence of HPV;
-    - the distribution of genotypes in detected cases of cancer/high-grade lesions;
-    - sexual behavior metrics like the average age at first marriage, duration of relationships, or number of lifetime partners.
 
-After running HPVsim, estimates all of these variables are included within the `results` dictionary. To plot them alongside data, the easiest method is to use the `Calibration` object.
+- age-specific incidence of cancer or high-grade lesions in one or more years;
+- number of cases of cancer or high-grade lesions reported in one or more years;
+- HPV prevalence over time;
+- the distribution of genotypes in detected cases of cancer/high-grade lesions.
 
+The `AgeResults` analyzer (see the [analyzers tutorial](tut_analyzers.qmd)) records these quantities at the age bins and years you choose, and exposes them as a tidy dataframe via `AgeResults.to_dataframe(key=...)`. Calibration compares those dataframes against dataframes of the same shape holding your observed data.
 
 ## The Calibration object
 
-Calibration objects contain the following ingredients:
-    - an `hpv.Sim()` instance with details of the model configuration;
-    - two lists of parameters to vary, one for parameters that vary by genotype and one for those that don't;
-    - dataframes that hold the calibration targets, which are typically added as csv files;
-    - a list of any additional results to plot;
-    - settings that are passed to the Optuna package[LINK], an open source hyperparameter optimization framework that automates calibration for HPVsim.
+In v3 the `Calibration` object is built on Starsim's calibration machinery, which is in turn built on [Optuna](https://optuna.org), an open-source hyperparameter-optimization framework. A calibration needs:
 
-We have included Optuna as a built-in calibration option as we have found that it works reasonably well, but it is also possible to use other methods; we will discuss this a little further down.
+- an `hpv.Sim()` instance carrying an `AgeResults` analyzer that records the quantities you have data on;
+- `calib_pars`: a flat dictionary of the parameters to vary. A bare key (e.g. `'beta'`) targets a sim-level parameter; a dotted key (e.g. `'hpv16.cin_fn.k'`) targets a per-genotype parameter, and a `'cross_immunity....'` key targets the cross-immunity matrix. Each entry is `dict(low=..., high=..., guess=...)`.
+- `data`: a dictionary mapping each `AgeResults` result key to a dataframe of observed values (indexed by snapshot year, index name `'t'`, one column per age bin).
 
-The example below illustrates the general idea of calibration, and can be adapted for different use cases:
+The example below illustrates the general idea. To keep it self-contained we synthesize a target dataset from a run with a known CIN-progression parameter, then ask the calibration to recover it; in practice you would load your observed data into the `data` dataframes instead.
 
 ```{python}
 #| pycharm: {is_executing: true}
-# Import HPVsim
+import numpy as np
+import sciris as sc
 import hpvsim as hpv
 
-# Configure a simulation with some parameters
-pars = dict(n_agents=10e3, start=1980, end=2020, dt=0.25, location='nigeria')
-sim = hpv.Sim(pars)
+# Age bins and years at which we have (or, here, synthesize) cancer data.
+edges = np.array([0., 30., 50., 70., 100.])
+years = [2015, 2020]
 
-# Specify some parameters to adjust during calibration.
-# The parameters in the calib_pars dictionary don't vary by genotype,
-# whereas those in the genotype_pars dictionary do. Both kinds are
-# given in the order [best, lower_bound, upper_bound].
-calib_pars = dict(
-        beta=[0.05, 0.010, 0.20],
+def make_sim():
+    return hpv.Sim(
+        n_agents=4e3, start=1990, stop=2021, dt=1.0, rand_seed=0,
+        genotypes=[16, 18], location='nigeria', verbose=0,
+        analyzers=[hpv.AgeResults(result_args=sc.objdict(
+            cancers=sc.objdict(years=years, edges=edges)))],
     )
 
-genotype_pars = dict(
-    hpv16=dict(
-        cin_fn=dict(k=[0.5, 0.2, 1.0]),
-        dur_cin=dict(par1=[6, 4, 12])
-    ),
-    hpv18=dict(
-        cin_fn=dict(k=[0.5, 0.2, 1.0]),
-        dur_cin=dict(par1=[6, 4, 12])
-    )
-)
+# Synthesize a target: run with a known parameter and take its AgeResults output.
+# (Replace this block with your own observed data as a {key: dataframe} dict.)
+target = make_sim()
+hpv.calibration.build_sim(target, calib_pars={'hpv16.cin_fn.k': 0.55})
+target.run()
+data = {'cancers': target.analyzers['ageresults'].to_dataframe(key='cancers')}
 
-# List the datafiles that contain data that we wish to compare the model to:
-datafiles=['nigeria_cancer_cases.csv',
-           'nigeria_cancer_types.csv']
+# Parameters to calibrate, each given as dict(low, high, guess).
+calib_pars = {
+    'hpv16.cin_fn.k':                 dict(low=0.20, high=0.90, guess=0.50),
+    'hpv16.cancer_fn.transform_prob': dict(low=0.001, high=0.005, guess=0.002),
+}
 
-# List extra results that we don't have data on, but wish to include in the
-# calibration object so we can plot them.
-results_to_plot = ['cancer_incidence', 'asr_cancer_incidence']
-
-# Create the calibration object, run it, and plot the results
+# Build the calibration, run a few trials, and report the best fit.
 calib = hpv.Calibration(
-    sim,
-    calib_pars=calib_pars,
-    genotype_pars=genotype_pars,
-    extra_sim_result_keys=results_to_plot,
-    datafiles=datafiles,
-    total_trials=3, n_workers=1
+    make_sim(),
+    calib_pars,
+    data=data,
+    total_trials=6,
+    n_workers=1,
 )
-calib.calibrate(die=True)
-calib.plot(res_to_plot=4);
+calib.calibrate()
+print('Best parameters:', calib.best_pars)
 ```
 
-This isn't a great fit yet! In general, it will probably be necessary to run many more trials that the 3 we ran here. Moreover, careful consideration should be given to the parameters that you want to adjust during calibration. In HPVsim we have taken the approach that any parameter can be adjusted. As we learn more about which parameters make most sense to calibrate, we will add details here. We would also enourage users to share their experiences with calibration and parameter searches.
+We can visualize how well the best-fit simulation matches the target data:
 
+```{python}
+hpv.plot_calibration(calib)
+```
+
+This is only 6 trials — a real calibration needs many more, and careful thought about which parameters to vary. In HPVsim any parameter can be adjusted; as we learn which parameters make the most sense to calibrate, we will expand the guidance here. We also encourage users to share their experiences with calibration and parameter searches.

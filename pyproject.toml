@@ -7,7 +7,7 @@ name = "hpvsim"
 dynamic = ["version"]
 description = "HPVsim: Human Papillomavirus Simulator"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["HPV", "human papillomavirus", "cervical cancer", "agent-based model", "disease modeling", "simulation"]
@@ -19,7 +19,8 @@ authors = [
   { name = "Romesh Abeysuriya" },
   { name = "Mariah Boudreau" },
   { name = "Daniel Klein" },
-  { name = "Hao Hu" }
+  { name = "Hao Hu" },
+  { name = "Ryan Hull" }
 ]
 
 maintainers = [
@@ -39,12 +40,12 @@ classifiers = [
 
 dependencies = [
     'numpy',
-    'scipy',
-    'pandas>=2.0.0', 
+    'pandas>=2.0.0',
     'sciris>=3.0.0',
+    'starsim>=3.5',  # 3.5 changed Dist construction (see hpvsim/parameters.py ss.beta_dist); pinned baselines are 3.5-valued
+    'stisim>=1.5',  # transmission-based HIV for the HIV-HPV co-infection model (hpvsim/hiv.py)
     'matplotlib',
-    'seaborn',
-    'optuna',
+    'optuna',  # not imported directly, but hpv.Calibration subclasses ss.Calibration and starsim ships optuna only as an optional extra
 ]
 
 [project.scripts]

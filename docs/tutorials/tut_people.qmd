@@ -8,79 +8,64 @@ This tutorial gives a brief introduction to people, populations, and contact lay
 
 
 <div class="alert alert-info">
-    
-Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_people.ipynb) to open an interactive version of this notebook.
-    
+
+Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_people.ipynb) to open an interactive version of this notebook.
+
 </div>
 
 ## Demographic data
 
-HPVsim includes pre-downloaded demographic data for almost all countries, including:
+HPVsim includes pre-downloaded demographic data, including:
 
  * Population sizes from 1950-2100 from the UN's World Population Projections;
  * Birth rates from 1950-2100 from the World Bank;
  * Age- and sex-specific mortality rates from 1950-2100 from the UN's World Population Projections.
 
- As we saw in Tutorial 1, you can load these data simply by using the `location` parameter. You can show a list of all available locations with `hpv.data.show_locations()`.
+As we saw in Tutorial 1, you load these data simply by using the `location` parameter. HPVsim ships demographic data (age structure, births, deaths) for any country in the UN World Population Prospects; just pass the country name (case-insensitive). Network calibration is location-agnostic by default — analysis scripts supply their own per-country network parameters.
+
+When a `location` is set, HPVsim uses these data to seed the initial age/sex pyramid and to drive births, deaths, and age-specific migration over the course of the run. The migration module pins the simulated age pyramid to the target population trajectory each year; the resulting immigrant/emigrant flows are reported under `sim.results.agemigration`.
 
 ## People and contact network layers
 
-Agents in HPVsim are contained in an object called `People`, which contains all of the agents' properties, as well as methods for changing them from one state to another (e.g., from susceptible to infected).
+Agents in HPVsim are contained in an object called `People`, which holds all of the agents' properties (age, sex, disease state, ...), together with the machinery for moving them from one state to another (e.g., from susceptible to infected).
 
-HPV transmits via sexual contact, and in HPVsim this is represented by sexual networks that allow agents to interact with one another. For the moment, HPVsim only models heterosexual partnerships. The sexual contact networks in HPVsim can have multiple *contact layers*, with each layer having different properties that characterize sexual contact, including the duration of the contact, age mixing preferences of partners, etc. HPVsim comes with two options for the sexual network:
+HPV transmits via sexual contact, represented in HPVsim by a sexual network that lets agents interact. For the moment, HPVsim only models heterosexual partnerships. The default sexual network (`hpv.SexualNetwork`) has three contact layers — marital, casual, and one-off — each with its own properties characterizing sexual contact (partnership duration, age-mixing preferences, concurrency, and so on). The network is created automatically from the `location`'s network parameters when you build a `hpv.Sim`.
 
-* The *random* option has a single contact layer. The number of partners that each agent has is Poisson distributed with a mean of 1.
-* The *default* option has 3 contact layers, representing marital, casual, and one-off partnership types.
+## A worked example
 
-## Assortative mixing
-
-By default, new partnerships are formed based on age mixing patterns. There is an optional additional dimension of assortative mixing that could be used to represent geographical location or other demographic groups.
-
-To enable the additional mixing, user needs to specify additional parameters that define 1) the number of clusters to use `n_clusters`; 2) a mixing matrix `add_mixing` that specifies pair-wise relative mixing weights between clusters.
+Below we build and run a sim, then inspect the population and network it produced. Because demographics evolve over the run, the number of alive agents changes over time:
 
 ```{python}
 #| collapsed: false
-import sciris as sc
 import numpy as np
 import hpvsim as hpv
-import scipy.linalg
 
 hpv.options(jupyter=True, verbose=False)
 
-base_pars = {
-    'n_agents': 2e4,
-    'start': 1970,
-    'end': 2020,
-    'location': 'nigeria',
-    'rand_seed': 1,
-}
+sim = hpv.Sim(
+    n_agents=20_000,
+    start=1970,
+    stop=2020,
+    location='nigeria',
+    rand_seed=1,
+)
+sim.run()
 
-# Default: well-mixed (1 cluster)
-sim0 = hpv.Sim(pars=base_pars)
-assert sim0['n_clusters'] == 1
+# Population size over time (driven by births, deaths, and migration)
+print('Alive at start:', int(sim.results.n_alive[0]))
+print('Alive at end:  ', int(sim.results.n_alive[-1]))
 
-# Multiple clusters but well-mixed
-pars1 = sc.dcp(base_pars)
-pars1['n_clusters'] = 10 # create 10 clusters
-pars1['add_mixing'] = np.ones((10, 10)) # set all between-cluster mixing to the same as within-cluster mixing
-sim1 = hpv.Sim(pars=pars1)
-print(sim1['add_mixing']) # print actual mixing matrix
-
-# Modifying mixing matrix
-pars2 = sc.dcp(base_pars)
-pars2['n_clusters'] = 3 # create 3 clusters
-pars2['add_mixing'] = np.array([[1, 0, 0],
-                               [0, 1, 0],
-                               [0, 0, 1]]) # No between-cluster mixing
-sim2 = hpv.Sim(pars=pars2)
-
-# Mixing by distance
-pars3 = sc.dcp(base_pars)
-pars3['n_clusters'] = 5
-pars3['add_mixing'] = scipy.linalg.circulant([1,0.5,0.1,0.1,0.5])
-sim3 = hpv.Sim(pars=pars3)
-
-msim = hpv.parallel(sim0, sim1, sim2, sim3)
-msim.plot()
+sim.plot();
 ```
 
+To assess the effect of stochasticity, it is often useful to run several sims with different random seeds and combine them. Starsim's `MultiSim` does this — pass an `hpv.Sim` and a number of runs, then reduce with `mean()` (or `median()`):
+
+```{python}
+import starsim as ss
+
+msim = ss.MultiSim(hpv.Sim(n_agents=10_000, start=1970, stop=2020,
+                           location='nigeria'), n_runs=3)
+msim.run(parallel=False, verbose=False)
+msim.mean()
+msim.plot();
+```
