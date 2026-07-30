@@ -503,7 +503,15 @@ class BaseTxVx(BaseTreatment):
         """One-step delivery — finds accepters, administers, bumps counters."""
         accept_uids = self.get_accept_inds()
         if len(accept_uids):
-            self.product.administer(self.sim.people, accept_uids)
+            # Products use two administer conventions: ss.Vx-based (hpv.vx,
+            # hpv.txvx) take (people, uids); ss.Tx/ss.Dx (hpv.tx, hpv.dx) take
+            # (uids, ...). A TxV can be modelled either as an immunity hpv.txvx
+            # OR (faithfully to v2) as an hpv.tx state-flip product, so dispatch
+            # on the product type rather than assuming (people, uids).
+            if isinstance(self.product, ss.Vx):
+                self.product.administer(self.sim.people, accept_uids)
+            else:
+                self.product.administer(accept_uids)
             new = accept_uids[~self.tx_vaccinated[accept_uids]]
             self.tx_vaccinated[accept_uids] = True
             self.txvx_doses[accept_uids] += 1
