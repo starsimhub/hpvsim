@@ -7,28 +7,39 @@ fraction of HIV+ agents end up on_art in the ART era, and (b) STIsim's CD4
 reconstitution actually fires for treated agents.
 """
 import numpy as np
+import pytest
 import hpvsim as hpv
 
 
 def _coinfection_sim(interventions=None, stop=2018, seed=1):
-    """Small Rwanda-like HIV+HPV sim seeded into the ART era."""
-    # HIV/ART curves are loaded from Rwanda's bundled inputs; the sim's
-    # demographics use 'nigeria' (the only location with bundled country
-    # demographics so far) — the ART shortcut is independent of demographics.
+    """Small Rwanda-like HIV+HPV sim seeded into the ART era.
+
+    HIV/ART curves are loaded from Rwanda's bundled inputs; the sim's
+    demographics use 'nigeria' (the only location with bundled country
+    demographics so far) — the ART shortcut is independent of demographics.
+    Annual steps from 1995 are enough to build a ~50% HIV prevalence and put
+    ~75% of the HIV+ on ART by 2017, which is all these assertions need.
+    """
     h = hpv.HIV.from_location('rwanda', beta_m2f=0.02, rel_beta_f2m=0.5)
     return hpv.Sim(
-        n_agents=2000, start=1990, stop=stop, dt=0.5, rand_seed=seed,
+        n_agents=2000, start=1995, stop=stop, dt=1.0, rand_seed=seed,
         location='nigeria', genotypes=[16, 18], diseases=[h],
         interventions=interventions or [],
     )
 
 
-def test_art_shortcut_treats_nonzero_fraction():
-    """With hpv.hiv_art, a plausible nonzero fraction of HIV+ are on_art by 2017."""
+@pytest.fixture(scope='module')
+def art_sim():
+    """One ART-era run, shared read-only by the two coverage tests below."""
     art = hpv.hiv_art.from_location('rwanda')
     sim = _coinfection_sim(interventions=[art])
     sim.run()
-    hiv = sim.diseases.hiv
+    return sim
+
+
+def test_art_shortcut_treats_nonzero_fraction(art_sim):
+    """With hpv.hiv_art, a plausible nonzero fraction of HIV+ are on_art by 2017."""
+    hiv = art_sim.diseases.hiv
     hiv_pos = hiv.infected.uids
     assert len(hiv_pos) > 0, 'no HIV+ agents to treat'
     frac_on_art = hiv.on_art[hiv_pos].mean()
@@ -36,12 +47,9 @@ def test_art_shortcut_treats_nonzero_fraction():
     assert 0.1 < frac_on_art < 1.0, f'on-ART fraction {frac_on_art:.3f} out of plausible range'
 
 
-def test_art_shortcut_reconstitutes_cd4():
+def test_art_shortcut_reconstitutes_cd4(art_sim):
     """CD4 among on-ART HIV+ agents exceeds CD4 among untreated HIV+ agents."""
-    art = hpv.hiv_art.from_location('rwanda')
-    sim = _coinfection_sim(interventions=[art])
-    sim.run()
-    hiv = sim.diseases.hiv
+    hiv = art_sim.diseases.hiv
     hiv_pos = hiv.infected.uids
     on_art = hiv_pos[hiv.on_art[hiv_pos]]
     off_art = hiv_pos[~hiv.on_art[hiv_pos]]

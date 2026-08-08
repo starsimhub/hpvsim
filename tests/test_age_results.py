@@ -136,24 +136,32 @@ def test_age_results_cancer_incidence_by_age():
     assert (df.values >= 0).all()
 
 
-def test_age_results_type_distribution_sums_to_one():
-    """cancerous_genotype_dist normalizes to a probability distribution per year.
+@pytest.fixture(scope='module')
+def type_dist_sim():
+    """One 4-genotype run recording both `cancers` and `cancerous_genotype_dist`.
 
-    Uses n_agents=10000 so a reasonable number of cancers (~8 at seed=0) have
-    fired by 2020 even after small RNG shifts; with n=4000 the count hovers
-    near zero and the precondition flakes under any RNG-affecting change.
+    n_agents=10000 so a reasonable number of cancers (~8 at seed=0) have fired
+    by 2020 even after small RNG shifts; with n=4000 the count hovers near zero
+    and the precondition flakes under any RNG-affecting change. Both type-dist
+    tests read the same two outputs off this one run.
     """
-    edges = np.array([0., 100.])  # one age window — all ages
+    edges = np.array([0., 40., 100.])
     sim = hpv.Sim(n_agents=10000, start=1990, stop=2021, dt=1.0,
                   rand_seed=0,
                   genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
                   analyzers=[hpv.AgeResults(
                       result_args=sc.objdict(
+                          cancers=sc.objdict(years=[2020], edges=edges),
                           cancerous_genotype_dist=sc.objdict(years=[2020], edges=edges),
                       ),
                   )])
     sim.run()
-    ar = sim.analyzers['ageresults']
+    return sim
+
+
+def test_age_results_type_distribution_sums_to_one(type_dist_sim):
+    """cancerous_genotype_dist normalizes to a probability distribution per year."""
+    ar = type_dist_sim.analyzers['ageresults']
     df = ar.to_dataframe(key='cancerous_genotype_dist')
     # Columns are genotype keys (hpv16, hpv18, hi5, ohr).
     assert list(df.columns) == ['hpv16', 'hpv18', 'hi5', 'ohr']
@@ -168,61 +176,18 @@ def test_age_results_type_distribution_sums_to_one():
     assert abs(row_sum - 1.0) < 1e-9
 
 
-def test_age_results_type_distribution_per_genotype_sums_match_total():
+def test_age_results_type_distribution_per_genotype_sums_match_total(type_dist_sim):
     """Sum-over-genotypes of per-bin raw counts == sum-over-genotypes-elsewhere
     cancerous count for that bin. Confirms type-dist's binning matches the
     aggregate 'cancers' binning at the raw-count level.
-
-    n_agents=10000 to match the sister test so both tests exercise the
-    normalization paths even after RNG-affecting changes.
     """
-    edges = np.array([0., 40., 100.])
-    sim = hpv.Sim(n_agents=10000, start=1990, stop=2021, dt=1.0,
-                  rand_seed=0,
-                  genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
-                  analyzers=[hpv.AgeResults(
-                      result_args=sc.objdict(
-                          cancers=sc.objdict(years=[2020], edges=edges),
-                          cancerous_genotype_dist=sc.objdict(years=[2020], edges=edges),
-                      ),
-                  )])
-    sim.run()
-    ar = sim.analyzers['ageresults']
+    ar = type_dist_sim.analyzers['ageresults']
     # 'cancers' output is union-across-genotypes — undercounts when an agent
     # is cancerous in two genotypes (rare for cancer; cancer is attributed
-    # to one genotype per agent in the natural-history model). Use a generous
-    # tolerance: total dist count >= union count (each multi-genotype agent
-    # contributes to dist but counts once in union).
+    # to one genotype per agent in the natural-history model).
     cancers_arr = ar.outputs['cancers'][2020.0]
     dist_arr = ar.outputs['cancerous_genotype_dist'][2020.0]
     dist_total_per_bin = dist_arr.sum(axis=1)
     # Each agent is cancerous in exactly one genotype in the standard model,
     # so the dist sum equals the union count exactly.
     assert np.allclose(dist_total_per_bin, cancers_arr)
-
-
-@pytest.mark.slow
-def test_cancer_incidence_accumulates_over_full_year_at_subannual_dt():
-    """Incidence sums new events across all sub-steps of a calendar year.
-
-    Regression guard for the dt<1 undercount: at dt=0.25 a fully-covered year
-    (2019, 4 sub-steps) must report ~4x the incidence of the terminal year
-    (2020, only its first tick, since the sim stops at 2020). The old code
-    captured a single sub-step per year, giving a ratio near 1. Comparing two
-    years within one run isolates the accumulation from dt-dependent dynamics.
-    """
-    edges = np.array([0., 30., 50., 70., 100.])
-    az = hpv.AgeResults(result_args=sc.objdict(
-        cancer_incidence=sc.objdict(years=[2019, 2020], edges=edges)))
-    sim = hpv.Sim(n_agents=5000, location='nigeria', genotypes=[16, 18],
-                  start=1985, stop=2020, dt=0.25, ms_agent_ratio=50,
-                  rand_seed=0, analyzers=[az], verbose=0)
-    sim.run()
-    ar = sim.analyzers['ageresults']
-    full_year = float(np.sum(ar.outputs['cancer_incidence'][2019.0]))
-    terminal = float(np.sum(ar.outputs['cancer_incidence'][2020.0]))
-    assert terminal > 0, 'expected some cancers at the terminal tick'
-    assert full_year > 2.5 * terminal, (
-        f'full-year 2019 incidence ({full_year:.1f}) should be ~4x the single-tick '
-        f'terminal 2020 ({terminal:.1f}); got ratio {full_year / terminal:.2f} '
-        f'(a ratio near 1 means the annual accumulation regressed)')

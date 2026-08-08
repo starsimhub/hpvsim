@@ -7,15 +7,35 @@ import hpvsim as hpv
 
 @pytest.fixture(scope='module')
 def nathist_sim():
-    """One long single-genotype run (n=5000, 1990-2050, dt=0.25) that reaches
+    """One long single-genotype run (n=10000, 2000-2050, dt=0.5) that reaches
     every natural-history stage — clearance -> CIN -> cancer -> cancer death.
 
     The progression tests below only inspect scheduled/realized state, so they
     share this one run rather than each building a sim sized to the specific
     stage they check (this longest window is a superset of all of them).
+
+    Sizing: cancers are the scarcest stage, and they scale with agents x steps,
+    so the population is traded up against a coarser dt to keep a handful of
+    realized cancers (and tens of scheduled cancer deaths) at half the cost.
+    The tests assert those counts are non-zero rather than skipping quietly, so
+    a future shrink that loses the cancer stage fails loudly.
+    """
+    sim = hpv.Sim(n_agents=10000, location='nigeria',
+                  start=2000, stop=2050, dt=0.5, rand_seed=0)
+    sim.run()
+    return sim
+
+
+@pytest.fixture(scope='module')
+def cleared_sim():
+    """One shorter run (n=5000, 1990-2005, dt=1.0) with hundreds of clearances.
+
+    The four post-clearance immunity tests below all read the same
+    nab_imm / cell_imm / rel_sus / sev_imm state off a finished run, so they
+    share it. 15 years is plenty: ~500 females have cleared at least once.
     """
     sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2050, dt=0.25, rand_seed=0)
+                  start=1990, stop=2005, dt=1.0, rand_seed=0)
     sim.run()
     return sim
 
@@ -84,14 +104,14 @@ def test_set_prognoses_chain_consistency(nathist_sim):
     sim = nathist_sim
     mod = sim.diseases.hpv16
     has_cancer_sched = mod.ti_cancerous.notnan
-    if has_cancer_sched.any():
-        uids = has_cancer_sched.uids
-        # Compare time-step values directly
-        ti_cin = mod.ti_cin[uids]
-        ti_cancerous = mod.ti_cancerous[uids]
-        ti_dead = mod.ti_dead_cancer[uids]
-        assert (ti_cin <= ti_cancerous).all()
-        assert (ti_cancerous <= ti_dead).all()
+    assert has_cancer_sched.any(), 'no agent was ever scheduled for cancer — test is vacuous'
+    uids = has_cancer_sched.uids
+    # Compare time-step values directly
+    ti_cin = mod.ti_cin[uids]
+    ti_cancerous = mod.ti_cancerous[uids]
+    ti_dead = mod.ti_dead_cancer[uids]
+    assert (ti_cin <= ti_cancerous).all()
+    assert (ti_cancerous <= ti_dead).all()
 
 
 def test_step_state_progresses_precin_to_cin(nathist_sim):
@@ -99,10 +119,10 @@ def test_step_state_progresses_precin_to_cin(nathist_sim):
     sim = nathist_sim
     mod = sim.diseases.hpv16
     has_cin_sched = mod.ti_cin.notnan
-    if has_cin_sched.any():
-        uids = has_cin_sched.uids
-        passed = sim.t.ti >= mod.ti_cin[uids]
-        assert passed.any(), 'No CIN-scheduled agent ever had ti >= ti_cin by sim end'
+    assert has_cin_sched.any(), 'no agent was ever scheduled for CIN — test is vacuous'
+    uids = has_cin_sched.uids
+    passed = sim.t.ti >= mod.ti_cin[uids]
+    assert passed.any(), 'No CIN-scheduled agent ever had ti >= ti_cin by sim end'
 
 
 def test_step_state_progresses_cin_to_cancerous(nathist_sim):
@@ -110,13 +130,13 @@ def test_step_state_progresses_cin_to_cancerous(nathist_sim):
     sim = nathist_sim
     mod = sim.diseases.hpv16
     cancerous_now = mod.cancerous.uids
-    if len(cancerous_now):
-        # Cancer agents are not currently infected and not susceptible
-        assert not mod.infected[cancerous_now].any()
-        assert not mod.susceptible[cancerous_now].any()
-        # And rel_trans = 0
-        rel_trans_arr = np.asarray(mod.rel_trans[cancerous_now])
-        assert (rel_trans_arr == 0).all()
+    assert len(cancerous_now), 'no agent is cancerous at sim end — test is vacuous'
+    # Cancer agents are not currently infected and not susceptible
+    assert not mod.infected[cancerous_now].any()
+    assert not mod.susceptible[cancerous_now].any()
+    # And rel_trans = 0
+    rel_trans_arr = np.asarray(mod.rel_trans[cancerous_now])
+    assert (rel_trans_arr == 0).all()
 
 
 def test_step_state_cancer_death_removes_agents(nathist_sim):
@@ -174,15 +194,13 @@ def test_hpv_has_raw_immunity_states():
         assert np.allclose(np.asarray(arr.values), 0.0)
 
 
-def test_cleared_agents_have_reduced_susceptibility():
+def test_cleared_agents_have_reduced_susceptibility(cleared_sim):
     """After running a sim, female agents who seroconverted after clearance
     have rel_sus < 1.0 (Connector-derived from running-max nab_imm samples).
     Males are excluded: male immunity is never updated on clearance, so males
     retain rel_sus = 1.0.  Only females with nab_imm > 0 are checked here.
     """
-    sim = hpv.Sim(n_agents=500, location='nigeria',
-                  start=1990, stop=1995, dt=0.25, rand_seed=0)
-    sim.run()
+    sim = cleared_sim
     mod = sim.diseases.hpv16
 
     # Female agents who have ever been infected, are now susceptible (cleared),
@@ -199,11 +217,9 @@ def test_cleared_agents_have_reduced_susceptibility():
                 f'seroconverted female cleared agents have rel_sus={rel_sus_arr[:5]}; expected <1.0'
 
 
-def test_clearance_writes_raw_immunity_not_effective():
+def test_clearance_writes_raw_immunity_not_effective(cleared_sim):
     """After Task 7: HPV.step_state writes nab_imm/cell_imm; rel_sus/sev_imm are Connector-derived."""
-    sim = hpv.Sim(n_agents=2000, location='nigeria',
-                  start=1990, stop=2010, dt=0.5, rand_seed=0)
-    sim.run()
+    sim = cleared_sim
     mod = sim.diseases.hpv16
     # After running, agents that have ever cleared should have nab_imm > 0.
     nab = np.asarray(mod.nab_imm.values)
@@ -266,34 +282,30 @@ def test_per_genotype_init_prev_curve():
         assert n_init > 0, f'{key} seeded zero initial infections'
 
 
-def test_clearance_sero_prob_gates_first_immunity():
+def test_clearance_sero_prob_gates_first_immunity(cleared_sim):
     """First-clearance immunity is gated on sero_prob; ~(1-sero_prob) of
     first-cleared agents keep nab_imm=0 (still fully susceptible)."""
-    sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2010, dt=0.5, rand_seed=0)
-    sim.run()
+    sim = cleared_sim
     mod = sim.diseases.hpv16
     # Females who ever cleared. Use ti_clearance.notnan as a proxy for cleared
     # at least once. (Only females have CIN; clearance from precin can also
     # set ti_clearance.)
     female = sim.people.female
     ever_cleared_f = (mod.ti_clearance.notnan & female).uids
-    if len(ever_cleared_f) >= 50:
-        nab = np.asarray(mod.nab_imm[ever_cleared_f])
-        zero_imm_frac = float((nab == 0).sum()) / float(len(ever_cleared_f))
-        # Approximate: with sero_prob=0.75, ~25% of FIRST clearances stay 0;
-        # but agents who clear multiple times get repeat-path updates which
-        # always boost. So zero_imm_frac is bounded above by (1 - sero_prob).
-        # Some flexibility in the upper bound; just verify it's > 0 and < 0.30.
-        assert 0.0 < zero_imm_frac < 0.30, \
-            f'zero_imm_frac={zero_imm_frac:.3f}; expected sero_prob gating in (0, 0.30)'
+    assert len(ever_cleared_f) >= 50, 'too few cleared females to estimate the sero_prob gate'
+    nab = np.asarray(mod.nab_imm[ever_cleared_f])
+    zero_imm_frac = float((nab == 0).sum()) / float(len(ever_cleared_f))
+    # Approximate: with sero_prob=0.75, ~25% of FIRST clearances stay 0;
+    # but agents who clear multiple times get repeat-path updates which
+    # always boost. So zero_imm_frac is bounded above by (1 - sero_prob).
+    # Some flexibility in the upper bound; just verify it's > 0 and < 0.30.
+    assert 0.0 < zero_imm_frac < 0.30, \
+        f'zero_imm_frac={zero_imm_frac:.3f}; expected sero_prob gating in (0, 0.30)'
 
 
-def test_clearance_males_get_no_immunity():
+def test_clearance_males_get_no_immunity(cleared_sim):
     """Males never get post-clearance immunity (gated to cleared females)."""
-    sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2010, dt=0.5, rand_seed=0)
-    sim.run()
+    sim = cleared_sim
     mod = sim.diseases.hpv16
     males = ~sim.people.female
     male_uids = males.uids

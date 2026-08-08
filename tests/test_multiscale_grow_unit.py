@@ -9,22 +9,66 @@ import pytest
 
 # Module-scoped shared runs. The multiscale-grow invariant tests below are
 # read-only on post-run state, so they share one expensive run each instead of
-# rebuilding it per test. (For these to share under ``pytest -n auto``, the CI
-# command uses ``--dist loadscope`` so a module's tests stay on one worker.)
+# rebuilding it per test.
+#
+# ``grown`` also carries the AgeMigration call records, so the two white-box
+# emigration tests read them off the same run rather than each paying for their
+# own ms_agent_ratio=10 sim. dt=0.5 over 1990-2020 at n=3000 is the cheapest
+# window that still grows a few hundred fine agents, infects most of them, and
+# fires the per-band fine-emigration hazard tens of times — see the non-vacuity
+# assertions in each test.
+class _GrownRun:
+    """A finished ms_agent_ratio=10 sim plus what AgeMigration did during it."""
+    def __init__(self, sim):
+        self.sim = sim
+        self.fine_in_emigrate = []   # per _emigrate call: was any candidate fine?
+        self.fine_existed = []       # per _emigrate call: did any fine agent exist?
+        self.hazard_removed = []     # per _emigrate_fine call: how many were removed?
+
+
 @pytest.fixture(scope='module')
-def grown_sim():
-    """One ms_agent_ratio=10 run (n=6000, 1980-2025) with fine agents grown."""
-    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
-                  ms_agent_ratio=10, rand_seed=7)
+def grown():
+    """One ms_agent_ratio=10 run with both AgeMigration emigration paths recorded."""
+    from hpvsim.demographics import AgeMigration
+    sim = hpv.Sim(location='nigeria', n_agents=3000, start=1990, stop=2020,
+                  dt=0.5, ms_agent_ratio=10, rand_seed=6)
+    sim.init()
+    run = _GrownRun(sim)
+    mig = [d for d in sim.demographics.values() if isinstance(d, AgeMigration)][0]
+    ppl = sim.people
+    orig_emigrate, orig_emigrate_fine = mig._emigrate, mig._emigrate_fine
+
+    def recording_emigrate(band_uids, n):
+        # Query fine state AT THIS MOMENT (before request_removal removes agents).
+        if len(band_uids) > 0 and 'fine' in ppl.states:
+            run.fine_in_emigrate.append(bool(np.asarray(ppl.fine[band_uids]).any()))
+            run.fine_existed.append(bool(np.asarray(ppl.fine[ppl.auids]).any()))
+        return orig_emigrate(band_uids, n)
+
+    def recording_emigrate_fine(fine_band_uids, p):
+        orig_emigrate_fine(fine_band_uids, p)
+        # Count fine uids newly marked for removal by this call.
+        if len(fine_band_uids):
+            just = fine_band_uids[np.asarray(ppl.ti_removed[fine_band_uids]) == sim.ti]
+            run.hazard_removed.append(len(just))
+
+    mig._emigrate = recording_emigrate
+    mig._emigrate_fine = recording_emigrate_fine
     sim.run()
-    return sim
+    return run
+
+
+@pytest.fixture(scope='module')
+def grown_sim(grown):
+    """The finished ms_agent_ratio=10 sim, for tests that don't need the records."""
+    return grown.sim
 
 
 @pytest.fixture(scope='module')
 def ratio1_sim():
-    """One ms_agent_ratio==1 run (n=4000, 1990-2020) — no fine agents."""
-    sim = hpv.Sim(location='nigeria', n_agents=4000, start=1990, stop=2020,
-                  ms_agent_ratio=1, rand_seed=1)
+    """One ms_agent_ratio==1 run (n=2000, 1990-2010) — no fine agents."""
+    sim = hpv.Sim(location='nigeria', n_agents=2000, start=1990, stop=2010,
+                  dt=0.5, ms_agent_ratio=1, rand_seed=1)
     sim.run()
     return sim
 
@@ -112,7 +156,7 @@ def test_fine_agents_excluded_from_network(grown_sim):
     p2 = set(np.asarray(edges.p2).tolist())
     assert fine_set.isdisjoint(p1) and fine_set.isdisjoint(p2)
 
-def test_fine_agents_excluded_from_pyramid_emigration():
+def test_fine_agents_excluded_from_pyramid_emigration(grown):
     """Fine agents are excluded from the pyramid-target emigration path.
 
     AgeMigration._emigrate is the pyramid-TARGET path (removes excess real bodies
@@ -122,93 +166,39 @@ def test_fine_agents_excluded_from_pyramid_emigration():
     _emigrate_fine (see test_fine_agents_face_emigration_hazard), so this test
     asserts only that the pyramid-target path never receives a fine uid.
 
-    White-box: monkeypatch _emigrate to capture, at call-time, which of the
-    candidate band_uids are fine. Non-vacuous: with the snapshot filter removed
-    (``snap_uids = people.auids.copy()``), fine uids appear in band_uids and this
-    fails RED.
+    White-box: the ``grown`` fixture wraps _emigrate to capture, at call-time,
+    which of the candidate band_uids were fine. Non-vacuous: with the snapshot
+    filter removed (``snap_uids = people.auids.copy()``), fine uids appear in
+    band_uids and this fails RED.
     """
-    from hpvsim.demographics import AgeMigration
-    import numpy as np
-
-    # Each entry is True if any uid in that _emigrate call was fine at call-time.
-    any_fine_emigrated = []
-    fine_existed = []          # Track whether fine agents existed when _emigrate fired
-
-    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1980, stop=2025,
-                  ms_agent_ratio=10, rand_seed=6)
-    sim.init()
-
-    # Find the AgeMigration instance so we can wrap its _emigrate method.
-    mig = [d for d in sim.demographics.values()
-           if isinstance(d, AgeMigration)][0]
-    ppl = sim.people
-    orig_emigrate = mig._emigrate
-
-    def recording_emigrate(band_uids, n):
-        # Query fine state AT THIS MOMENT (before request_removal removes agents).
-        if len(band_uids) > 0 and 'fine' in ppl.states:
-            fine_flags = np.asarray(ppl.fine[band_uids])
-            any_fine_emigrated.append(fine_flags.any())
-            # Also record whether any fine agents exist right now (non-vacuous guard).
-            all_alive = ppl.auids
-            fine_existed.append(np.asarray(ppl.fine[all_alive]).any())
-        return orig_emigrate(band_uids, n)
-
-    mig._emigrate = recording_emigrate
-    sim.run()
-
     # Non-vacuous guard: _emigrate must have fired at least once while fine agents
     # existed, proving the scenario was actually exercised.
-    assert any(fine_existed), (
+    assert any(grown.fine_existed), (
         '_emigrate never fired while fine agents existed — test is vacuous'
     )
 
     # Core behavioral assertion: none of the band_uids passed to _emigrate were
     # fine at call-time.
-    assert not any(any_fine_emigrated), (
+    assert not any(grown.fine_in_emigrate), (
         'AgeMigration emigrated at least one fine agent (snapshot filter missing)'
     )
 
 
-def test_fine_agents_face_emigration_hazard():
+def test_fine_agents_face_emigration_hazard(grown):
     """Fine agents DO face an independent per-band emigration hazard.
 
     Task 9 fix: fine agents are excluded from the pyramid target, but if they
     were excluded from emigration entirely they would over-realize cancer vs
     single scale (the coarse source can emigrate before its cancer fires, but
     its fine peers otherwise cannot). AgeMigration._emigrate_fine applies a
-    per-band Bernoulli hazard to fine agents. This test wraps it to confirm it
-    fires and removes fine agents at ms_agent_ratio>1.
+    per-band Bernoulli hazard to fine agents. The ``grown`` fixture wraps it to
+    count removals; this asserts it fires at ms_agent_ratio>1.
 
-    White-box: wrap _emigrate_fine to count removals. Non-vacuous: asserts fine
-    agents existed AND at least one was emigrated via the hazard over the run.
+    Non-vacuous: asserts fine agents existed AND at least one was emigrated via
+    the hazard over the run.
     """
-    from hpvsim.demographics import AgeMigration
-    import numpy as np
-
-    removed_fine = []
-    sim = hpv.Sim(location='nigeria', n_agents=6000, start=1970, stop=2030,
-                  ms_agent_ratio=10, rand_seed=6)
-    sim.init()
-    mig = [d for d in sim.demographics.values()
-           if isinstance(d, AgeMigration)][0]
-    ppl = sim.people
-    orig = mig._emigrate_fine
-
-    def recording(fine_band_uids, p):
-        before = len(ppl.auids)
-        orig(fine_band_uids, p)
-        # count fine uids newly marked for removal this call
-        if len(fine_band_uids):
-            ti = sim.ti
-            just = fine_band_uids[np.asarray(ppl.ti_removed[fine_band_uids]) == ti]
-            removed_fine.append(len(just))
-
-    mig._emigrate_fine = recording
-    sim.run()
-
-    assert ppl.fine.values.any() or len(removed_fine) > 0, 'no fine agents grown'
-    assert sum(removed_fine) > 0, (
+    assert grown.sim.people.fine.values.any() or grown.hazard_removed, 'no fine agents grown'
+    assert sum(grown.hazard_removed) > 0, (
         'no fine agent was emigrated via the per-band hazard — fine agents are '
         'not facing emigration competing-risk (Task 9 incidence inflation returns)'
     )

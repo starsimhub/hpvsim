@@ -32,11 +32,34 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run all tests
         working-directory: ./tests
-        # --dist loadscope keeps each module's tests on one worker so module-scoped
-        # sim fixtures build once per module instead of once per worker.
-        run: pytest test_*.py -n auto --dist loadscope -m "not slow" --durations=0 --junitxml=test-results.xml # Run actual tests
+        run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml # Run actual tests
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
         with:
           report_paths: './tests/test-results.xml'
+
+  devtests:
+    # The statistical acceptance gates in ./devtests take ~15-20 min, so they run
+    # on the nightly schedule (and on demand) rather than on every pull request.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    name: Developer tests
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@master
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install HPVsim
+        run:  pip install -e .
+      - name: Download data on first load
+        run: hpvsim-download-data
+      - name: Install tests
+        working-directory: ./tests
+        run: pip install -r requirements.txt
+      - name: Run developer tests
+        working-directory: ./devtests
+        run: pytest -n auto --durations=0
