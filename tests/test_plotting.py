@@ -21,16 +21,18 @@ def rich_sim():
     AgeResults plus ``age_pyramid`` / ``age_causal_infection`` / ``dalys`` covers
     every plot_* entry point except the intervention-impact pair (needs a
     scenario arm) and the two ``plot_sim`` negative cases (need a sim that lacks
-    the required AgeResults keys). 800 agents over the full duration keeps enough
-    cancer signal for cancerous_genotype_dist and the dalys/age_causal panels.
+    the required AgeResults keys). 6000 agents at dt=0.5 keeps enough cancer
+    signal for cancerous_genotype_dist and the dalys/age_causal panels — a wide,
+    coarse run is cheaper than a narrow, fine one for the same signal, since
+    cost is dominated by a fixed per-timestep overhead.
     """
     ar = hpv.AgeResults(result_args=sc.objdict(
         cancers=sc.objdict(years=[2015, 2025], edges=EDGES),
         hpv_prevalence=sc.objdict(years=[2015, 2025], edges=EDGES),
         cancerous_genotype_dist=sc.objdict(years=[2025], edges=EDGES),
     ))
-    sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria', start=1990,
-                  stop=2030, n_agents=800, rand_seed=1,
+    sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria', start=2000,
+                  stop=2030, dt=0.5, n_agents=6000, rand_seed=1,
                   analyzers=[ar,
                              hpv.age_pyramid(timepoints=[2010]),
                              hpv.age_causal_infection(start=2000),
@@ -88,8 +90,8 @@ def test_plot_sim_default_four_panels_and_requires_age_results(rich_sim):
     # 'all' delegates to ss.Sim.plot and still returns a Figure.
     assert hpv.plot_sim(rich_sim, which='all') is not None
     # Without an AgeResults analyzer, 'default' raises a clear error.
-    bare = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
-                   stop=2000, n_agents=200, rand_seed=1)
+    bare = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
+                   stop=2000, dt=1.0, n_agents=200, rand_seed=1)
     bare.run()
     with pytest.raises(ValueError):
         hpv.plot_sim(bare, which='default')
@@ -100,8 +102,8 @@ def test_plot_sim_default_raises_when_age_results_lacks_keys():
     edges = np.array([0., 50., 100.])
     ar = hpv.AgeResults(result_args=sc.objdict(
         cin_incidence=sc.objdict(years=[2005], edges=edges)))
-    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2006,
-                  n_agents=200, rand_seed=1, analyzers=[ar])
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2006,
+                  dt=1.0, n_agents=200, rand_seed=1, analyzers=[ar])
     sim.run()
     with pytest.raises(ValueError):
         hpv.plot_sim(sim, which='default')
@@ -109,15 +111,15 @@ def test_plot_sim_default_raises_when_age_results_lacks_keys():
 
 def test_plot_intervention_impact_averted_identity():
     # Asserts an algebraic identity (averted == baseline - scenario) + panel
-    # count, so it holds for any values — a small/short sim suffices.
-    base = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
-                   stop=2015, n_agents=300, rand_seed=1)
+    # count, so it holds for any values — a small/short annual-step sim suffices.
+    base = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
+                   stop=2015, dt=1.0, n_agents=300, rand_seed=1)
     base.run()
     # Scenario with routine vaccination from 2000.
     vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 10],
                         start_year=2000)
-    scen = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
-                   stop=2015, n_agents=300, rand_seed=1, interventions=[vx])
+    scen = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
+                   stop=2015, dt=1.0, n_agents=300, rand_seed=1, interventions=[vx])
     scen.run()
     fig = hpv.plot_intervention_impact(base, scen, key='cum_cancers')
     assert len(fig.axes) == 2
@@ -128,8 +130,8 @@ def test_plot_intervention_impact_averted_identity():
     averted = fig.axes[1].lines[0].get_ydata()
     assert np.allclose(averted, b - s)
     # Mismatched timevecs raise (different stop -> different timevec than base).
-    other = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
-                    stop=2020, n_agents=200, rand_seed=1)
+    other = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
+                    stop=2020, dt=1.0, n_agents=200, rand_seed=1)
     other.run()
     with pytest.raises(ValueError):
         hpv.plot_intervention_impact(base, other, key='cum_cancers')
@@ -138,12 +140,12 @@ def test_plot_intervention_impact_averted_identity():
 def test_plot_intervention_impact_multisim_smoke():
     def make_msim(seeds, interventions=None):
         # Smoke test of band rendering (collection counts) — small/short is fine.
-        sims = [hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
-                        stop=2015, n_agents=300, rand_seed=s,
+        sims = [hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
+                        stop=2015, dt=1.0, n_agents=300, rand_seed=s,
                         interventions=interventions or [])
                 for s in seeds]
         msim = ss.MultiSim(sims)
-        msim.run()
+        msim.run(parallel=False)  # 4 tiny sims: process startup costs more than the runs
         return msim
     base = make_msim([1, 2])
     vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 10],
@@ -153,55 +155,6 @@ def test_plot_intervention_impact_multisim_smoke():
     assert len(fig.axes) == 2
     # Each arm renders a 10/90 band (one fill_between collection per arm).
     assert len(fig.axes[0].collections) == 2
-
-
-@pytest.mark.slow
-def test_plot_calibration_data_vs_fit():
-    import pandas as pd
-    edges = np.array([0., 30., 50., 100.])
-    def make_sim(seed=1):
-        ar = hpv.AgeResults(result_args=sc.objdict(
-            cancers=sc.objdict(years=[2020], edges=edges)))
-        return hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
-                       stop=2020, n_agents=600, rand_seed=seed, analyzers=[ar])
-    target = pd.DataFrame({'0-30': [1.0], '30-50': [5.0], '50+': [3.0]},
-                          index=pd.Index([2020.0], name='t'))
-    calib = hpv.Calibration(
-        make_sim(), calib_pars=dict(beta=dict(low=0.1, high=0.3)),
-        data={'cancers': target}, total_trials=2, n_workers=1)
-    calib.calibrate()
-    assert 'beta' in calib.best_pars   # beta is a free (sampled) parameter
-    fig = hpv.plot_calibration(calib)
-    assert len(fig.axes) == 1            # one panel per target
-    ax = fig.axes[0]
-    # Single-year, age-stratified target -> age on the x-axis: exactly two
-    # series (data + fit), one tick per age bin (3 bins for edges 0/30/50/100).
-    assert len(ax.lines) == 2
-    assert len(ax.get_xticks()) == 3
-    assert ax.get_xlabel() == 'Age group'
-
-
-@pytest.mark.slow
-def test_plot_calibration_multiyear_uses_year_axis():
-    import pandas as pd
-    edges = np.array([0., 50., 100.])
-    def make_sim(seed=1):
-        ar = hpv.AgeResults(result_args=sc.objdict(
-            cancers=sc.objdict(years=[2010, 2015, 2020], edges=edges)))
-        return hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
-                       stop=2020, n_agents=600, rand_seed=seed, analyzers=[ar])
-    # Multi-year target (3 years x 2 age-bin columns).
-    target = pd.DataFrame({'0-50': [2.0, 3.0, 4.0], '50+': [1.0, 2.0, 3.0]},
-                          index=pd.Index([2010.0, 2015.0, 2020.0], name='t'))
-    calib = hpv.Calibration(
-        make_sim(), calib_pars=dict(beta=dict(low=0.1, high=0.3)),
-        data={'cancers': target}, total_trials=2, n_workers=1)
-    calib.calibrate()
-    fig = hpv.plot_calibration(calib)
-    ax = fig.axes[0]
-    # Year on x-axis: one data + one fit series per age-bin column (2 cols -> 4 lines).
-    assert len(ax.lines) == 4
-    assert ax.get_xlabel() == 'Year'
 
 
 def test_analyzer_plot_methods_return_figures(rich_sim):

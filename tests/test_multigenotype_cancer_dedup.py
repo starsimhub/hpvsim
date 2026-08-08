@@ -12,11 +12,17 @@ import hpvsim as hpv
 
 @pytest.fixture(scope='module')
 def multigenotype_sim():
-    """One 4-genotype run shared (read-only) by both dedup tests below."""
+    """One 4-genotype run shared (read-only) by both dedup tests below.
+
+    Both tests are about how cancers are attributed, so the run has to actually
+    produce some: 6000 agents at dt=0.5 over 2000-2050 realizes ~30-40 cancers
+    across the four genotypes, and both tests assert that total is non-zero so
+    a future shrink can't make them pass vacuously.
+    """
     sim = hpv.Sim(
         location='nigeria',
-        start=1990, stop=2050,
-        n_agents=2000,
+        start=2000, stop=2050, dt=0.5,
+        n_agents=6000,
         genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
         rand_seed=0,
     )
@@ -41,6 +47,9 @@ def test_no_double_counting_of_multigenotype_cancers(multigenotype_sim):
     for mod in genotypes:
         cancerous_count_per_agent += np.asarray(mod.cancerous.raw).astype(int)
 
+    assert cancerous_count_per_agent.sum() > 0, (
+        'no agent is cancerous at sim end — the dedup rule is untested here'
+    )
     max_concurrent = int(cancerous_count_per_agent.max())
     n_double = int((cancerous_count_per_agent >= 2).sum())
     assert max_concurrent <= 1, (
@@ -75,6 +84,8 @@ def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
     }
     total_from_modules = sum(per_module_sums.values())
     total_hpvtotal = int(sim.results.all_hpv.new_cancers[:].sum())
+
+    assert total_hpvtotal > 0, 'no cancers recorded — aggregation is untested here'
 
     # 1. Aggregation invariant.
     assert total_from_modules == total_hpvtotal, (

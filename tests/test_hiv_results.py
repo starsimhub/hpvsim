@@ -17,7 +17,7 @@ def test_hiv_stratified_results_present_and_shaped():
 
 
 def test_stratified_cancers_sum_matches_total():
-    sim = hpv.Sim(n_agents=1500, start=1990, stop=2010, dt=0.25, location='nigeria',
+    sim = hpv.Sim(n_agents=4000, start=1990, stop=2010, dt=0.5, location='nigeria',
                   genotypes=[16, 18, 'hi5', 'ohr'], diseases=[hpv.HIV(beta_m2f=0.004)])
     sim.run()
     res = sim.results.hivstratifiedresults
@@ -41,7 +41,7 @@ def test_stratified_cancers_scale_weighted_at_ms_gt_1():
     the stratified total a lower bound on the total. Regression guard for the
     fix to HIVStratifiedResults.step (was raw int sums).
     """
-    sim = hpv.Sim(n_agents=1500, start=1990, stop=2010, dt=0.25, location='nigeria',
+    sim = hpv.Sim(n_agents=4000, start=1990, stop=2010, dt=0.5, location='nigeria',
                   genotypes=[16, 18, 'hi5', 'ohr'], ms_agent_ratio=5,
                   diseases=[hpv.HIV(beta_m2f=0.004)])
     sim.run()

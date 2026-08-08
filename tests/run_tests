@@ -2,5 +2,4 @@
 # Run the integration tests Requires pytest-xdist:
 #   pip install pytest-xdist
 
-# SCIRIS_INTERACTIVE=0
 pytest test_*.py -n auto --durations=0

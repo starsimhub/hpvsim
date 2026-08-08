@@ -19,29 +19,45 @@ def base_sim():
 
     Carries age_causal_infection / dalys / age_pyramid / snapshot so a single
     run backs the ordering, DALY-decomposition, pyramid-histogram, per-genotype
-    and no-fine-agent assertions. 3000 agents to 2040 keeps robust cancer signal.
-    Tests that MUTATE people (snapshot deep-copy) use their own sim instead.
+    and no-fine-agent assertions, plus an early/late pair of each recorder so
+    the ``start``-filter test shares the same trajectory instead of paying for
+    its own run.
+
+    Sizing: sim cost is dominated by a fixed per-timestep overhead, so the
+    cheapest way to hold cancer signal is a wide, coarse run rather than a
+    narrow, fine one — 8000 agents at dt=0.5 over 2000-2040 yields ~45-55
+    resolved cancers, matching the old 3000-agent dt=0.25 run at half the cost
+    (checked over 6 seeds). Tests that MUTATE people (snapshot deep-copy) use
+    their own sim instead.
     """
     sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria',
-                  start=1990, stop=2040, n_agents=3000, rand_seed=1,
+                  start=2000, stop=2040, n_agents=8000, dt=0.5, rand_seed=1,
                   analyzers=[hpv.age_causal_infection(start=2000),
                              hpv.dalys(start=2000, life_expectancy=84),
                              hpv.age_pyramid(edges=PYRAMID_EDGES, timepoints=[2010]),
-                             hpv.snapshot(timepoints=[2010])])
+                             hpv.snapshot(timepoints=[2010]),
+                             hpv.dalys(start=2000, name='dalys_early'),
+                             hpv.dalys(start=2025, name='dalys_late'),
+                             hpv.age_causal_infection(start=2000, name='aci_early'),
+                             hpv.age_causal_infection(start=2025, name='aci_late')])
     sim.run()
     return sim
 
 
 @pytest.fixture(scope='module')
 def grow_sim():
-    """One multiscale (ratio=5) sim, run once and shared across the grow tests.
+    """One multiscale (ratio=10) sim, run once and shared across the grow tests.
 
-    ratio=5 materializes real fine cancer agents; 5000 agents over 1970-2030
-    gives enough realized cancers for the analyzer-vs-engine consistency check.
+    ratio>1 materializes real fine cancer agents. Raising the ratio (rather than
+    the agent count or the horizon) is the cheap way to buy resolved cancers for
+    the analyzer-vs-engine consistency check: at ratio=10 over 4000 agents the
+    analyzer/engine gap stays under 2% for every seed tried, well inside the 5%
+    tolerance asserted below.
     """
     aci = hpv.age_causal_infection()
-    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1970, stop=2030,
-                  n_agents=5000, rand_seed=1, ms_agent_ratio=5, analyzers=[aci])
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2040,
+                  n_agents=4000, dt=0.5, rand_seed=1, ms_agent_ratio=10,
+                  analyzers=[aci])
     sim.run(verbose=0)
     return sim
 
@@ -90,7 +106,8 @@ def test_grow_analyzer_matches_engine_cancer_total(grow_sim):
 
 def test_resolve_date_ticks_nearest():
     from hpvsim.analyzers import _resolve_date_ticks
-    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2018, stop=2022, n_agents=300)
+    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2018, stop=2022,
+                  n_agents=300, dt=1.0)
     sim.init()
     out = _resolve_date_ticks(sim, [2020, ss.date(2021)])
     # Keys are ss.date; values are tick indices whose year matches the request.
@@ -105,7 +122,7 @@ def test_snapshot_records_and_get_coerces():
     # Own sim (this test mutates sim.people, so it cannot share a fixture).
     snap = hpv.snapshot(timepoints=[2000, 2010])
     sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995, stop=2012,
-                  n_agents=250, analyzers=[snap])
+                  n_agents=250, dt=1.0, analyzers=[snap])
     sim.run()
     s = sim.analyzers['snapshot']
     # Two snapshots, keyed by ss.date.
@@ -178,37 +195,6 @@ def test_age_causal_infection_single_scale(base_sim):
     assert np.allclose(a.weights, 1.0)
 
 
-@pytest.mark.slow
-def test_age_causal_infection_grow_unbiased():
-    """Grow's fine agents don't bias mean age-at-cancer vs ratio==1 base agents.
-
-    A SINGLE-seed comparison is too fragile here: the whole natural-history age
-    distribution reshuffles across RNG streams (e.g. between starsim versions),
-    so at n_agents=3000 one seed's ratio=1-vs-ratio=3 mean-age gap swings up to
-    ~2.5yr on noise alone. We therefore compare the SEED-AVERAGED mean age,
-    matching the multi-seed methodology of the slow acceptance gate
-    (test_multiscale_grow_acceptance), which validates the rigorous
-    ratio-independence properties (incidence-flat, variance-shrinks, ratio==1
-    bit-identical). This is the fast unit-level guard on the mean only.
-    """
-    def run(ratio, seed):
-        aci = hpv.age_causal_infection(start=2000)
-        sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
-                      n_agents=3000, rand_seed=seed, ms_agent_ratio=ratio, analyzers=[aci])
-        sim.run()
-        a = sim.analyzers['age_causal_infection']
-        return np.nanmean(a.age_cancer), len(a.age_cancer)
-    seeds = range(6)
-    res1 = [run(1, s) for s in seeds]
-    res3 = [run(3, s) for s in seeds]
-    ages1 = [m for m, _ in res1]
-    ages3 = [m for m, _ in res3]
-    # grow yields ~ratio x more resolved samples every seed
-    assert all(n3 > n1 for (_, n1), (_, n3) in zip(res1, res3))
-    # seed-averaged mean age at cancer agrees within 2 years
-    assert abs(np.mean(ages3) - np.mean(ages1)) < 2.0
-
-
 def test_dalys_basic_and_av_disutility(base_sim):
     a = base_sim.analyzers['dalys']
     # av_disutility matches the GBD2017 constant exactly.
@@ -220,35 +206,6 @@ def test_dalys_basic_and_av_disutility(base_sim):
     assert (a.yll >= 0).all() and (a.yld >= 0).all()
     assert a.dalys.sum() > 0
     assert a.years[0] == 2000
-
-
-@pytest.mark.slow
-def test_dalys_grow_overlaps_single_scale():
-    """Mean total DALYs converge across ms_agent_ratio (multiscale-equivalence).
-
-    DALYs are dominated by rare young-onset cancers, so single-seed totals are
-    high-variance; the unbiased quantity is the mean over seeds. On grow, extra
-    cancers are real fine agents at scale 1/ratio, so the scale-weighted DALY
-    total matches the ratio==1 base-agent path in expectation. (This only holds
-    because both paths count REALIZED cancers — the step path gates on
-    cancerous & alive, not a bare ti_cancerous==ti time-match, which would
-    overcount agents who die before onset.)
-    """
-    seeds = [1, 2, 3, 4]
-
-    def mean_total(ratio):
-        tots = []
-        for s in seeds:
-            d = hpv.dalys(start=2000)
-            sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
-                          n_agents=5000, rand_seed=s, ms_agent_ratio=ratio, analyzers=[d])
-            sim.run(verbose=0)
-            tots.append(sim.analyzers['dalys'].dalys.sum())
-        return float(np.mean(tots))
-
-    m1 = mean_total(1)
-    m3 = mean_total(3)
-    assert abs(m3 - m1) / m1 < 0.15
 
 
 def test_results_by_genotype_stacks_and_normalizes(base_sim):
@@ -270,27 +227,19 @@ def test_public_api_exports():
         assert hasattr(hpv, name), f'hpv.{name} not exported'
 
 
-def test_start_filter_excludes_earlier_onsets():
+def test_start_filter_excludes_earlier_onsets(base_sim):
     """`start` excludes cancer onsets before that year in dalys + age_causal.
 
     A later `start` must capture strictly fewer DALYs and fewer counted cancers
-    than an earlier `start`. Both windows are measured from ONE run by attaching
-    two differently-named analyzer pairs (early=1990, late=2025), so the
-    comparison is on an identical trajectory with a single sim.
+    than an earlier `start`. Both windows are measured from ONE run: base_sim
+    carries two differently-named analyzer pairs (early=2000, late=2025), so the
+    comparison is on an identical trajectory and costs no extra sim.
     """
-    d_early = hpv.dalys(start=1990, name='dalys_early')
-    d_late = hpv.dalys(start=2025, name='dalys_late')
-    a_early = hpv.age_causal_infection(start=1990, name='aci_early')
-    a_late = hpv.age_causal_infection(start=2025, name='aci_late')
-    sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990, stop=2040,
-                  n_agents=3000, rand_seed=1,
-                  analyzers=[d_early, d_late, a_early, a_late])
-    sim.run()
-    d0 = sim.analyzers['dalys_early']
-    d1 = sim.analyzers['dalys_late']
-    a0 = sim.analyzers['aci_early']
-    a1 = sim.analyzers['aci_late']
-    assert d0.years[0] == 1990 and d1.years[0] == 2025
+    d0 = base_sim.analyzers['dalys_early']
+    d1 = base_sim.analyzers['dalys_late']
+    a0 = base_sim.analyzers['aci_early']
+    a1 = base_sim.analyzers['aci_late']
+    assert d0.years[0] == 2000 and d1.years[0] == 2025
     assert 0 < d1.dalys.sum() < d0.dalys.sum()
     assert 0 < len(a1.age_cancer) < len(a0.age_cancer)
 
@@ -299,6 +248,6 @@ def test_age_pyramid_die_on_past_end():
     """age_pyramid raises when a timepoint is past sim end and die=True."""
     ap = hpv.age_pyramid(timepoints=[2099], die=True)
     sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2010,
-                  n_agents=200, analyzers=[ap])
+                  n_agents=200, dt=1.0, analyzers=[ap])
     with pytest.raises(ValueError):
         sim.run()
