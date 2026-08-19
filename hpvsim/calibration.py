@@ -79,7 +79,8 @@ class Calibration(ss.Calibration):
             raise TypeError(
                 f'hpv.Calibration.data must be a dict; got {type(data).__name__}')
         known = set(AgeResults._COUNT_TO_STATE) | set(AgeResults._PREV_TO_STATE) \
-            | set(AgeResults._INC_TO_ATTRS) | set(AgeResults._TYPE_DIST_TO_STATE)
+            | set(AgeResults._INC_TO_ATTRS) | set(AgeResults._FLOW_TO_ATTRS) \
+            | set(AgeResults._TYPE_DIST_TO_STATE)
         for key, df in data.items():
             if key not in known:
                 raise ValueError(

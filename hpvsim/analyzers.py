@@ -12,11 +12,16 @@ __all__ = ['AgeResults', 'snapshot', 'age_pyramid', 'age_causal_infection',
 class AgeResults(ss.Analyzer):
     """Snapshot age-binned simulation outputs at specified years.
 
-    Records counts (e.g. ``cancers``), prevalences (e.g. ``hpv_prevalence``),
-    incidences (e.g. ``cancer_incidence``), and per-genotype distributions
-    (e.g. ``cancerous_genotype_dist``) at each requested year. Observed
-    data and likelihood evaluation live on the ``CalibComponent`` side;
-    this class only produces simulation outputs.
+    Records annual event flows (``cancers``, ``cins`` — new events in the
+    calendar year, scaled to population units by ``sim.pars.pop_scale``),
+    prevalent stocks (``n_cancerous``, ``n_cin``, ``n_precin``,
+    ``n_infected``, ``hpv``), prevalences (e.g. ``hpv_prevalence``),
+    per-100k incidence rates (``cancer_incidence``, ``cin_incidence``),
+    and per-genotype distributions (``cancerous_genotype_dist``,
+    ``cin_genotype_dist``). Flow keys emit population-unit counts —
+    suitable for calibrating against absolute annual case-count targets
+    (e.g. Globocan). Observed data and likelihood evaluation live on the
+    ``CalibComponent`` side; this class only produces simulation outputs.
 
     Args:
         result_args (dict): nested dict / objdict where each top-level key
@@ -39,9 +44,10 @@ class AgeResults(ss.Analyzer):
     """
 
     # Result-name -> per-HPV-module BoolState attribute. Union across modules
-    # ("any genotype with this state").
+    # ("any genotype with this state"). Prevalent stocks — snapshotted at the
+    # year-end tick. See ``_FLOW_TO_ATTRS`` for the annual-flow counterparts
+    # (``cancers``, ``cins``) that live in population units.
     _COUNT_TO_STATE = {
-        'cancers':       'cancerous',
         'n_cancerous':   'cancerous',
         'n_cin':         'cin',
         'n_precin':      'precin',
@@ -66,6 +72,19 @@ class AgeResults(ss.Analyzer):
     _INC_TO_ATTRS = {
         'cancer_incidence':  ('ti_cancerous', 'cancerous'),
         'cin_incidence':     ('ti_cin',       'cin'),
+    }
+
+    # Result-name -> (event-time attr, in-state attr). Same annual-flow
+    # accumulator as ``_INC_TO_ATTRS``, but the year-end output is the raw
+    # event count multiplied by ``sim.pars.pop_scale`` — no denominator, no
+    # per-100k rescale. Matches the v2 ``age_results`` FLOW semantics for
+    # ``cancers`` / ``cins`` (annual events in population units), suitable
+    # for calibrating against absolute annual case-count targets (e.g.
+    # Globocan cancer-cases-by-age). Prevalent-stock counterparts live in
+    # ``_COUNT_TO_STATE`` as ``n_cancerous`` / ``n_cin``.
+    _FLOW_TO_ATTRS = {
+        'cancers':  ('ti_cancerous', 'cancerous'),
+        'cins':     ('ti_cin',       'cin'),
     }
 
     # Result-name -> per-HPV-module BoolState attribute used as numerator.
@@ -110,11 +129,11 @@ class AgeResults(ss.Analyzer):
             # Each requested year maps to the last sim tick within that
             # calendar year, so the rate is finalized at year-end.
             rdict.year_to_ti = self._resolve_year_ticks(sim, rdict.years)
-            # For incidence, annual flows must be summed across every sub-step
-            # of the calendar year (at dt<1 a single tick is only one
-            # sub-step). Precompute each year's full tick set + a numerator
-            # accumulator.
-            if rkey in self._INC_TO_ATTRS:
+            # For incidence and pop-scaled flows, annual events must be
+            # summed across every sub-step of the calendar year (at dt<1 a
+            # single tick is only one sub-step). Precompute each year's full
+            # tick set + a numerator accumulator.
+            if rkey in self._INC_TO_ATTRS or rkey in self._FLOW_TO_ATTRS:
                 tvy = sim.timevec.years
                 rdict.year_ticks = {
                     float(y): set(np.where((tvy >= y) & (tvy < y + 1))[0].tolist())
@@ -187,6 +206,20 @@ class AgeResults(ss.Analyzer):
                             self.outputs[rkey][year] = np.divide(
                                 self._inc_accum[rkey][year], denom,
                                 out=np.zeros(len(rdict.bins)), where=denom > 0) * 1e5
+                continue
+            # Population-scaled annual flow: accumulate the same sub-step
+            # events as incidence, but emit the raw sum multiplied by
+            # ``sim.pars.pop_scale`` at year-end. Matches v2 ``cancers`` /
+            # ``cins`` FLOW output (annual events in population units).
+            if rkey in self._FLOW_TO_ATTRS:
+                date_attr, state_attr = self._FLOW_TO_ATTRS[rkey]
+                for year, ticks in rdict.year_ticks.items():
+                    if ti in ticks:
+                        self._inc_accum[rkey][year] += self._incidence_numerator(
+                            rdict, date_attr, state_attr)
+                        if ti == rdict.year_to_ti[year]:
+                            self.outputs[rkey][year] = (
+                                self._inc_accum[rkey][year] * sim.pars.pop_scale)
                 continue
             # Stocks / prevalence / type-distribution: snapshot at year-end.
             year_match = [y for y, ti_y in rdict.year_to_ti.items() if ti_y == ti]

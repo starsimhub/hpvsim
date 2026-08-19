@@ -3,6 +3,16 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
+## Version 3.0.1 (2026-08-19)
+
+- Added `new_cancers` and `new_cins` result keys to `hpv.AgeResults`. Both are
+  annual event flows in population units (per-timestep cancer / CIN transitions
+  summed across the calendar year, weighted by `people.scale` and multiplied by
+  `sim.pars.pop_scale`), matching the semantics of the v2 `age_results` `cancers`
+  and `cins` flow keys. Calibrations against absolute annual case counts (e.g.
+  Globocan cancer-cases-by-age) should use `new_cancers`, not `cancers`
+  (`cancers` remains a raw prevalent-stock snapshot).
+
 ## Version 3.0.0 (2026-07-16)
 
 HPVsim v3 is a ground-up migration onto [Starsim](https://docs.starsim.org).
