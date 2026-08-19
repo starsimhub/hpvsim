@@ -254,7 +254,7 @@ def get_total_pop(location=None, pop_datafile=None):
     return df
 
 
-def get_death_rates(location=None, by_sex=True, overall=False):
+def get_death_rates(location=None, by_sex=True, overall=False, death_datafile=None):
     '''
     Load death rates for a given country or countries.
 
@@ -262,18 +262,20 @@ def get_death_rates(location=None, by_sex=True, overall=False):
         location (str or list): name of the country or countries to load the age distribution for
         by_sex (bool): whether to rates by sex
         overall (bool): whether to load total rate
+        death_datafile (str/Path): read from this CSV instead of the bundled data (schema: Time, AgeGrpStart, Sex, mx)
 
     Returns:
         death_rates (dict): death rates by age and sex
     '''
-    # Load the raw data
-    try:
-        df = load_file(files.death)
-    except Exception as E:
-        errormsg = f'Could not locate datafile with age-specific death rates by country. {download_tip}'
-        raise ValueError(errormsg) from E
-
-    raw_df = map_entries(df, location)
+    if death_datafile is not None:
+        raw_df = pd.read_csv(death_datafile)
+    else:
+        try:
+            df = load_file(files.death)
+        except Exception as E:
+            errormsg = f'Could not locate datafile with age-specific death rates by country. {download_tip}'
+            raise ValueError(errormsg) from E
+        raw_df = map_entries(df, location)
 
     sex_keys = []
     if by_sex: sex_keys += ['Male', 'Female']
@@ -296,25 +298,26 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     return result
 
 
-def get_birth_rates(location=None):
+def get_birth_rates(location=None, birth_datafile=None):
     '''
     Load crude birth rates for a given country
 
     Args:
         location (str or list): name of the country to load the birth rates for
+        birth_datafile (str/Path): read from this CSV instead of the bundled data (schema: Time, CBR)
 
     Returns:
         birth_rates (arr): years and crude birth rates
     '''
-    # Load the raw data
-    try:
-        birth_rate_data = load_file(files.birth)
-    except Exception as E:
-        errormsg = f'Could not locate datafile with birth rates by country. {download_tip}'
-        raise ValueError(errormsg) from E
-
-    raw_df = map_entries(birth_rate_data, location)
-    raw_df = raw_df.dropna()
+    if birth_datafile is not None:
+        raw_df = pd.read_csv(birth_datafile).dropna()
+    else:
+        try:
+            birth_rate_data = load_file(files.birth)
+        except Exception as E:
+            errormsg = f'Could not locate datafile with birth rates by country. {download_tip}'
+            raise ValueError(errormsg) from E
+        raw_df = map_entries(birth_rate_data, location).dropna()
     df = sc.dataframe(raw_df).reset_index().rename(columns={'Time':'year', 'CBR':'cbr'})
 
     return df

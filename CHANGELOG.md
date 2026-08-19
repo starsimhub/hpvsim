@@ -5,13 +5,57 @@ the term "Regression information".
 
 ## Version 3.0.1 (2026-08-19)
 
-- Added `new_cancers` and `new_cins` result keys to `hpv.AgeResults`. Both are
-  annual event flows in population units (per-timestep cancer / CIN transitions
-  summed across the calendar year, weighted by `people.scale` and multiplied by
-  `sim.pars.pop_scale`), matching the semantics of the v2 `age_results` `cancers`
-  and `cins` flow keys. Calibrations against absolute annual case counts (e.g.
-  Globocan cancer-cases-by-age) should use `new_cancers`, not `cancers`
-  (`cancers` remains a raw prevalent-stock snapshot).
+### AgeResults `cancers` / `cins` restored to v2 FLOW semantics
+
+In v3.0 the `hpv.AgeResults` `cancers` key produced a prevalent-stock
+snapshot (alive + cancerous at year-end tick, raw agent counts). Under v2 the
+same key was an annual event flow in population units. This release restores
+the v2 semantics — `cancers` and `cins` now emit annual new-event counts
+multiplied by `sim.pars.pop_scale`. Use `n_cancerous` / `n_cin` for the
+prevalent-stock snapshots.
+
+**Regression information:** any calibration or plot comparing
+`AgeResults['cancers']` to absolute annual case-count data (e.g. Globocan
+cancer-cases-by-age) was silently off by both a stock-vs-flow semantic shift
+and a `pop_scale` factor. It now matches. Scripts asserting exact prevalent
+stock counts should migrate to `n_cancerous`.
+
+### Demographics API additions
+
+- `hpv.Sim()` bare (no `location` supplied) is now a valid natural-history
+  playground: uniform ages 0-60 (starsim default), no births/deaths/
+  migration modules, location-agnostic default sexual network, `pop_scale=1`.
+  Emits an `ss.warn` describing the auto-configuration.
+- `hpv.Sim(location='<name>')` — when `total_pop` is not passed, it is now
+  auto-populated from the sum of the UN WPP per-age counts at the sim start
+  year (matches `stisim.Sim.process_demographics`). Previous v3.0 behavior
+  left `pop_scale=1` even with a location.
+- `hpv.Sim(location='<name>', datafolder='<path>')` — a new `datafolder`
+  kwarg accepts user-supplied CSVs (`age_data.csv`, `birth_rate.csv`,
+  `death_rate.csv`, `pop_total.csv`) for sub-national / custom locations.
+  Missing indicators emit a warning and fall back to the bundled UN WPP
+  data for the caller's `location`.
+- `hpv.demo(name=None, run=True, plot=True, **kwargs)` — new factory
+  returning a canonical example sim. Currently only `'nigeria'` is
+  registered (defaults on no-arg). Follows the `hivsim.demo` pattern
+  (extensible via `hpvsim.examples.EXAMPLES`).
+
+**Regression information:** any script using `hpv.Sim(location='<name>',
+...)` without passing `total_pop` explicitly will now see `pop_scale > 1`
+and downstream results scaled to real-population magnitudes. Any code that
+was implicitly relying on `pop_scale=1` (comparing raw agent counts to
+real-scale targets) must either pass `total_pop=n_agents` to preserve the
+old behavior, or divide finalized `sim.results` by `sim.pars.pop_scale`
+before use.
+
+### Miscellaneous fixes
+
+- `HIVStratifiedResults.hpv_prevalence_with_hiv` / `hpv_prevalence_no_hiv`
+  are now declared with `scale=False`. Previously the numerator was
+  multiplied by `pop_scale` at finalize but the denominator (a ratio) was
+  not, so the reported "prevalence" was inflated by `pop_scale`. Under
+  the old v3.0 default (`pop_scale=1`) the bug was invisible; the
+  demographics changes above expose it and this release fixes it.
 
 ## Version 3.0.0 (2026-07-16)
 

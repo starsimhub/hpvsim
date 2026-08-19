@@ -96,7 +96,10 @@ def test_grow_analyzer_matches_engine_cancer_total(grow_sim):
     is the acceptance test the abandoned ledger path used to paper over.
     """
     aci = grow_sim.analyzers['age_causal_infection']
-    engine_total = float(hpv.results_by_genotype(grow_sim, key='cum_cancers').iloc[-1].sum())
+    # results_by_genotype reads finalized sim.results, which are multiplied
+    # by pop_scale; the analyzer's aci.weights are people.scale-weighted
+    # agent-scale values. Compare on the same scale by dividing out pop_scale.
+    engine_total = float(hpv.results_by_genotype(grow_sim, key='cum_cancers').iloc[-1].sum()) / grow_sim.pars.pop_scale
     analyzer_total = float(aci.weights.sum())
     assert engine_total > 0
     assert abs(analyzer_total - engine_total) / engine_total < 0.05

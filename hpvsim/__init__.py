@@ -37,6 +37,7 @@ from .interventions import (
     BaseTxVx, routine_txvx, campaign_txvx, linked_txvx,
     dynamic_pars,
 )
+from .examples import demo
 
 rootdir = sc.thispath(__file__).parent
 
@@ -57,6 +58,7 @@ __all__ = [
     'BaseTreatment', 'treat_num', 'treat_delay',
     'BaseTxVx', 'routine_txvx', 'campaign_txvx', 'linked_txvx',
     'dynamic_pars',
+    'demo',
 ]
 
 del sc
