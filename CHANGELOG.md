@@ -5,20 +5,92 @@ the term "Regression information".
 
 ## Version 3.0.1 (2026-08-19)
 
-### AgeResults `cancers` / `cins` restored to v2 FLOW semantics
+### `by_age` analyzer (renamed from `AgeResults`, API redesigned)
 
-In v3.0 the `hpv.AgeResults` `cancers` key produced a prevalent-stock
-snapshot (alive + cancerous at year-end tick, raw agent counts). Under v2 the
-same key was an annual event flow in population units. This release restores
-the v2 semantics — `cancers` and `cins` now emit annual new-event counts
-multiplied by `sim.pars.pop_scale`. Use `n_cancerous` / `n_cin` for the
-prevalent-stock snapshots.
+`hpv.AgeResults` has been renamed to `hpv.by_age`, matching the naming
+convention of the other analyzers (`age_pyramid`, `age_causal_infection`,
+`dalys`, `snapshot`). The API was also redesigned:
 
-**Regression information:** any calibration or plot comparing
-`AgeResults['cancers']` to absolute annual case-count data (e.g. Globocan
-cancer-cases-by-age) was silently off by both a stock-vs-flow semantic shift
-and a `pop_scale` factor. It now matches. Scripts asserting exact prevalent
-stock counts should migrate to `n_cancerous`.
+```python
+ar = hpv.by_age('cancers')                              # one key
+ar = hpv.by_age(['cancers', 'hpv_prevalence'])          # multiple keys
+ar = hpv.by_age('cancers', years=2020)                  # reporting filter
+ar = hpv.by_age('cancers', edges=[0,25,50,75,100])      # custom bins
+```
+
+Storage is now per-timestep as one `ss.Result` per (key, age bin), named
+e.g. `sim.results.by_age.cancers_20_25`. This means:
+
+- Count and flow keys are declared `scale=True`, so starsim's
+  `finalize_results` multiplies by `sim.pars.pop_scale` automatically
+  (matches the v2 `cancers` / `cins` semantics).
+- Prevalence keys are declared `scale=False` (ratios in [0,1] should not
+  be scaled).
+- Individual per-bin Results can be annualized via `ss.Result.annualize()`.
+- Convenience 2D arrays are populated on the analyzer after finalize:
+  `sim.analyzers.by_age.cancers` is shape `(npts, n_bins)`.
+- `to_dataframe(key)` annualizes each per-bin Result and returns a
+  year-indexed DataFrame with age-bin columns.
+
+**Removed keys** (`normalize=` argument on `to_dataframe` also removed):
+
+- `cancerous_genotype_dist`, `cin_genotype_dist` — per-genotype-by-age
+  distributions. Use `hpv.results_by_genotype(sim, key='cum_cancers')`
+  at the sim level instead.
+- `cancer_incidence`, `cin_incidence` — per-100k rates. Compute from
+  `cancers` / an at-risk denominator externally.
+
+**Removed storage shape**: prevalence keys used to store `(n_bins, 2)`
+= `(num, denom)` per bin so `ss.BetaBinomial` calibration components
+could pull raw counts. Now storing the ratio directly. No one uses the
+BetaBinomial component today.
+
+### `AgeResults`-era `cancers` / `cins` semantics still hold
+
+Cancers / cins keys were changed in v3.0 → v3.0.1 from a prevalent-stock
+snapshot (raw agent counts) to an annual event flow multiplied by
+`sim.pars.pop_scale` — restoring v2 semantics. Use `n_cancerous` /
+`n_cin` for the prevalent-stock snapshots.
+
+**Regression information (AgeResults / by_age):** any calibration or
+plot comparing `AgeResults['cancers']` to absolute annual case-count
+data (e.g. Globocan cancer-cases-by-age) was silently off by both a
+stock-vs-flow semantic shift and a `pop_scale` factor. It now matches.
+Scripts asserting exact prevalent stock counts should migrate to
+`n_cancerous`. Downstream `hpv.AgeResults` references must be renamed
+to `hpv.by_age` and the `result_args=` API replaced with the positional-
+keys form above.
+
+### `age_pyramid` / `dalys` / `age_causal_infection` scaled to real pop
+
+Three analyzers previously stored per-agent counts weighted only by
+`people.scale` (multiscale weight, not `pop_scale`), so their outputs
+were in agent-scale units. They now multiply by `sim.pars.pop_scale` at
+finalize to emit real-population magnitudes, matching `sim.results.*`
+and `by_age` FLOW/COUNT semantics:
+
+- `age_pyramid.age_pyramids[date]` values × pop_scale.
+- `dalys.yll`, `dalys.yld`, `dalys.dalys` × pop_scale (removes the
+  "callers multiply" docstring caveat).
+- `age_causal_infection.weights` × pop_scale.
+
+### `HPVTotal.prevalence` and `HIVStratifiedResults.hpv_prevalence_*`
+
+These `ss.Result` fields were declared with the default `scale=True`, so
+starsim's finalize multiplied them by `pop_scale` — but they are ratios
+in [0,1] that should not be scaled. Now declared `scale=False`. Under
+the v3.0 default (`pop_scale=1`) the bug was invisible; the auto-populate
+change below exposes it.
+
+### `hpv.Calibration.worker` crash tolerance
+
+`ss.Calibration.worker` (in starsim) calls `study.optimize` bare. When
+one worker hits a transient Optuna storage error (e.g. SQLite lock under
+heavy parallelism), Optuna's own error handler raises
+`assert False, 'Should not reach.'`, taking the whole run down.
+`hpv.Calibration` now overrides `worker()` to wrap `study.optimize` in
+try/except — a single worker failure logs and returns None; the
+remaining workers complete. Matches `stisim.Calibration.worker`.
 
 ### Demographics API additions
 

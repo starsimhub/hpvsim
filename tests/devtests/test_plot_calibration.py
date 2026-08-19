@@ -22,7 +22,7 @@ def teardown_function():
 def test_plot_calibration_data_vs_fit():
     edges = np.array([0., 30., 50., 100.])
     def make_sim(seed=1):
-        ar = hpv.AgeResults(result_args=sc.objdict(
+        ar = hpv.by_age(result_args=sc.objdict(
             cancers=sc.objdict(years=[2020], edges=edges)))
         return hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
                        stop=2020, n_agents=600, rand_seed=seed, analyzers=[ar])
@@ -47,7 +47,7 @@ def test_plot_calibration_data_vs_fit():
 def test_plot_calibration_multiyear_uses_year_axis():
     edges = np.array([0., 50., 100.])
     def make_sim(seed=1):
-        ar = hpv.AgeResults(result_args=sc.objdict(
+        ar = hpv.by_age(result_args=sc.objdict(
             cancers=sc.objdict(years=[2010, 2015, 2020], edges=edges)))
         return hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1990,
                        stop=2020, n_agents=600, rand_seed=seed, analyzers=[ar])

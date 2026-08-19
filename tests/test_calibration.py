@@ -112,25 +112,22 @@ def test_compute_gof_zero_actual_max_does_not_divide():
 # default_eval_fn
 # ---------------------------------------------------------------------------
 
-def _sim_with_age_results(*, n_agents=400, years=(2020,), keys=('cancers',),
+def _sim_with_by_age(*, n_agents=400, years=(2020,), keys=('cancers',),
                          genotypes=None):
     edges = np.array([0., 30., 60., 100.])
-    args = sc.objdict()
-    for k in keys:
-        args[k] = sc.objdict(years=list(years), edges=edges)
     kw = dict(n_agents=n_agents, start=min(years) - 1,
-              stop=max(years) + 1, dt=1.0,
-              rand_seed=0, analyzers=[hpv.AgeResults(result_args=args)])
+              stop=max(years) + 1, dt=1.0, rand_seed=0,
+              analyzers=[hpv.by_age(list(keys), years=list(years), edges=edges)])
     if genotypes is not None:
         kw['genotypes'] = genotypes
     return hpv.Sim(**kw)
 
 
 def test_default_eval_fn_zero_when_data_matches_sim():
-    """If the data dataframe IS the sim's AgeResults output, mismatch is 0."""
-    sim = _sim_with_age_results(keys=('cancers',))
+    """If the data dataframe IS the sim's by_age output, mismatch is 0."""
+    sim = _sim_with_by_age(keys=('cancers',))
     sim.run()
-    ar = sim.analyzers['ageresults']
+    ar = sim.analyzers['by_age']
     actual = ar.to_dataframe(key='cancers')
 
     data = {'cancers': actual.copy()}
@@ -140,9 +137,9 @@ def test_default_eval_fn_zero_when_data_matches_sim():
 
 def test_default_eval_fn_weighted_sum_across_targets():
     """Total fit is sum of per-key compute_gof * weights[key]."""
-    sim = _sim_with_age_results(keys=('cancers', 'hpv_prevalence'))
+    sim = _sim_with_by_age(keys=('cancers', 'hpv_prevalence'))
     sim.run()
-    ar = sim.analyzers['ageresults']
+    ar = sim.analyzers['by_age']
     cancers = ar.to_dataframe(key='cancers')
     prev = ar.to_dataframe(key='hpv_prevalence')
 
@@ -167,28 +164,18 @@ def test_default_eval_fn_weighted_sum_across_targets():
     assert fit_weighted == pytest.approx(2.0 * gof_cancers + 0.5 * gof_prev)
 
 
-def test_default_eval_fn_type_distribution_uses_raw_counts():
-    """For genotype-distribution keys, eval_fn pulls raw counts (not proportions)."""
-    sim = _sim_with_age_results(
-        keys=('cancerous_genotype_dist',),
-        years=(2020,),
-        genotypes=[16, 18, 'hi5', 'ohr'],
-    )
-    sim.run()
-    ar = sim.analyzers['ageresults']
-    raw = ar.to_dataframe(key='cancerous_genotype_dist', normalize=False)
-
-    data = {'cancerous_genotype_dist': raw.copy()}
-    fit = hpv.calibration.default_eval_fn(sim, data=data)
-    assert fit == pytest.approx(0.0, abs=1e-9)
+# test_default_eval_fn_type_distribution_uses_raw_counts removed:
+# by_age no longer supports type-distribution keys
+# (cancerous_genotype_dist, cin_genotype_dist). Callers wanting per-genotype
+# distribution should use `hpv.results_by_genotype(sim, key='cum_cancers')`.
 
 
 def test_default_eval_fn_aligns_on_expected_subset():
     """data only needs to cover a subset of the sim's snapshot years/bins."""
-    sim = _sim_with_age_results(keys=('cancers',),
+    sim = _sim_with_by_age(keys=('cancers',),
                                 years=(2018, 2019, 2020))
     sim.run()
-    ar = sim.analyzers['ageresults']
+    ar = sim.analyzers['by_age']
     actual = ar.to_dataframe(key='cancers')
 
     # Pick a single year + a single age bin.
@@ -201,10 +188,10 @@ def test_default_eval_fn_aligns_on_expected_subset():
 
 
 def test_default_eval_fn_missing_row_raises():
-    """An expected timepoint that AgeResults didn't record surfaces as KeyError."""
-    sim = _sim_with_age_results(keys=('cancers',), years=(2020,))
+    """An expected timepoint that by_age didn't record surfaces as KeyError."""
+    sim = _sim_with_by_age(keys=('cancers',), years=(2020,))
     sim.run()
-    ar = sim.analyzers['ageresults']
+    ar = sim.analyzers['by_age']
     actual = ar.to_dataframe(key='cancers')
 
     bad_data = actual.copy()
@@ -214,7 +201,7 @@ def test_default_eval_fn_missing_row_raises():
 
 
 def test_calibration_validates_data_keys_and_index():
-    """data= must use AgeResults result keys and 't'-named indexes."""
+    """data= must use by_age result keys and 't'-named indexes."""
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     calib_pars = dict(beta=dict(low=0.10, high=0.30, guess=0.20))
 

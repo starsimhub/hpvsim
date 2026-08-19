@@ -35,7 +35,7 @@ def test_parameter_recovery_smoke():
     def make_sim():
         return hpv.Sim(n_agents=20000, start=1990, stop=2026, dt=1.0,
                        rand_seed=0, genotypes=[16],
-                       analyzers=[hpv.AgeResults(result_args=sc.objdict(
+                       analyzers=[hpv.by_age(result_args=sc.objdict(
                            cancers=sc.objdict(years=snapshot_years,
                                               edges=edges),
                        ))])
@@ -44,7 +44,7 @@ def test_parameter_recovery_smoke():
     hpv.calibration.build_sim(target_sim, calib_pars=truth)
     target_sim.run()
     target_ar = [a for a in target_sim.analyzers.values()
-                 if isinstance(a, hpv.AgeResults)][0]
+                 if isinstance(a, hpv.by_age)][0]
     expected = target_ar.to_dataframe(key='cancers')
 
     base_sim = make_sim()

@@ -9,18 +9,19 @@ Provides:
       sim.pars, sim.diseases[<genotype>].pars, or the CrossImmunity connector.
 
 The default eval_fn pulls each target's simulated values out of the
-``AgeResults`` analyzer, aligns on (year, column), then sums
+``by_age`` analyzer, aligns on (year, column), then sums
 ``compute_gof`` over the flattened (year × column) values. Per-target
 ``weights`` scale each result's mismatch before summing.
 """
 import tempfile
 
 import numpy as np
+import optuna as op
 import pandas as pd
 import sciris as sc
 import starsim as ss
 
-from .analyzers import AgeResults
+from .analyzers import by_age
 
 
 __all__ = ['Calibration', 'build_sim', 'compute_gof', 'default_eval_fn']
@@ -32,7 +33,7 @@ class Calibration(ss.Calibration):
     Two entry points to specify the fit target:
 
     - ``data={'cancers': df, ...}``: dict of 't'-indexed DataFrames keyed by
-      ``AgeResults`` result name. The default eval_fn extracts the matching
+      ``by_age`` result name. The default eval_fn extracts the matching
       simulated values, aligns on (year, column), and sums
       ``compute_gof`` across all rows/columns, scaled by per-key
       ``weights`` (a mean-absolute-error mismatch).
@@ -72,15 +73,36 @@ class Calibration(ss.Calibration):
         super().__init__(sim, calib_pars, build_fn=build_fn,
                          eval_fn=eval_fn, eval_kw=eval_kw, **kwargs)
 
+    def worker(self):
+        """Run a single worker.
+
+        Mirrors ``stisim.Calibration.worker``: wraps ``study.optimize`` in a
+        try/except so a single worker's SQLite-lock error (or any other
+        transient Optuna storage failure) does not propagate through
+        Optuna's own error handler and trip its
+        ``assert False, 'Should not reach.'``, taking the whole run down.
+        Upstream ``ss.Calibration.worker`` calls ``study.optimize`` bare.
+        """
+        if self.verbose:
+            op.logging.set_verbosity(op.logging.DEBUG)
+        else:
+            op.logging.set_verbosity(op.logging.ERROR)
+        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.study_name, sampler=self.run_args.sampler)
+        try:
+            output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None)
+        except Exception as E:
+            print(f'Worker failed with error: {E}')
+            output = None
+        return output
+
     @staticmethod
     def _validate_data(data):
         """Each value must be a DataFrame whose index is named 't'."""
         if not isinstance(data, dict):
             raise TypeError(
                 f'hpv.Calibration.data must be a dict; got {type(data).__name__}')
-        known = set(AgeResults._COUNT_TO_STATE) | set(AgeResults._PREV_TO_STATE) \
-            | set(AgeResults._INC_TO_ATTRS) | set(AgeResults._FLOW_TO_ATTRS) \
-            | set(AgeResults._TYPE_DIST_TO_STATE)
+        known = (set(by_age._COUNT_KEYS) | set(by_age._PREV_KEYS)
+                 | set(by_age._FLOW_KEYS))
         for key, df in data.items():
             if key not in known:
                 raise ValueError(
@@ -247,31 +269,27 @@ def compute_gof(actual, predicted, normalize=True, use_frac=False,
     return gofs
 
 
-def _find_age_results(sim):
-    """Locate the AgeResults analyzer on the sim, regardless of its
+def _find_by_age(sim):
+    """Locate the by_age analyzer on the sim, regardless of its
     name/key. Raises if there isn't exactly one."""
-    matches = [a for a in sim.analyzers.values() if isinstance(a, AgeResults)]
+    matches = [a for a in sim.analyzers.values() if isinstance(a, by_age)]
     if len(matches) != 1:
         raise ValueError(
-            f'hpv.Calibration: expected exactly one AgeResults analyzer on '
+            f'hpv.Calibration: expected exactly one by_age analyzer on '
             f'the sim; found {len(matches)}')
     return matches[0]
 
 
 def _extract_actual(ar, key, expected):
-    """Pull `key` from AgeResults, aligned to expected's (index, columns)."""
-    # Type-distribution data is compared in raw-count units (same as expected).
-    if key in AgeResults._TYPE_DIST_TO_STATE:
-        actual = ar.to_dataframe(key=key, normalize=False)
-    else:
-        actual = ar.to_dataframe(key=key)
+    """Pull `key` from by_age, aligned to expected's (index, columns)."""
+    actual = ar.to_dataframe(key)
     missing_rows = [t for t in expected.index if t not in actual.index]
     missing_cols = [c for c in expected.columns if c not in actual.columns]
     if missing_rows or missing_cols:
         raise KeyError(
             f'hpv.Calibration eval: data[{key!r}] references rows '
             f'{missing_rows} / columns {missing_cols} not produced by '
-            f'AgeResults; available rows={list(actual.index)}, '
+            f'by_age; available rows={list(actual.index)}, '
             f'columns={list(actual.columns)}')
     return actual.loc[expected.index, expected.columns]
 
@@ -280,7 +298,7 @@ def default_eval_fn(sim, data, weights=None, gof_kwargs=None):
     """Default eval_fn: weighted sum of compute_gof across each data target.
 
     For each ``(key, expected_df)`` in ``data``, pull the simulated values
-    from the sim's ``AgeResults`` analyzer aligned on ``(index, columns)``,
+    from the sim's ``by_age`` analyzer aligned on ``(index, columns)``,
     flatten both, call ``compute_gof(as_scalar='sum')``, then multiply by
     ``weights.get(key, 1.0)``. Returns the total as a single float —
     smaller is better.
@@ -289,7 +307,7 @@ def default_eval_fn(sim, data, weights=None, gof_kwargs=None):
     gof_kwargs = dict(gof_kwargs or {})
     # Default to a scalar-sum gof unless the caller already specified.
     gof_kwargs.setdefault('as_scalar', 'sum')
-    ar = _find_age_results(sim)
+    ar = _find_by_age(sim)
     total = 0.0
     for key, expected in data.items():
         actual = _extract_actual(ar, key, expected)

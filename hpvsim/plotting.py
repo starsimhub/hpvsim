@@ -4,7 +4,7 @@ import sciris as sc
 import starsim as ss
 import matplotlib.pyplot as plt
 
-from .analyzers import AgeResults, results_by_genotype
+from .analyzers import by_age, results_by_genotype
 
 
 __all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim',
@@ -30,10 +30,10 @@ def _new_fig_ax(fig=None, figsize=(7, 5)):
 
 
 def plot_by_age(age_results, key, years=None, kind='line', fig=None, **kwargs):
-    """Plot an AgeResults result as a series per year over age bins.
+    """Plot an by_age result as a series per year over age bins.
 
     Args:
-        age_results: a run ``hpv.AgeResults`` analyzer.
+        age_results: a run ``hpv.by_age`` analyzer.
         key: a result name recorded by that analyzer (e.g. 'cancers').
         years: scalar/list of years to plot; default = all recorded years.
         kind: 'line' or 'bar'.
@@ -83,19 +83,10 @@ def plot_by_genotype(sim, key='cum_cancers', normalize=False, fig=None, **kwargs
 def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwargs):
     """Bar chart of each genotype's share of `key` at a given year.
 
-    `source` may be a run ``hpv.Sim`` (uses ``results_by_genotype``) or an
-    ``hpv.AgeResults`` analyzer (uses its type-distribution result `key`, e.g.
-    'cancerous_genotype_dist'). `year` defaults to the last recorded year.
-
-    Note: the default ``key='cum_cancers'`` is only valid for the Sim source;
-    for an AgeResults source pass a type-distribution key like
-    'cancerous_genotype_dist'.
-    For a year with zero cancers the normalized shares are all 0 (not 1).
+    `source` is a run ``hpv.Sim``. Delegates to ``results_by_genotype``. For
+    a year with zero cancers the normalized shares are all 0 (not 1).
     """
-    if isinstance(source, AgeResults):
-        df = source.to_dataframe(key, normalize=True)  # index=year, cols=genotypes
-    else:
-        df = results_by_genotype(source, key=key, normalize=True)
+    df = results_by_genotype(source, key=key, normalize=True)
     if year is None:
         row = df.iloc[-1]
     else:
@@ -187,7 +178,7 @@ def plot_calibration(calib, sim=None, fig=None):
     `fig` is honored if provided. Convergence and parameter-distribution views
     are available directly via ``calib.plot_optuna()`` and ``calib.plot_final()``.
     """
-    from .calibration import _find_age_results as _find_ar, _extract_actual
+    from .calibration import _find_by_age as _find_ar, _extract_actual
     data = (calib.eval_kw or {}).get('data')
     if not data:
         raise ValueError('plot_calibration: calibration has no target data '
@@ -285,10 +276,10 @@ def plot_dalys(dal, fig=None):
     return fig
 
 
-def _find_age_results_or_none(sim):
-    """Return the first AgeResults analyzer on `sim`, or None."""
+def _find_by_age_or_none(sim):
+    """Return the first by_age analyzer on `sim`, or None."""
     for a in sim.analyzers.values():
-        if isinstance(a, AgeResults):
+        if isinstance(a, by_age):
             return a
     return None
 
@@ -298,7 +289,7 @@ def plot_sim(sim, which='default', fig=None, **kwargs):
 
     which='default': 4-panel canonical figure (cumulative cancers over time,
     prevalence by age, cancers by age, genotype distribution). Requires an
-    AgeResults analyzer recording a prevalence key and 'cancers'.
+    by_age analyzer recording a prevalence key and 'cancers'.
     Any other value (e.g. 'all') delegates to ss.Sim.plot.
     `fig` is honored in both modes (a new figure is created if None).
     Pass a fresh/empty figure: multi-panel helpers add subplots rather than
@@ -307,18 +298,18 @@ def plot_sim(sim, which='default', fig=None, **kwargs):
     if which != 'default':
         return sim.plot(fig=fig, **kwargs)
 
-    ar = _find_age_results_or_none(sim)
+    ar = _find_by_age_or_none(sim)
     if ar is None:
         raise ValueError(
-            "plot_sim(which='default') needs an AgeResults analyzer recording "
+            "plot_sim(which='default') needs a by_age analyzer recording "
             "'cancers' and a prevalence key (one of %s). Add e.g. "
-            "hpv.AgeResults(result_args=...) to the sim, or call "
+            "hpv.by_age(['cancers', 'hpv_prevalence']) to the sim, or call "
             "plot_sim(sim, which='all')." % (_PREV_KEYS,))
-    prev_key = next((k for k in _PREV_KEYS if k in ar.outputs), None)
-    if prev_key is None or 'cancers' not in ar.outputs:
+    prev_key = next((k for k in _PREV_KEYS if k in ar.keys), None)
+    if prev_key is None or 'cancers' not in ar.keys:
         raise ValueError(
-            "plot_sim(which='default') needs the AgeResults analyzer to record "
-            "'cancers' and one of %s; found %s." % (_PREV_KEYS, list(ar.outputs)))
+            "plot_sim(which='default') needs the by_age analyzer to record "
+            "'cancers' and one of %s; found %s." % (_PREV_KEYS, ar.keys))
 
     fig = fig or plt.figure(figsize=(12, 9))
     # Panel 1: total cumulative cancers over time (summed across genotypes).

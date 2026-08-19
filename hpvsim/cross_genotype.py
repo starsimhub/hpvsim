@@ -241,7 +241,9 @@ class HPVTotal(ss.Analyzer):
         # Derived results (computed in step()).
         defs.append(ss.Result('n_susceptible', dtype=float,
                               label='Currently uninfected with any genotype'))
-        defs.append(ss.Result('prevalence', dtype=float,
+        # prevalence is a ratio in [0,1]; scale=False so finalize doesn't
+        # multiply it by pop_scale.
+        defs.append(ss.Result('prevalence', dtype=float, scale=False,
                               label='Prevalence of any HPV genotype'))
         # Extra result with no per-genotype counterpart.
         defs.append(ss.Result('cum_infections_unique', dtype=int,
