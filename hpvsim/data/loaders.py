@@ -11,7 +11,173 @@ import re
 
 
 __all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_age_distribution_over_time', 'get_total_pop', 'get_death_rates',
-           'get_birth_rates']
+           'get_birth_rates', 'load_calib_data']
+
+
+# ---------------------------------------------------------------------------
+# Calibration-target data loading
+# ---------------------------------------------------------------------------
+
+# Standardized column-name scheme (dot-separated):
+#     <scope>.<name>[.<subkey>]
+# where <scope> is 'all_hpv' (pooled) or 'by_genotype' (per-genotype
+# distribution), <name> is a result name (e.g. 'cancers', 'asr_cancer_incidence',
+# 'cancerous_genotype_dist'), and <subkey> is either an age-bin label
+# (e.g. '0-15', '85+' — matching hpv.by_age.bin_labels) or a canonical
+# genotype ('hpv16', 'hi5', ...). Scalars omit <subkey>.
+
+def load_calib_data(data):
+    """Normalize calibration target data into a single wide DataFrame.
+
+    Accepts:
+      - ``pd.DataFrame`` (index='t', dot-scoped columns): assumed
+        standardized; returned unchanged (with the ``t`` index enforced).
+      - ``dict[str, pd.DataFrame]``: legacy form; each value is a wide
+        DataFrame keyed by a target name (``'all_hpv.cancers'``).
+        Multi-column values are flattened with the key as scope prefix.
+      - ``list`` / ``tuple`` of paths or long-format DataFrames: each item
+        is a long CSV / DataFrame with ``year, name, [age, sex, genotype,]
+        value`` columns; dispatched by column presence and merged
+        outer-join on year.
+
+    Returns: a single ``pd.DataFrame`` with float year index (name='t')
+    and dot-scoped columns.
+    """
+    if isinstance(data, pd.DataFrame):
+        return _ensure_t_index(data)
+    if isinstance(data, dict):
+        return _flatten_dict_data(data)
+    if isinstance(data, (list, tuple)):
+        return _load_list_of_sources(data)
+    raise TypeError(
+        f'load_calib_data: unsupported type {type(data).__name__}; expected '
+        f'DataFrame, dict, or list of paths/DataFrames.')
+
+
+def _ensure_t_index(df):
+    if df.index.name != 't':
+        raise ValueError(
+            f"load_calib_data: DataFrame index name must be 't', "
+            f"got {df.index.name!r}")
+    df = df.copy()
+    df.index = df.index.astype(float)
+    return df
+
+
+def _flatten_dict_data(data):
+    """dict of pre-scoped wide DataFrames → standardized flat DataFrame."""
+    frames = []
+    for key, wide in data.items():
+        if not isinstance(wide, pd.DataFrame):
+            raise TypeError(
+                f'load_calib_data: data[{key!r}] must be a DataFrame; '
+                f'got {type(wide).__name__}')
+        wide = _ensure_t_index(wide)
+        if wide.shape[1] == 1:
+            # Scalar / already-flat single column — use the key as the name.
+            renamed = wide.rename(columns={wide.columns[0]: key})
+        else:
+            renamed = wide.copy()
+            renamed.columns = [f'{key}.{col}' for col in renamed.columns]
+        frames.append(renamed)
+    return pd.concat(frames, axis=1)
+
+
+def _load_list_of_sources(items):
+    """List of paths / long-format DataFrames → standardized flat DataFrame."""
+    long_frames = []
+    for it in items:
+        if isinstance(it, str):
+            long_frames.append(pd.read_csv(it))
+        elif isinstance(it, pd.DataFrame):
+            long_frames.append(it.copy())
+        else:
+            raise TypeError(
+                f'load_calib_data: list items must be file paths or '
+                f'DataFrames; got {type(it).__name__}')
+    frames = []
+    for df in long_frames:
+        df.columns = df.columns.str.replace('﻿', '', regex=False)
+        frames.append(_standardize_long_frame(df))
+    return pd.concat(frames, axis=1)
+
+
+def _standardize_long_frame(df):
+    """Dispatch a single long-format frame by column shape."""
+    if 'name' not in df.columns or 'value' not in df.columns:
+        raise ValueError(
+            f'load_calib_data: long-format frame must have "name" and '
+            f'"value" columns; got {list(df.columns)}.')
+    if 'genotype' in df.columns:
+        genotypes = set(df['genotype'].astype(str).unique())
+        is_pooled = genotypes <= {'total', 'all_hpv'}
+    else:
+        is_pooled = True
+    if is_pooled:
+        if 'age' in df.columns:
+            return _long_age_to_wide(df)
+        return _long_scalar_to_wide(df)
+    return _long_genotype_to_wide(df)
+
+
+def _long_age_to_wide(df):
+    """Age-stratified long → wide with cols like 'all_hpv.cancers.0-15'."""
+    from ..analyzers import _make_age_labels
+    if 'genotype' in df.columns:
+        df = df[df['genotype'].astype(str).isin(['total', 'all_hpv'])]
+    if 'sex' in df.columns:
+        df = df[df['sex'] == 'female']
+    frames = []
+    for name in df['name'].unique():
+        block = df[df['name'] == name]
+        pivot = block.pivot_table(index='year', columns='age',
+                                  values='value', aggfunc='sum').sort_index()
+        ages = np.sort(block['age'].unique()).astype(float)
+        edges = np.append(ages, 150.0)
+        labels = _make_age_labels(edges)
+        age_to_label = {float(int(a)): lab for a, lab in zip(ages, labels)}
+        pivot.columns = [f'all_hpv.{name}.{age_to_label[float(int(c))]}'
+                         for c in pivot.columns]
+        pivot.index = pivot.index.astype(float)
+        pivot.index.name = 't'
+        frames.append(pivot)
+    return pd.concat(frames, axis=1)
+
+
+def _long_scalar_to_wide(df):
+    """Scalar long → wide with a single column 'all_hpv.<name>'."""
+    if 'genotype' in df.columns:
+        df = df[df['genotype'].astype(str).isin(['total', 'all_hpv'])]
+    frames = []
+    for name in df['name'].unique():
+        block = df[df['name'] == name]
+        series = block.groupby('year')['value'].sum().sort_index()
+        series.index = series.index.astype(float)
+        series.index.name = 't'
+        frames.append(series.to_frame(name=f'all_hpv.{name}'))
+    return pd.concat(frames, axis=1)
+
+
+def _long_genotype_to_wide(df):
+    """Per-genotype long → wide with cols like 'by_genotype.<name>.hpv16'."""
+    from ..parameters import genotype_aliases
+    def _canonical(g):
+        s = str(g).lower()
+        for canonical, aliases in genotype_aliases.items():
+            if s in [a.lower() for a in aliases]:
+                return canonical
+        return s
+    frames = []
+    for name in df['name'].unique():
+        block = df[df['name'] == name].copy()
+        block['genotype'] = block['genotype'].map(_canonical)
+        pivot = block.pivot_table(index='year', columns='genotype',
+                                  values='value', aggfunc='sum').sort_index()
+        pivot.columns = [f'by_genotype.{name}.{c}' for c in pivot.columns]
+        pivot.index = pivot.index.astype(float)
+        pivot.index.name = 't'
+        frames.append(pivot)
+    return pd.concat(frames, axis=1)
 
 
 thisdir = sc.thispath(__file__)

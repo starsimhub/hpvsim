@@ -10,8 +10,7 @@ from .version import __version__, __versiondate__, __license__
 from .settings import options
 from .defaults import datadir
 from . import data
-from . import migration_utils
-from .parameters import SimPars, GenotypePars, get_genotype_pars, get_cross_immunity, GENOTYPE_KEYS
+from .parameters import SimPars, GenotypePars, get_genotype_pars, GENOTYPE_KEYS, route_pars
 from . import misc
 from . import utils
 
@@ -47,8 +46,8 @@ __all__ = [
     'by_age', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys', 'results_by_genotype',
     'Calibration', 'calibration',
     'plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim', 'plot_intervention_impact', 'plot_calibration',
-    'data', 'migration_utils', 'options', 'datadir', '__version__',
-    'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
+    'data', 'options', 'datadir', '__version__',
+    'SimPars', 'GenotypePars', 'get_genotype_pars', 'route_pars',
     'GENOTYPE_KEYS',
     'vx', 'dx', 'tx', 'txvx', 'radiation',
     'BaseVaccination', 'routine_vx', 'campaign_vx',

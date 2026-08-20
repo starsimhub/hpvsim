@@ -48,10 +48,10 @@ def test_parameter_recovery_smoke():
     expected = target_ar.to_dataframe(key='cancers')
 
     base_sim = make_sim()
-    calib_pars = {
-        'hpv16.cin_fn.k':                 dict(low=0.20, high=0.90, guess=0.50),
-        'hpv16.cancer_fn.transform_prob': dict(low=0.001, high=0.005, guess=0.002),
-    }
+    calib_pars = dict(hpv16=dict(
+        cin_fn=dict(k=[0.50, 0.20, 0.90]),
+        cancer_fn=dict(transform_prob=[0.002, 0.001, 0.005]),
+    ))
     calib = hpv.Calibration(
         base_sim,
         calib_pars,

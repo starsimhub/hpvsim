@@ -152,68 +152,179 @@ def plot_intervention_impact(baseline, scenario, key='cum_cancers',
 _PREV_KEYS = ('hpv_prevalence', 'precin_prevalence', 'cin_prevalence')
 
 
-def _best_fit_sim(calib):
-    """Rebuild and run the sim at the calibration's best parameters
-    (mirrors ss.Calibration.plot_final)."""
-    pars = sc.dcp(calib.calib_pars)
-    for parname, spec in pars.items():
-        # Only overwrite 'value' for parameters that Optuna actually sampled
-        # (i.e. those present in best_pars). Parameters supplied with a fixed
-        # 'value' in the spec are skipped by _sample_from_trial and therefore
-        # never appear in study.best_params.
-        if parname in calib.best_pars:
-            spec['value'] = calib.best_pars[parname]
-    sim = calib.build_fn(calib.sim.copy(), calib_pars=pars, **calib.build_kw)
-    sim.run()
-    if isinstance(sim, ss.MultiSim):
-        sim = sim.sims[0]
-    return sim
+def _run_top_n_trials(calib, n):
+    """Re-run the top-``n`` trials from ``calib.df`` in parallel; return a
+    list of per-trial DataFrames shaped like ``calib.eval_kw['data']``.
 
-
-def plot_calibration(calib, sim=None, fig=None):
-    """Overlay simulated vs observed for each calibration target (data-vs-fit).
-
-    `calib` is a run ``hpv.Calibration`` (after ``calibrate()``). If `sim` is
-    None, the best-fit sim is rebuilt at ``calib.best_pars`` and run once.
-    `fig` is honored if provided. Convergence and parameter-distribution views
-    are available directly via ``calib.plot_optuna()`` and ``calib.plot_final()``.
+    Each per-trial DataFrame has the same year index + dot-scoped columns
+    as the target data; values are the sim's extracted-per-column
+    predictions at that trial's parameters.
     """
-    from .calibration import _find_by_age as _find_ar, _extract_actual
+    import pandas as pd
+    from .calibration import _extract_columns
+    data = calib.eval_kw['data']
+    n = min(n, len(calib.df))
+    top = calib.df.head(n)
+    par_cols = [c for c in top.columns if c not in ('index', 'mismatch')]
+    par_sets = [{c: row[c] for c in par_cols} for _, row in top.iterrows()]
+
+    calib_pars = calib.calib_pars
+    build_fn = calib.build_fn
+    build_kw = calib.build_kw or {}
+    base_sim = calib.sim
+
+    def _worker(pars):
+        spec = sc.dcp(calib_pars)
+        for parname, s in spec.items():
+            if parname in pars:
+                s['value'] = pars[parname]
+        sim = build_fn(sc.dcp(base_sim), calib_pars=spec, **build_kw)
+        sim.run()
+        if isinstance(sim, ss.MultiSim):
+            sim = sim.sims[0]
+        return _extract_columns(sim, data)
+
+    ncpus = min(len(par_sets), sc.cpu_count())
+    frames = sc.parallelize(_worker, iterkwargs=[{'pars': p} for p in par_sets],
+                            ncpus=ncpus, serial=False)
+    return frames
+
+
+def _group_columns(cols):
+    """Group standardized calib data columns by (scope, name). Preserves
+    within-group column order."""
+    groups = {}
+    for c in cols:
+        parts = c.split('.')
+        key = (parts[0], parts[1])
+        groups.setdefault(key, []).append(c)
+    return groups
+
+
+def _plot_age_panel(ax, name, cols, expected, actual_list, top_n):
+    """Age-stratified panel: x = age bins, y = value. Median + 95% PI band
+    across top-N trials; data as diamonds."""
+    bin_labels = [c.split('.', 2)[-1] for c in cols]
+    x = np.arange(len(bin_labels))
+    for yr in expected.index:
+        exp = expected.loc[yr, cols].to_numpy(dtype=float)
+        stack = np.array([a.loc[yr, cols].to_numpy(dtype=float) for a in actual_list])
+        med = np.median(stack, axis=0)
+        lo = np.percentile(stack, 2.5, axis=0)
+        hi = np.percentile(stack, 97.5, axis=0)
+        yr_lab = f' ({int(yr)})' if len(expected.index) > 1 else ''
+        ax.fill_between(x, lo, hi, alpha=0.25,
+                        label=f'Top-{top_n} 95% PI{yr_lab}')
+        ax.plot(x, med, marker='o', lw=2,
+                label=f'Top-{top_n} median{yr_lab}')
+        ax.scatter(x, exp, marker='d', s=60, color='k', zorder=3,
+                   label=f'Data{yr_lab}')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bin_labels, rotation=45, ha='right')
+    ax.set_xlabel('Age')
+    ax.set_ylabel(name)
+    ax.set_title(name)
+    ax.legend(fontsize=8, loc='best')
+
+
+def _plot_scalar_ts(ax, name, col, expected, actual_list, top_n):
+    """Scalar-per-year panel: x = year, y = value. Timeseries with
+    median + 95% PI ribbon; data as diamonds. Single-year targets get an
+    errorbar-style point instead of a ribbon."""
+    years = expected.index.values
+    stack = np.array([a[col].reindex(expected.index).to_numpy(dtype=float)
+                      for a in actual_list])
+    med = np.median(stack, axis=0)
+    lo = np.percentile(stack, 2.5, axis=0)
+    hi = np.percentile(stack, 97.5, axis=0)
+    if len(years) > 1:
+        ax.fill_between(years, lo, hi, alpha=0.25, label=f'Top-{top_n} 95% PI')
+        ax.plot(years, med, lw=2, label=f'Top-{top_n} median')
+        ax.scatter(years, expected[col].values, marker='d', s=60, color='k',
+                   label='Data', zorder=3)
+        ax.set_xlim(years.min(), years.max())
+    else:
+        y0 = float(years[0])
+        yerr = np.array([[med[0] - lo[0]], [hi[0] - med[0]]])
+        ax.errorbar([y0], [med[0]], yerr=yerr, marker='o', capsize=6, lw=2,
+                    label=f'Top-{top_n} median (95% PI)')
+        ax.scatter([y0], [expected[col].iloc[0]], marker='d', s=80,
+                   color='k', zorder=3, label='Data')
+    ax.set_xlabel('Year')
+    ax.set_ylabel(name)
+    ax.set_title(name)
+    ax.legend(fontsize=8, loc='best')
+
+
+def _plot_genotype_box(ax, name, cols, expected, actual_list, top_n):
+    """Per-genotype panel: x = genotype, y = value. Box plot of top-N
+    trial distributions (aggregated across any years in the data);
+    data as diamonds."""
+    genotypes = [c.split('.', 2)[-1] for c in cols]
+    boxes = []
+    for c in cols:
+        vals = np.concatenate([a[c].reindex(expected.index).dropna().to_numpy()
+                               for a in actual_list])
+        boxes.append(vals)
+    x = np.arange(1, len(genotypes) + 1)
+    ax.boxplot(boxes, tick_labels=genotypes, showfliers=False, widths=0.5)
+    for i, c in enumerate(cols):
+        exp_vals = expected[c].dropna().values
+        ax.scatter([x[i]] * len(exp_vals), exp_vals, marker='d', s=70,
+                   color='k', zorder=3, label='Data' if i == 0 else None)
+    ax.set_xlabel('Genotype')
+    ax.set_ylabel(name)
+    ax.set_title(f'{name} (top-{top_n} trials)')
+    ax.legend(fontsize=8, loc='best')
+
+
+def plot_calibration(calib, top_n=50, fig=None, ncols=None):
+    """Data-vs-fit plot for a run ``hpv.Calibration``.
+
+    Auto-inspects ``calib.eval_kw['data']`` and renders one panel per
+    (scope, name) target group, overlaying a top-``top_n``-trial model
+    ribbon / box on the observed data.
+
+    Panel layout by scope:
+      - ``all_hpv.<name>.<bin>``   age-stratified: line + 95% PI band vs.
+        data scatter, x = age bins.
+      - ``all_hpv.<name>``         scalar: timeseries if multi-year, else
+        an errorbar point.
+      - ``by_genotype.<name>.<g>`` box plot per genotype vs. data markers.
+
+    Args:
+        calib: run ``hpv.Calibration``.
+        top_n (int): number of best-mismatch trials to re-run for the
+            ribbon (default 50). Clamped to available trials.
+        fig: matplotlib Figure to draw into (default: new).
+        ncols (int): grid ncols (default: min(n_panels, 3)).
+    """
     data = (calib.eval_kw or {}).get('data')
-    if not data:
+    if data is None or data.empty:
         raise ValueError('plot_calibration: calibration has no target data '
                          "(expected calib.eval_kw['data']).")
-    if sim is None:
-        sim = _best_fit_sim(calib)
-    elif isinstance(sim, ss.MultiSim):
-        sim = sim.sims[0]
-    ar = _find_ar(sim)
-    keys = list(data.keys())
-    fig = fig or plt.figure(figsize=(5 * len(keys), 4))
-    for i, key in enumerate(keys):
-        ax = fig.add_subplot(1, len(keys), i + 1)
-        expected = data[key]
-        actual = _extract_actual(ar, key, expected)
-        if len(expected.index) == 1:
-            # Single-year, age-stratified target (the common HPV cancer-incidence
-            # case): plot the age profile (age bins on x), data vs fit, rather
-            # than collapsing every age bin to a point at one year.
-            yr = expected.index[0]
-            x = np.arange(len(expected.columns))
-            ax.plot(x, expected.iloc[0].values, 'o-', label=f'data {yr:g}')
-            ax.plot(x, actual.iloc[0].values, 's--', label=f'fit {yr:g}')
-            ax.set_xticks(x)
-            ax.set_xticklabels(list(expected.columns), rotation=45, ha='right')
-            ax.set_xlabel('Age group')
+
+    groups = _group_columns(data.columns)
+    actual_list = _run_top_n_trials(calib, top_n)
+    top_n_actual = len(actual_list)
+
+    n_panels = len(groups)
+    ncols = ncols or min(n_panels, 3)
+    nrows = -(-n_panels // ncols)
+    fig = fig or plt.figure(figsize=(6.0 * ncols, 4.5 * nrows))
+
+    for i, ((scope, name), cols) in enumerate(groups.items()):
+        ax = fig.add_subplot(nrows, ncols, i + 1)
+        if scope == 'all_hpv':
+            is_age = all(len(c.split('.')) == 3 for c in cols)
+            if is_age:
+                _plot_age_panel(ax, name, cols, data, actual_list, top_n_actual)
+            else:
+                _plot_scalar_ts(ax, name, cols[0], data, actual_list, top_n_actual)
+        elif scope == 'by_genotype':
+            _plot_genotype_box(ax, name, cols, data, actual_list, top_n_actual)
         else:
-            # Multi-year target: one data + one fit series per age-bin column,
-            # over time.
-            for col in expected.columns:
-                ax.plot(expected.index, expected[col].values, 'o', label=f'data {col}')
-                ax.plot(actual.index, actual[col].values, '-', label=f'fit {col}')
-            ax.set_xlabel('Year')
-        ax.set_title(key)
-        ax.legend()
+            ax.set_title(f'{scope}.{name} (unknown scope)')
     fig.tight_layout()
     return fig
 

@@ -21,10 +21,36 @@ import starsim as ss
 
 from . import misc
 from .hpv import HPV
-from .parameters import get_cross_immunity
+from .parameters import GENOTYPE_KEYS
 
 
 __all__ = ['CrossImmunity', 'HPVTotal']
+
+
+# Genotypes whose own-immunity is hardcoded to 1.0; other keys use ``own_imm_hr``.
+_FULL_OWN_IMM_KEYS = frozenset({'hpv16', 'hpv18'})
+
+# Pairwise cross-protection clade map. 'high' = hpv16 <-> hpv18 (same clade);
+# everything else is 'med'.
+_CLADE_HIGH_PAIRS = frozenset({
+    ('hpv16', 'hpv18'),
+    ('hpv18', 'hpv16'),
+})
+
+
+def _build_cross_matrix(keys, scalar_med, scalar_high, own_imm_hr):
+    """One (n, n) cross-protection matrix. Diagonal: 1.0 for keys in
+    ``_FULL_OWN_IMM_KEYS`` (hpv16, hpv18); else ``own_imm_hr``. Off-diagonal:
+    ``scalar_high`` for clade-high pairs, ``scalar_med`` otherwise."""
+    n = len(keys)
+    m = np.full((n, n), scalar_med, dtype=np.float32)
+    for i, ki in enumerate(keys):
+        for j, kj in enumerate(keys):
+            if i == j:
+                m[i, j] = 1.0 if ki in _FULL_OWN_IMM_KEYS else own_imm_hr
+            elif (ki, kj) in _CLADE_HIGH_PAIRS:
+                m[i, j] = scalar_high
+    return m
 
 
 class CrossImmunity(ss.Connector):
@@ -50,9 +76,10 @@ class CrossImmunity(ss.Connector):
     genotypes read the same per-agent draw from ``set_prognoses``.
     """
 
-    def __init__(self, cross_imm_sus=None, cross_imm_sev=None,
-                 rel_sev_loc=1.0, rel_sev_scale=0.2, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, cross_imm_sus=None, cross_imm_sev=None, pars=None, **kwargs):
+        super().__init__()
+        # User-supplied matrices override the auto-built defaults; auto-built
+        # matrices are constructed at init_pre from the scalar med/high pars.
         self.cross_imm_sus = cross_imm_sus
         self.cross_imm_sev = cross_imm_sev
         self.hpv_modules = None
@@ -63,12 +90,34 @@ class CrossImmunity(ss.Connector):
             ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
             ss.BoolState('rel_sev_sampled', default=False),
         )
-        # Folded normal via abs() in _ensure_rel_sev; with the default
-        # loc=1.0, scale=0.2 the negative tail mass is < 1e-6 so the practical
-        # distribution is equivalent to a positive-truncated normal(1, 0.2). A
-        # location calibration may lower loc (e.g. to a positive normal(0.87,
-        # 0.2)); expose loc/scale so it is set at construction.
-        self._rel_sev_dist = ss.normal(loc=rel_sev_loc, scale=rel_sev_scale)
+        self.define_pars(
+            # Folded normal via abs() in _ensure_rel_sev. Default loc=1, scale=0.2
+            # has < 1e-6 negative tail so it's effectively a positive-truncated
+            # normal; calibration may lower loc (e.g. to normal(0.87, 0.2)).
+            rel_sev=ss.normal(loc=1.0, scale=0.2),
+            # Scalar medium/high cross-immunity used by get_cross_immunity to
+            # build the sus/sev matrices when explicit matrices aren't passed.
+            cross_imm_sus_med=0.3,
+            cross_imm_sus_high=0.5,
+            cross_imm_sev_med=0.5,
+            cross_imm_sev_high=0.7,
+            own_imm_hr=0.9,
+        )
+        self.update_pars(pars=pars, **kwargs)
+
+    def make_cross_immunity(self, keys=None):
+        """Return ``(m_sus, m_sev)`` matrices built from ``self.pars`` scalars
+        (``cross_imm_sus_med/high``, ``cross_imm_sev_med/high``, ``own_imm_hr``).
+        ``keys`` defaults to ``GENOTYPE_KEYS``.
+        """
+        if keys is None:
+            keys = GENOTYPE_KEYS
+        own = self.pars.own_imm_hr
+        m_sus = _build_cross_matrix(keys, self.pars.cross_imm_sus_med,
+                                    self.pars.cross_imm_sus_high, own)
+        m_sev = _build_cross_matrix(keys, self.pars.cross_imm_sev_med,
+                                    self.pars.cross_imm_sev_high, own)
+        return m_sus, m_sev
 
     def init_pre(self, sim):
         super().init_pre(sim)
@@ -83,7 +132,7 @@ class CrossImmunity(ss.Connector):
 
         # Populate defaults if matrices not supplied.
         if self.cross_imm_sus is None or self.cross_imm_sev is None:
-            m_sus, m_sev = get_cross_immunity(keys=keys)
+            m_sus, m_sev = self.make_cross_immunity(keys=keys)
             if self.cross_imm_sus is None:
                 self.cross_imm_sus = m_sus
             if self.cross_imm_sev is None:
@@ -120,7 +169,7 @@ class CrossImmunity(ss.Connector):
         if not unset_mask.any():
             return
         unset = uids[unset_mask]
-        self.rel_sev[unset] = np.abs(self._rel_sev_dist.rvs(unset))
+        self.rel_sev[unset] = np.abs(self.pars.rel_sev.rvs(unset))
         self.rel_sev_sampled[unset] = True
 
     def step(self):
@@ -198,6 +247,47 @@ class HPVTotal(ss.Analyzer):
         'n_cancerous': 'cancerous',
     }
 
+    # WHO 2000 World Standard Population weights per 5-year age band (0-4
+    # through 100+). Sum = 100_035 (rounding artifact vs the nominal
+    # 100_000; ASR normalizes by weights.sum() so the total is harmless).
+    # Bin 21 (100+) uses an open-ended upper edge of 150.
+    WHO2000_5YR_EDGES = np.array(
+        [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75,
+         80, 85, 90, 95, 100, 150], dtype=float)
+    WHO2000_5YR_WEIGHTS = np.array(
+        [8860, 8690, 8600, 8470, 8220, 7930, 7610, 7150, 6590, 6040, 5370,
+         4550, 3720, 2960, 2210, 1520, 910, 440, 150, 40, 5], dtype=float)
+
+    @classmethod
+    def who2000_weights_for_edges(cls, edges):
+        """Aggregate WHO 2000 5-year weights to arbitrary bin ``edges``.
+        Each output bin ``[edges[i], edges[i+1])`` sums the 5-year weights
+        whose age midpoint falls within it."""
+        edges = np.asarray(edges, dtype=float)
+        midpoints = (cls.WHO2000_5YR_EDGES[:-1] + cls.WHO2000_5YR_EDGES[1:]) / 2.0
+        out = np.zeros(len(edges) - 1, dtype=float)
+        for i in range(len(edges) - 1):
+            mask = (midpoints >= edges[i]) & (midpoints < edges[i + 1])
+            out[i] = cls.WHO2000_5YR_WEIGHTS[mask].sum()
+        return out
+
+    @classmethod
+    def compute_asr(cls, cancers_by_age, n_female_by_age, edges):
+        """Age-standardized cancer incidence per 100k person-years (WHO 2000).
+
+        Args:
+            cancers_by_age: per-bin annual cancer counts.
+            n_female_by_age: per-bin female population at risk.
+            edges: bin edges (len = counts + 1); weights aggregate to
+                these bins from ``WHO2000_5YR_WEIGHTS``.
+        """
+        weights = cls.who2000_weights_for_edges(edges)
+        cancers = np.asarray(cancers_by_age, dtype=float)
+        n = np.asarray(n_female_by_age, dtype=float)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rates = np.where(n > 0, cancers / n * 1e5, 0.0)
+        return float(np.sum(rates * weights) / weights.sum())
+
     # HPV result keys we override with custom derivation, not naive sum/union.
     _DERIVED = ('n_susceptible', 'prevalence')
 
@@ -212,6 +302,14 @@ class HPVTotal(ss.Analyzer):
         """
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
         super().init_pre(sim)
+        # Allocate per-ti WHO2000-binned histograms (rows = ti, cols = 5-year
+        # bins). Populated in step() and consumed by finalize_results() to
+        # derive per-year `asr_cancer_incidence`. See compute_asr / WHO2000_*.
+        n_pts = len(sim.timevec)
+        n_bins = len(self.WHO2000_5YR_EDGES) - 1
+        self._cancers_by_who_bin       = np.zeros((n_pts, n_bins), dtype=float)
+        self._cancer_deaths_by_who_bin = np.zeros((n_pts, n_bins), dtype=float)
+        self._females_by_who_bin       = np.zeros((n_pts, n_bins), dtype=float)
 
     def init_results(self):
         """Mirror schema from per-genotype HPV results + add derived/extras.
@@ -248,6 +346,17 @@ class HPVTotal(ss.Analyzer):
         # Extra result with no per-genotype counterpart.
         defs.append(ss.Result('cum_infections_unique', dtype=int,
                               label='Cumulative agents ever infected with any genotype'))
+        # Age-standardized cancer incidence / mortality (WHO 2000, per 100k
+        # person-years). Populated in finalize_results from per-ti
+        # WHO2000-binned histograms; per-ti positions carry the annualized
+        # value of that timestep's year (so every ti within a calendar year
+        # reads the same ASR).
+        defs.append(ss.Result('asr_cancer_incidence', dtype=float, scale=False,
+                              label='Age-standardized cervical cancer incidence '
+                                    '(WHO 2000, per 100,000 person-years)'))
+        defs.append(ss.Result('asr_cancer_mortality', dtype=float, scale=False,
+                              label='Age-standardized cervical cancer mortality '
+                                    '(WHO 2000, per 100,000 person-years)'))
         self.define_results(*defs)
 
     def step(self):
@@ -305,6 +414,43 @@ class HPVTotal(ss.Analyzer):
         ever_infected &= people.alive.values
         self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
 
+        # Populate WHO2000-binned histograms used to derive per-year ASR
+        # (incidence + mortality) in finalize_results.
+        self._accumulate_asr_histograms(ti, people, hpvs)
+
+    def _accumulate_asr_histograms(self, ti, people, hpvs):
+        """Fill per-ti WHO2000 5-year-bin histograms for alive-females,
+        new cancer events, and new cancer-death events. Aggregated to
+        per-year ASR in ``finalize_results`` via ``compute_asr``."""
+        ages = people.age.values
+        female_mask = people.female.values
+        alive_bool = people.alive.values
+        edges = self.WHO2000_5YR_EDGES
+        w = getattr(people, 'scale', None)
+        # Denominator: currently alive females per bin (scale-weighted).
+        alive_female = alive_bool & female_mask
+        wts_af = w.values[alive_female] if w is not None else None
+        self._females_by_who_bin[ti, :] = np.histogram(
+            ages[alive_female], bins=edges, weights=wts_af)[0]
+        # Numerator: cancers realized this step, across genotypes.
+        new_cancer = np.zeros_like(alive_bool)
+        for m in hpvs:
+            new_cancer |= ((m.ti_cancerous.values == ti) & m.cancerous.values)
+        new_cancer &= alive_bool
+        wts_nc = w.values[new_cancer] if w is not None else None
+        self._cancers_by_who_bin[ti, :] = np.histogram(
+            ages[new_cancer], bins=edges, weights=wts_nc)[0]
+        # Numerator: cancer deaths realized this step, across genotypes.
+        # ``ti_dead_cancer`` is set at scheduled cancer-death time; the agent
+        # is still marked alive at ti (remove_dead runs after analyzers).
+        new_cd = np.zeros_like(alive_bool)
+        for m in hpvs:
+            new_cd |= (m.ti_dead_cancer.values == ti)
+        new_cd &= alive_bool
+        wts_cd = w.values[new_cd] if w is not None else None
+        self._cancer_deaths_by_who_bin[ti, :] = np.histogram(
+            ages[new_cd], bins=edges, weights=wts_cd)[0]
+
     def finalize_results(self):
         """Sum across modules for all results not handled by step()."""
         super().finalize_results()
@@ -313,9 +459,31 @@ class HPVTotal(ss.Analyzer):
             return
         handled_in_step = (set(self._UNION_STATES)
                            | set(self._DERIVED)
-                           | {'cum_infections_unique', 'timevec'})
+                           | {'cum_infections_unique',
+                              'asr_cancer_incidence', 'asr_cancer_mortality',
+                              'timevec'})
         template = hpvs[0].results
         for key in template.keys():
             if key in self._SKIP or key in handled_in_step:
                 continue
             self.results[key][:] = sum(m.results[key] for m in hpvs)
+        self._finalize_asr()
+
+    def _finalize_asr(self):
+        """Aggregate per-ti WHO2000-binned cancer / cancer-death counts to
+        annual (sum) and alive-female counts to annual (mean), then write
+        annualized ``asr_cancer_incidence`` / ``asr_cancer_mortality`` to
+        every ti within each calendar year (all ti in year Y hold Y's ASR)."""
+        edges = self.WHO2000_5YR_EDGES
+        years = np.asarray(self.sim.timevec.years).astype(int)
+        inc = np.zeros(len(years), dtype=float)
+        mort = np.zeros(len(years), dtype=float)
+        for y in np.unique(years):
+            mask = years == y
+            n_female_year = self._females_by_who_bin[mask].mean(axis=0)
+            cancers_year = self._cancers_by_who_bin[mask].sum(axis=0)
+            cd_year = self._cancer_deaths_by_who_bin[mask].sum(axis=0)
+            inc[mask] = self.compute_asr(cancers_year, n_female_year, edges)
+            mort[mask] = self.compute_asr(cd_year, n_female_year, edges)
+        self.results['asr_cancer_incidence'][:] = inc
+        self.results['asr_cancer_mortality'][:] = mort

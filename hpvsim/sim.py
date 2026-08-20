@@ -196,11 +196,9 @@ class Sim(ss.Sim):
 
         networks = kwargs.pop('networks', None)
         if networks is None:
-            # location=None -> location-agnostic default network pars
-            # (_default_network_pars accepts None; see data/country.py).
-            network_pars = country['network_pars'] if country is not None else \
-                hpv.data.country._shape_network_pars(
-                    hpv.data.country._default_network_pars(location=None))
+            # Network calibration is location-agnostic (see hpv.NetworkPars);
+            # country['network_pars'] is just NetworkPars() defaults.
+            network_pars = country['network_pars'] if country is not None else {}
             networks = [hpv.SexualNetwork(**network_pars)]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
@@ -230,6 +228,17 @@ class Sim(ss.Sim):
         self.location = location.lower() if location is not None else None
         # Stored for use in init() to discretize initial ages.
         self._v2_compat_demographics = v2_compat_demographics
+
+        # Split pars into (a) starsim-recognized sim-level keys forwarded to
+        # super() so pre-init state (People/timeline) picks them up, and
+        # (b) hpv module-level keys (per-genotype pars, network flat pars,
+        # connector pars) routed after super().__init__ via hpv.route_pars.
+        sim_pars, mod_pars = None, None
+        if pars:
+            sim_par_keys = set(ss.SimPars().keys())
+            sim_pars = {k: v for k, v in pars.items() if k in sim_par_keys}
+            mod_pars = {k: v for k, v in pars.items() if k not in sim_par_keys}
+
         super().__init__(
             start=ss.years(start),
             stop=ss.years(stop),
@@ -240,10 +249,13 @@ class Sim(ss.Sim):
             networks=networks,
             demographics=demographics,
             analyzers=analyzers,
-            pars=pars,
+            pars=sim_pars,
             total_pop=total_pop,
             **kwargs,
         )
+        if mod_pars:
+            from .parameters import route_pars
+            route_pars(self, mod_pars, verbose=False)
 
     def init(self, **kwargs):
         """Initialize the sim, then discretize initial ages if v2_compat_demographics is set.

@@ -60,6 +60,14 @@ class by_age(ss.Analyzer):
         'hpv':           'infected',
     }
 
+    # Demographic counts read directly from ``people.<attr>`` (no HPV
+    # module lookup). Result-name -> people-attr, or None to count ``alive``.
+    _DEMO_KEYS = {
+        'n_alive':   None,
+        'n_females': 'female',
+        'n_males':   'male',
+    }
+
     # Result-name -> (BoolState attr, female_only). Ratio in [0, 1].
     _PREV_KEYS = {
         'hpv_prevalence':       ('infected',  False),

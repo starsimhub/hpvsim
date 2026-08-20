@@ -29,7 +29,7 @@ def test_plot_calibration_data_vs_fit():
     target = pd.DataFrame({'0-30': [1.0], '30-50': [5.0], '50+': [3.0]},
                           index=pd.Index([2020.0], name='t'))
     calib = hpv.Calibration(
-        make_sim(), calib_pars=dict(beta=dict(low=0.1, high=0.3)),
+        make_sim(), calib_pars=dict(beta=[0.2, 0.1, 0.3]),
         data={'cancers': target}, total_trials=2, n_workers=1)
     calib.calibrate()
     assert 'beta' in calib.best_pars   # beta is a free (sampled) parameter
@@ -55,7 +55,7 @@ def test_plot_calibration_multiyear_uses_year_axis():
     target = pd.DataFrame({'0-50': [2.0, 3.0, 4.0], '50+': [1.0, 2.0, 3.0]},
                           index=pd.Index([2010.0, 2015.0, 2020.0], name='t'))
     calib = hpv.Calibration(
-        make_sim(), calib_pars=dict(beta=dict(low=0.1, high=0.3)),
+        make_sim(), calib_pars=dict(beta=[0.2, 0.1, 0.3]),
         data={'cancers': target}, total_trials=2, n_workers=1)
     calib.calibrate()
     fig = hpv.plot_calibration(calib)

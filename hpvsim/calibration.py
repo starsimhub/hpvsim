@@ -1,17 +1,24 @@
 """HPVsim calibration — ss.Calibration subclass with a weighted-gof eval.
 
 Provides:
-    - hpv.Calibration: ss.Calibration subclass that takes a ``data`` dict of
-      observed-target DataFrames and computes a single weighted mismatch
-      using ``compute_gof`` (normalized absolute error by default).
+    - hpv.Calibration: ss.Calibration subclass that takes ``data`` (a
+      standardized wide DataFrame, a dict of pre-scoped DataFrames, or a
+      list of CSV paths / long-format DataFrames — all normalized via
+      ``hpv.data.loaders.load_calib_data``) and computes a single weighted
+      mismatch using ``compute_gof``.
     - compute_gof: goodness-of-fit between actual and predicted arrays.
     - build_sim: default build_fn that routes flat dotted-key calib_pars to
       sim.pars, sim.diseases[<genotype>].pars, or the CrossImmunity connector.
 
-The default eval_fn pulls each target's simulated values out of the
-``by_age`` analyzer, aligns on (year, column), then sums
-``compute_gof`` over the flattened (year × column) values. Per-target
-``weights`` scale each result's mismatch before summing.
+Standardized ``data`` DataFrame: index='t' (float years), columns dot-scoped:
+    - ``all_hpv.<name>``           scalar-per-year pooled target; looked up
+      on ``sim.results.all_hpv`` (HPVTotal) at eval time
+      (e.g. ``all_hpv.asr_cancer_incidence``).
+    - ``all_hpv.<name>.<bin>``     age-stratified pooled target; looked up
+      on the auto-attached ``all_hpv_by_age`` ``by_age`` analyzer
+      (e.g. ``all_hpv.cancers.0-15``).
+    - ``by_genotype.<name>.<g>``   per-genotype distribution target;
+      computed at eval time via ``hpv.results_by_genotype``.
 """
 import tempfile
 
@@ -21,35 +28,106 @@ import pandas as pd
 import sciris as sc
 import starsim as ss
 
-from .analyzers import by_age
+from .analyzers import by_age, results_by_genotype
+from .parameters import route_pars as build_sim
+from .data.loaders import load_calib_data
 
 
 __all__ = ['Calibration', 'build_sim', 'compute_gof', 'default_eval_fn']
 
 
+_LIST_SPEC_KEYS = ('guess', 'low', 'high', 'step')
+
+
+def _prepare_calib_pars(calib_pars):
+    """Flatten a nested-by-scope calib_pars dict and convert list leaves to
+    Optuna spec dicts. Nested scopes are collapsed with ``sc.flattendict``
+    (dot-separated). Leaves must be ``[best, low, high, step]`` lists (step
+    optional) -- Optuna spec dicts already at leaves would over-flatten.
+    """
+    if any('.' in k for k in calib_pars):
+        bad = sorted(k for k in calib_pars if '.' in k)
+        raise ValueError(
+            f'hpv.Calibration: flat dotted-key calib_pars no longer supported '
+            f'(got {bad!r}). Use nested dict form, e.g. '
+            f'hi5=dict(cin_fn=dict(k=[best, low, high, step])).'
+        )
+    # Detect Optuna spec dicts at leaves before sc.flattendict over-descends
+    # into them and produces confusing "leaf 'x.low'" errors.
+    def _check(d, path=()):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                if v.keys() & {'low', 'high', 'guess', 'value', 'step'}:
+                    raise ValueError(
+                        f'hpv.Calibration: leaf {".".join((*path, k))!r} is a '
+                        f'dict {v!r}; use the list form [best, low, high, step].'
+                    )
+                _check(v, (*path, k))
+    _check(calib_pars)
+    flat = sc.flattendict(calib_pars, sep='.')
+    spec = {}
+    for key, val in flat.items():
+        if isinstance(val, (list, tuple)):
+            if not 3 <= len(val) <= 4:
+                raise ValueError(
+                    f'hpv.Calibration: leaf {key!r} must be [best, low, high] '
+                    f'or [best, low, high, step]; got {val!r}.'
+                )
+            spec[key] = dict(zip(_LIST_SPEC_KEYS, val))
+        else:
+            raise ValueError(
+                f'hpv.Calibration: leaf {key!r} must be a list '
+                f'[best, low, high, step]; got {type(val).__name__}.'
+            )
+    return spec
+
+
 class Calibration(ss.Calibration):
     """HPVsim calibration. Delegates to ss.Calibration with HPV-aware defaults.
 
-    Two entry points to specify the fit target:
+    Three entry points to specify the fit target:
 
-    - ``data={'cancers': df, ...}``: dict of 't'-indexed DataFrames keyed by
-      ``by_age`` result name. The default eval_fn extracts the matching
-      simulated values, aligns on (year, column), and sums
-      ``compute_gof`` across all rows/columns, scaled by per-key
-      ``weights`` (a mean-absolute-error mismatch).
+    - ``datafiles=['data/foo_cancer_cases.csv', ...]``: list of long-format
+      CSV paths (columns ``year,name,[age,sex,genotype,]value``). The loader
+      dispatches on stratification columns: files with an ``age`` column go
+      to a shared ``by_age`` analyzer named ``'calib_by_age'`` (attached to
+      ``sim.pars.analyzers`` if not already there); ``by_age`` result keys
+      then live under the scoped data key ``'calib_by_age.<name>'``. Ages
+      and years are derived from the data itself. Genotype-stratified files
+      (no ``age`` column) are reserved for ``'calib_by_genotype.<name>'``
+      but not yet wired up (``NotImplementedError``).
+    - ``data={'calib_by_age.cancers': df, ...}``: pre-built dict of
+      't'-indexed DataFrames. Keys are ``'<analyzer_name>.<result_key>'``
+      (scoped) or a bare result key that unambiguously matches a single
+      ``by_age`` analyzer on the sim. The default eval_fn extracts each,
+      aligns on ``(index, columns)``, and sums ``compute_gof`` across all
+      cells, scaled by per-key ``weights``.
     - ``components=[...]`` or a custom ``eval_fn``: standard ss.Calibration
       paths, unchanged.
 
-    Default build_fn is hpv.calibration.build_sim, which routes flat
-    dotted-key calib_pars (e.g. 'beta', 'hpv16.cin_fn.k',
-    'cross_immunity.cross_imm_sus.hpv16.hpv18') to the right address.
+    ``calib_pars`` is a nested dict grouped by scope, with **list** leaves
+    ``[best, low, high, step]`` (step optional). ``sc.flattendict`` collapses
+    the scope tree to ``ss.Calibration``'s flat dotted-key form::
+
+        calib_pars = dict(
+            beta=[0.2, 0.1, 0.34, 0.02],
+            network=dict(m_partners_casual=[0.5, 0.1, 0.9, 0.05]),
+            hi5=dict(cin_fn=dict(k=[0.15, 0.1, 0.25, 0.02])),
+        )
+
+    Default build_fn is ``hpv.calibration.build_sim`` (``route_pars``); it
+    accepts the flattened dotted keys and routes them.
     """
 
-    def __init__(self, sim, calib_pars, *, data=None, weights=None,
-                 gof_kwargs=None, build_fn=None, eval_fn=None, eval_kw=None,
-                 **kwargs):
+    def __init__(self, sim, calib_pars, *, data=None,
+                 weights=None, gof_kwargs=None, build_fn=None,
+                 eval_fn=None, eval_kw=None, **kwargs):
         if build_fn is None:
             build_fn = build_sim
+
+        if calib_pars is not None:
+            calib_pars = _prepare_calib_pars(calib_pars)
+
         # Give each calibration its own Optuna study database, in a temp dir, so
         # multiple hpv.Calibration runs in one session (or the test suite) do not
         # share or leak trials through a single database in the cwd. Callers can
@@ -58,11 +136,24 @@ class Calibration(ss.Calibration):
             kwargs['study_name'] = 'hpvsim_calibration'
             kwargs['db_name'] = str(sc.path(tempfile.mkdtemp()) / 'hpvsim_calibration.db')
 
+        # Default storage: JournalStorage (Optuna 4.x). SQLite (ss.Calibration
+        # default) uses a global write lock that serializes every trial commit;
+        # under ~32+ concurrent workers this deadlocks. JournalStorage is
+        # Optuna's recommended backend for distributed / high-worker-count
+        # optimization -- append-only per-process journals.
+        if 'storage' not in kwargs:
+            from optuna.storages import JournalStorage
+            from optuna.storages.journal import JournalFileBackend
+            journal_dir = sc.path(tempfile.mkdtemp())
+            journal_path = journal_dir / 'hpvsim_calibration.log'
+            kwargs['storage'] = JournalStorage(JournalFileBackend(str(journal_path)))
+
         if data is not None:
             if eval_fn is not None:
                 raise ValueError(
                     'hpv.Calibration: pass either data= or eval_fn=, not both.')
-            self._validate_data(data)
+            data = load_calib_data(data)
+            _setup_analyzers(sim, data)
             eval_fn = default_eval_fn
             eval_kw = sc.mergedicts(eval_kw, dict(
                 data=data,
@@ -73,13 +164,21 @@ class Calibration(ss.Calibration):
         super().__init__(sim, calib_pars, build_fn=build_fn,
                          eval_fn=eval_fn, eval_kw=eval_kw, **kwargs)
 
+    def remove_db(self):
+        """Skip cleanup when ``self.run_args.storage`` isn't a string URL
+        (parent's ``'sqlite' in storage`` check errors on a Storage object).
+        Each hpv.Calibration gets its own tempdir per instance, so there's
+        no cross-run pollution to worry about."""
+        if isinstance(self.run_args.storage, str):
+            return super().remove_db()
+        return
+
     def worker(self):
         """Run a single worker.
 
         Mirrors ``stisim.Calibration.worker``: wraps ``study.optimize`` in a
-        try/except so a single worker's SQLite-lock error (or any other
-        transient Optuna storage failure) does not propagate through
-        Optuna's own error handler and trip its
+        try/except so a single worker's transient Optuna storage failure
+        does not propagate through Optuna's own error handler and trip its
         ``assert False, 'Should not reach.'``, taking the whole run down.
         Upstream ``ss.Calibration.worker`` calls ``study.optimize`` bare.
         """
@@ -95,119 +194,6 @@ class Calibration(ss.Calibration):
             output = None
         return output
 
-    @staticmethod
-    def _validate_data(data):
-        """Each value must be a DataFrame whose index is named 't'."""
-        if not isinstance(data, dict):
-            raise TypeError(
-                f'hpv.Calibration.data must be a dict; got {type(data).__name__}')
-        known = (set(by_age._COUNT_KEYS) | set(by_age._PREV_KEYS)
-                 | set(by_age._FLOW_KEYS))
-        for key, df in data.items():
-            if key not in known:
-                raise ValueError(
-                    f'hpv.Calibration.data: unknown result key {key!r}; '
-                    f'must be one of {sorted(known)}')
-            if not isinstance(df, pd.DataFrame):
-                raise TypeError(
-                    f'hpv.Calibration.data[{key!r}] must be a DataFrame; '
-                    f'got {type(df).__name__}')
-            if df.index.name != 't':
-                raise ValueError(
-                    f'hpv.Calibration.data[{key!r}].index.name must be \'t\'; '
-                    f'got {df.index.name!r}')
-
-
-def build_sim(sim, calib_pars, **kwargs):
-    """Apply calib_pars to a (copy of) sim and return it.
-
-    calib_pars is a flat dict with dotted-key paths. Routing rules:
-      - No dot: writes to sim.pars[key].
-      - '<genotype>.<...>': writes to sim.diseases[<genotype>].pars[...].
-      - 'cross_immunity.<matrix>.<tgt>.<src>': writes a cell into the
-        CrossImmunity connector's named matrix.
-      - Anything else: raises ValueError.
-
-    ss.Calibration passes a sc.dcp(sim) in per trial, so we mutate freely.
-    """
-    from .hpv import HPV
-    from .cross_genotype import CrossImmunity
-
-    # ss.Calibration deep-copies an uninitialized sim before calling build_fn.
-    # Support both initialized sims (sim.diseases is an ndict) and
-    # uninitialized sims (disease modules live in sim.pars['diseases'] list).
-    if hasattr(sim, 'diseases'):
-        # Post-init: diseases and connectors are ndict attributes on sim.
-        disease_lookup = {d.name: d for d in sim.diseases.values()
-                          if isinstance(d, HPV)}
-        connector_list = [c for c in sim.connectors.values()
-                          if isinstance(c, CrossImmunity)]
-    else:
-        # Pre-init: modules are lists in sim.pars.
-        disease_lookup = {d.name: d
-                          for d in sim.pars.get('diseases', [])
-                          if isinstance(d, HPV)}
-        connector_list = [c for c in sim.pars.get('connectors', [])
-                          if isinstance(c, CrossImmunity)]
-
-    hpv_keys = set(disease_lookup.keys())
-
-    for key, value in calib_pars.items():
-        # ss.Calibration._sample_from_trial passes each entry as a spec dict
-        # {'low':..., 'high':..., 'value': <sampled_float>, 'path':..., ...}.
-        # Extract the actual scalar when that shape is present.
-        if isinstance(value, dict) and 'value' in value:
-            value = value['value']
-        parts = key.split('.')
-        if len(parts) == 1:
-            # Top-level sim par.
-            sim.pars[parts[0]] = value
-        elif parts[0] in hpv_keys:
-            # Per-genotype par: walk into disease.pars[...].
-            target = disease_lookup[parts[0]].pars
-            for p in parts[1:-1]:
-                target = target[p]
-            # Special case: pars.beta is stored as a per-network dict
-            # {'sexualnetwork': [f2m, m2f]}. If the caller supplies a scalar,
-            # scale all entries proportionally (preserving the F→M / M→F ratio).
-            final_key = parts[-1]
-            if (final_key == 'beta' and sc.isnumber(value)
-                    and isinstance(target.get(final_key), dict)):
-                old_beta = target[final_key]
-                first_entry = next(iter(old_beta.values()))
-                old_ref = first_entry[0] if isinstance(first_entry, list) else first_entry
-                if old_ref == 0:
-                    scale = 1.0
-                else:
-                    scale = value / old_ref
-                target[final_key] = {
-                    net: ([v[0] * scale, v[1] * scale] if isinstance(v, list)
-                          else v * scale)
-                    for net, v in old_beta.items()
-                }
-            else:
-                target[final_key] = value
-        elif parts[0] == 'cross_immunity':
-            # cross_immunity.<matrix>.<tgt>.<src>
-            if len(parts) != 4:
-                raise ValueError(
-                    f'build_sim: cross_immunity key must be of the form '
-                    f'cross_immunity.<matrix>.<tgt>.<src>; got {key!r}')
-            _, matrix_name, tgt, src = parts
-            if not connector_list:
-                raise ValueError(
-                    f'build_sim: cross_immunity key {key!r} requires a '
-                    f'CrossImmunity connector on the sim')
-            conn = connector_list[0]
-            idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
-            i, j = idx[tgt], idx[src]   # matrix is [target, source]
-            getattr(conn, matrix_name)[i, j] = value
-        else:
-            raise ValueError(
-                f'build_sim: unrecognized calib_par key {key!r}. '
-                f'Expected a bare sim par name, a <genotype>.<...> path '
-                f'(genotypes: {sorted(hpv_keys)}), or cross_immunity.<...>.')
-    return sim
 
 
 def compute_gof(actual, predicted, normalize=True, use_frac=False,
@@ -269,52 +255,207 @@ def compute_gof(actual, predicted, normalize=True, use_frac=False,
     return gofs
 
 
-def _find_by_age(sim):
-    """Locate the by_age analyzer on the sim, regardless of its
-    name/key. Raises if there isn't exactly one."""
-    matches = [a for a in sim.analyzers.values() if isinstance(a, by_age)]
-    if len(matches) != 1:
-        raise ValueError(
-            f'hpv.Calibration: expected exactly one by_age analyzer on '
-            f'the sim; found {len(matches)}')
-    return matches[0]
+# ---------------------------------------------------------------------------
+# Data-key scoping (standardized column-name conventions produced by
+# hpv.data.loaders.load_calib_data) + analyzer-attachment helpers.
+# ---------------------------------------------------------------------------
+
+ALL_HPV = 'all_hpv'                # column prefix: pooled target
+BY_GENOTYPE = 'by_genotype'        # column prefix: per-genotype distribution
+ALL_HPV_BY_AGE = 'all_hpv_by_age'  # by_age analyzer name for pooled age-stratified targets
+
+# Genotype-stratified target name -> (per-HPV result key, normalize).
+# Stock-based (matches v2 `{state}_genotype_dist = n_{state}_by_genotype /
+# totals`; see v2.2.6 hpvsim/sim.py:1112).
+_GENOTYPE_DIST_MAP = {
+    'precin_genotype_dist':    ('n_precin',    True),
+    'cin_genotype_dist':       ('n_cin',       True),
+    'cancerous_genotype_dist': ('n_cancerous', True),
+}
 
 
-def _extract_actual(ar, key, expected):
-    """Pull `key` from by_age, aligned to expected's (index, columns)."""
-    actual = ar.to_dataframe(key)
-    missing_rows = [t for t in expected.index if t not in actual.index]
-    missing_cols = [c for c in expected.columns if c not in actual.columns]
-    if missing_rows or missing_cols:
-        raise KeyError(
-            f'hpv.Calibration eval: data[{key!r}] references rows '
-            f'{missing_rows} / columns {missing_cols} not produced by '
-            f'by_age; available rows={list(actual.index)}, '
-            f'columns={list(actual.columns)}')
-    return actual.loc[expected.index, expected.columns]
+def _parse_column(col):
+    """Parse a standardized column name into (scope, name, subkey).
+
+    Two accepted forms (dot-scoped, 2 or 3 levels):
+      ``'all_hpv.<name>'``            scalar; subkey=None. Looked up on
+                                       ``sim.results.all_hpv`` (HPVTotal).
+      ``'all_hpv.<name>.<bin>'``      age-stratified; looked up on the
+                                       ``all_hpv_by_age`` analyzer.
+      ``'by_genotype.<name>.<g>'``    per-genotype; computed via
+                                       ``results_by_genotype``.
+    """
+    parts = col.split('.')
+    if len(parts) == 2:
+        return parts[0], parts[1], None
+    if len(parts) == 3:
+        return parts[0], parts[1], parts[2]
+    raise ValueError(
+        f'hpv.Calibration: unrecognized column format {col!r}; expected '
+        f'"<scope>.<name>" or "<scope>.<name>.<subkey>".')
+
+
+def _parse_bin_label(label):
+    """``'0-15'`` -> ``(0.0, 15.0)``; ``'85+'`` -> ``(85.0, 150.0)``."""
+    if label.endswith('+'):
+        return (float(label.rstrip('+')), 150.0)
+    lo_str, hi_str = label.split('-', 1)
+    return (float(lo_str), float(hi_str))
+
+
+def _edges_from_labels(labels):
+    """Set of contiguous by_age bin labels -> sorted edges array."""
+    ranges = sorted(_parse_bin_label(l) for l in labels)
+    lows = [r[0] for r in ranges]
+    highs = [r[1] for r in ranges]
+    for i in range(len(ranges) - 1):
+        if highs[i] != lows[i + 1]:
+            raise ValueError(
+                f'hpv.Calibration: age bin labels not contiguous: {sorted(labels)}')
+    return np.array(lows + [highs[-1]], dtype=float)
+
+
+def _setup_analyzers(sim, data):
+    """Inspect ``data`` columns and attach any analyzers the sim is missing.
+
+    - Age-stratified pooled columns ``all_hpv.<name>.<bin>`` require a
+      ``by_age`` named ``all_hpv_by_age`` with matching edges + years;
+      created if absent, edges-validated if present.
+    - Scalar ``all_hpv.<name>`` columns are read from HPVTotal at eval time
+      (no attachment needed).
+    - ``by_genotype.<name>.<g>`` columns compute via ``results_by_genotype``
+      at eval time (no attachment needed).
+
+    ``sim.pars.stop`` is auto-extended past the latest data year (+1 for
+    partial-year margin) so callers don't redefine sim horizon.
+    """
+    age_result_names = []          # preserves order of appearance
+    age_labels_by_result = {}      # name -> set of bin labels
+    unknown = []
+    for col in data.columns:
+        try:
+            scope, name, subkey = _parse_column(col)
+        except ValueError:
+            unknown.append(col)
+            continue
+        if scope == ALL_HPV and subkey is not None:
+            if name not in age_result_names:
+                age_result_names.append(name)
+            age_labels_by_result.setdefault(name, set()).add(subkey)
+        elif scope == ALL_HPV and subkey is None:
+            pass  # HPVTotal result -- no attachment
+        elif scope == BY_GENOTYPE:
+            if name not in _GENOTYPE_DIST_MAP:
+                raise ValueError(
+                    f'hpv.Calibration: unknown by_genotype target {name!r} '
+                    f'(from column {col!r}); known: {sorted(_GENOTYPE_DIST_MAP)}.')
+        else:
+            unknown.append(col)
+    if unknown:
+        raise ValueError(f'hpv.Calibration: unrecognized data columns: {unknown}')
+
+    if age_result_names:
+        label_sets = list(age_labels_by_result.values())
+        if any(s != label_sets[0] for s in label_sets[1:]):
+            raise ValueError(
+                f'hpv.Calibration: age-stratified targets have inconsistent '
+                f'bin labels across result names: {age_labels_by_result!r}')
+        edges = _edges_from_labels(label_sets[0])
+        years = sorted(float(y) for y in data.index)
+        _get_or_create_all_hpv_by_age(sim, age_result_names, years, edges)
+
+    if len(data):
+        target_stop = int(float(data.index.max())) + 1
+        cur_stop = sim.pars.get('stop')
+        if cur_stop is None or float(cur_stop) < target_stop:
+            sim.pars.stop = target_stop
+
+
+def _get_or_create_all_hpv_by_age(sim, result_keys, years, edges):
+    """Return the ``all_hpv_by_age`` by_age analyzer on ``sim`` (create +
+    attach if absent; edges-validated if present)."""
+    existing = sim.pars.get('analyzers', []) or []
+    for a in existing:
+        if getattr(a, 'name', None) == ALL_HPV_BY_AGE:
+            if not np.array_equal(a.edges, edges):
+                raise ValueError(
+                    f'hpv.Calibration: existing {ALL_HPV_BY_AGE} analyzer has '
+                    f'edges {list(a.edges)}, incompatible with data-derived '
+                    f'edges {list(edges)}.')
+            return a
+    ar = by_age(result_keys, years=years, edges=edges, name=ALL_HPV_BY_AGE)
+    sim.pars.analyzers = list(existing) + [ar]
+    return ar
+
+
+def _extract_columns(sim, data):
+    """Return a DataFrame same-shape as ``data`` with sim-side values per
+    column. Extraction is cached per underlying source (by_age analyzer,
+    results_by_genotype table, HPVTotal result) so multi-subkey columns
+    sharing a base don't re-extract.
+    """
+    tv_years = np.asarray(sim.timevec.years).astype(int)
+    all_hpv_results = sim.results['all_hpv'] if 'all_hpv' in sim.results else None
+    all_hpv_by_age = sim.analyzers.get(ALL_HPV_BY_AGE)
+    cache = {}
+    out = pd.DataFrame(np.nan, index=data.index.copy(), columns=data.columns)
+    for col in data.columns:
+        scope, name, subkey = _parse_column(col)
+        if scope == ALL_HPV and subkey is not None:
+            key = ('by_age', name)
+            if key not in cache:
+                cache[key] = all_hpv_by_age.to_dataframe(name)
+            out[col] = cache[key][subkey].reindex(data.index)
+        elif scope == ALL_HPV and subkey is None:
+            if all_hpv_results is None or name not in all_hpv_results:
+                raise KeyError(
+                    f'hpv.Calibration eval: column {col!r} needs '
+                    f'sim.results.all_hpv.{name}; not found.')
+            vals = np.asarray(all_hpv_results[name])
+            for year in data.index:
+                matches = np.where(tv_years == int(float(year)))[0]
+                if len(matches):
+                    out.at[year, col] = float(vals[matches[0]])
+        elif scope == BY_GENOTYPE:
+            key = ('by_genotype', name)
+            if key not in cache:
+                sim_key, normalize = _GENOTYPE_DIST_MAP[name]
+                df = results_by_genotype(sim, key=sim_key, normalize=normalize)
+                df.index = df.index.astype(float)
+                df.columns = [str(c) for c in df.columns]
+                cache[key] = df
+            out[col] = cache[key][subkey].reindex(data.index)
+    return out
 
 
 def default_eval_fn(sim, data, weights=None, gof_kwargs=None):
-    """Default eval_fn: weighted sum of compute_gof across each data target.
+    """Weighted sum of ``compute_gof`` across each column of ``data``.
 
-    For each ``(key, expected_df)`` in ``data``, pull the simulated values
-    from the sim's ``by_age`` analyzer aligned on ``(index, columns)``,
-    flatten both, call ``compute_gof(as_scalar='sum')``, then multiply by
-    ``weights.get(key, 1.0)``. Returns the total as a single float —
-    smaller is better.
+    ``data`` is a wide DataFrame (index='t', dot-scoped columns). For each
+    column, sim-side values are extracted via ``_extract_columns``, NaN
+    cells in ``data`` are skipped, and per-column mismatches are weighted
+    by ``weights.get(column_name, 1.0)`` before summing.
     """
     weights = weights or {}
     gof_kwargs = dict(gof_kwargs or {})
-    # Default to a scalar-sum gof unless the caller already specified.
     gof_kwargs.setdefault('as_scalar', 'sum')
-    ar = _find_by_age(sim)
+    actual = _extract_columns(sim, data)
     total = 0.0
-    for key, expected in data.items():
-        actual = _extract_actual(ar, key, expected)
+    for col in data.columns:
+        expected_col = data[col].dropna()
+        if len(expected_col) == 0:
+            continue
+        actual_col = actual[col].loc[expected_col.index]
+        if actual_col.isna().any():
+            missing = expected_col.index[actual_col.isna()].tolist()
+            raise KeyError(
+                f'hpv.Calibration eval: sim produced no value for {col!r} at '
+                f'years {missing}; expand sim.stop or update data.')
         mismatch = compute_gof(
-            np.asarray(expected.values, dtype=float).ravel(),
-            np.asarray(actual.values, dtype=float).ravel(),
+            np.asarray(expected_col.values, dtype=float),
+            np.asarray(actual_col.values, dtype=float),
             **gof_kwargs,
         )
-        total += float(mismatch) * float(weights.get(key, 1.0))
+        total += float(mismatch) * float(weights.get(col, 1.0))
     return total
+
