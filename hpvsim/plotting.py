@@ -164,8 +164,9 @@ def _run_top_n_trials(calib, n):
     from .calibration import _extract_columns
     data = calib.eval_kw['data']
     n = min(n, len(calib.df))
-    top = calib.df.head(n)
-    par_cols = [c for c in top.columns if c not in ('index', 'mismatch')]
+    top = calib.df.nsmallest(n, 'mismatch')
+    # Optuna leaks 'rand_seed' when reseed=True; not a calibratable model par.
+    par_cols = [c for c in top.columns if c not in ('index', 'mismatch', 'rand_seed')]
     par_sets = [{c: row[c] for c in par_cols} for _, row in top.iterrows()]
 
     calib_pars = calib.calib_pars

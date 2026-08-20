@@ -148,6 +148,16 @@ class Calibration(ss.Calibration):
             journal_path = journal_dir / 'hpvsim_calibration.log'
             kwargs['storage'] = JournalStorage(JournalFileBackend(str(journal_path)))
 
+        # ss.Calibration defaults to reseed=True, which resamples rand_seed
+        # from [0, 1_000_000] on every trial as if it were a calibrated par.
+        # For HPV/cancer this is nearly always wrong: cancer is a rare event,
+        # per-agent stochastic variance is large, and the resulting mismatch
+        # surface is dominated by seed noise -- Optuna picks the luckiest
+        # seed rather than the best parameters (see
+        # https://github.com/starsimhub/hpvsim/pull/... for the pathology).
+        # Override to False; callers who want per-trial reseed pass explicitly.
+        kwargs.setdefault('reseed', False)
+
         if data is not None:
             if eval_fn is not None:
                 raise ValueError(

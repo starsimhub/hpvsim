@@ -98,6 +98,30 @@ and `sim` template. `top_n=50` is the default; pass `top_n=1` to plot
 just the best. Old plot-config kwargs (`res_to_plot`, per-panel dicts)
 are gone.
 
+### `hpv.Calibration` default `reseed=False`; top-N trial selection
+
+Two related fixes:
+
+- ``ss.Calibration`` defaults to ``reseed=True``, which resamples
+  ``rand_seed`` from ``[0, 1_000_000]`` on every trial *as if it were a
+  calibrated parameter*. For HPV/cancer this is nearly always wrong:
+  cancer is a rare event, per-agent stochastic variance is large, and the
+  resulting mismatch surface is dominated by seed noise -- Optuna picks
+  the luckiest seed rather than the best parameters. ``hpv.Calibration``
+  now defaults ``reseed=False``; callers who want per-trial reseed pass
+  it explicitly.
+- ``hpv.plot_calibration._run_top_n_trials`` used ``calib.df.head(n)``,
+  which returns the first *N chronological* trials (essentially early
+  Optuna exploration = random guesses), not the *N* best-fitting trials.
+  Fixed to ``calib.df.nsmallest(n, 'mismatch')``. ``rand_seed`` is now
+  also stripped from top-N par sets before rerun (in case a caller opts
+  back into ``reseed=True``).
+
+**Regression information:** any calibration produced with the pre-fix
+default (``reseed=True``) has ``rand_seed`` in ``best_pars`` / ``calib.df``
+and a top-N ribbon that reflects seed-noise variance, not parameter
+variance. Redo the calibration on the new default before trusting the fit.
+
 ### `hpv.results_by_genotype` helper
 
 New helper in `hpv.analyzers` (also exported at the top level):
