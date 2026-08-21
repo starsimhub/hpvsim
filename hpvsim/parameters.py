@@ -462,9 +462,9 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
     def apply_beta_scalar(disease, value):
         """Broadcast a scalar beta onto pars.beta ({'sexualnetwork': [f2m, m2f]}),
         preserving the F/M ratio. Per-act probabilities are clipped to
-        [0, 1] via ``HPV._clip_beta`` (matches the construction-time clip);
-        transm2f=3.69 defaults mean any scalar > ~0.271 would push m2f > 1
-        and silently NaN transmission."""
+        [0, 1] via ``HPV._clip_beta`` (matches the construction-time clip)
+        to protect against unusual parameter combinations pushing a per-act
+        probability above 1 (would silently NaN transmission)."""
         from .hpv import _clip_beta
         old = disease.pars.beta
         if not (sc.isnumber(value) and isinstance(old, dict)):

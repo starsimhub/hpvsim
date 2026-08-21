@@ -81,12 +81,14 @@ def _clone_agents(sim, src_uids, new_uids):
 def _clip_beta(f2m, m2f, genotype='?'):
     """Clip HPV per-act transmission probabilities to [0, 1].
 
-    Guards against ``gpars.beta * rel_beta * transm2f`` exceeding 1 when
-    default ``transm2f=3.69`` is combined with a ``beta`` (or ``rel_beta``)
-    high enough to push m2f above 1: the network's per-act calc
-    ``1 - (1 - p) ** acts`` silently produces NaN, so the sim runs to
-    completion with garbage prevalence rather than erroring. Warn on clip
-    so calibrator priors that hit this cap are visible.
+    Guards against ``gpars.beta * rel_beta * transm2f`` exceeding 1: the
+    network's per-act calc ``1 - (1 - p) ** acts`` silently produces NaN
+    for p > 1, so the sim would run to completion with garbage
+    prevalence rather than erroring. Warn on clip so unusual parameter
+    combinations that hit this cap are visible. With defaults
+    (``transm2f=2.0``, ``beta=0.25``) no clip triggers; it fires when
+    users pin transm2f higher, set ``rel_beta > 1``, or pass a very
+    high per-genotype beta.
     """
     if f2m > 1.0 or m2f > 1.0:
         import warnings
@@ -94,8 +96,8 @@ def _clip_beta(f2m, m2f, genotype='?'):
             f'HPV[{genotype}] beta clipped to [0, 1]: '
             f'raw f2m={f2m:.4f}, m2f={m2f:.4f} '
             f'-> clipped f2m={min(f2m, 1.0):.4f}, m2f={min(m2f, 1.0):.4f}. '
-            f'(default transm2f=3.69 amplifies m2f; a beta scalar > ~0.271 '
-            f'via route_pars will hit this cap.)',
+            f'(transm2f amplifies m2f; verify transm2f, rel_beta, and '
+            f'top-level beta scalar are consistent with per-act probs ≤ 1.)',
             RuntimeWarning, stacklevel=2,
         )
     return [min(1.0, f2m), min(1.0, m2f)]
