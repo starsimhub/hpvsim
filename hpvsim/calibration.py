@@ -33,7 +33,8 @@ from .parameters import route_pars as build_sim
 from .data.loaders import load_calib_data
 
 
-__all__ = ['Calibration', 'build_sim', 'compute_gof', 'default_eval_fn']
+__all__ = ['Calibration', 'build_sim', 'compute_gof', 'default_eval_fn',
+           'make_calib_sims']
 
 
 _LIST_SPEC_KEYS = ('guess', 'low', 'high', 'step')
@@ -483,6 +484,93 @@ def _extract_columns(sim, data):
                 cache[key] = df
             out[col] = cache[key][subkey].reindex(data.index)
     return out
+
+
+def _make_calib_sim_worker(pars, calib_pars, build_fn, build_kw, base_sim,
+                           sim_kwargs, analyzers, extract_fn):
+    """sc.parallelize worker for ``make_calib_sims``: apply this trial's
+    ``pars`` to a deep-copied ``base_sim``, extend analyzers, run, then
+    return the sim (or ``extract_fn(sim)`` if provided)."""
+    spec = sc.dcp(calib_pars)
+    for parname, s in spec.items():
+        if parname in pars:
+            s['value'] = pars[parname]
+    sim = sc.dcp(base_sim)
+    for k, v in (sim_kwargs or {}).items():
+        setattr(sim.pars, k, v)
+    if analyzers is not None:
+        extra = analyzers() if callable(analyzers) else sc.dcp(analyzers)
+        existing = list(sim.pars.get('analyzers', []) or [])
+        sim.pars.analyzers = existing + list(extra)
+    sim = build_fn(sim, calib_pars=spec, **build_kw)
+    if isinstance(sim, ss.MultiSim):
+        sim = sim.sims[0]
+    sim.run()
+    return extract_fn(sim) if extract_fn is not None else sim
+
+
+def make_calib_sims(calib, n=50, sim_kwargs=None, analyzers=None,
+                    extract_fn=None, n_workers=None):
+    """Rerun the top-``n`` trials from a ``hpv.Calibration`` in parallel.
+
+    A ``hpv.Calibration`` stores per-trial ``mismatch`` + eval-column values,
+    not per-trial sim results. To inspect any other result (e.g. the
+    ``asr_cancer_incidence`` trajectory, or a custom by_age analyzer output),
+    rerun the top-``n`` best-fit trials with this helper and read
+    ``sim.results`` / ``sim.analyzers`` from the returned sims.
+
+    Args:
+        calib: hpv.Calibration (or the shrunk sc.objdict from
+            ``calib.shrink()`` — both expose ``df``, ``calib_pars``,
+            ``build_fn``, ``build_kw``, ``sim``).
+        n (int): number of best-mismatch trials to rerun; clamped to
+            ``len(calib.df)``.
+        sim_kwargs (dict): overrides applied to ``sim.pars`` before
+            ``build_fn`` (e.g. ``dict(stop=2045)`` to project past the
+            calibration window).
+        analyzers: zero-arg callable returning a fresh list of Analyzer
+            instances (recommended so each subprocess gets its own state),
+            OR a list of instances (deep-copied per worker). Appended to
+            any analyzers the Calibration already attached to the base sim.
+        extract_fn (callable): if provided, worker returns
+            ``extract_fn(sim)`` instead of the full sim. Strongly recommended
+            — see the note below.
+        n_workers (int): defaults to ``min(n, cpu_count())``.
+
+    Returns:
+        list of length ``min(n, len(calib.df))``: run sims if ``extract_fn``
+        is None, else the extract_fn outputs.
+
+    Note:
+        Full sims are memory-heavy (each holds people arrays, edge tables,
+        results, analyzers). For ``n=50`` this can be many GB in the parent
+        process after ``sc.parallelize`` pickles them back. Standard
+        practice: pass an ``extract_fn`` that returns a small dict /
+        DataFrame / array (use ``ss.Result.to_df`` or ``ss.Result.annualize``
+        for time-series results), then commit that extracted output rather
+        than the raw sims.
+    """
+    n = min(n, len(calib.df))
+    top = calib.df.nsmallest(n, 'mismatch')
+    # Optuna leaks 'rand_seed' when reseed=True; not a calibratable model par.
+    par_cols = [c for c in top.columns if c not in ('index', 'mismatch', 'rand_seed')]
+    par_sets = [{c: row[c] for c in par_cols} for _, row in top.iterrows()]
+    if n_workers is None:
+        n_workers = min(len(par_sets), sc.cpu_count())
+    return sc.parallelize(
+        _make_calib_sim_worker,
+        iterkwargs=[{'pars': p} for p in par_sets],
+        kwargs=dict(
+            calib_pars=calib.calib_pars,
+            build_fn=calib.build_fn,
+            build_kw=calib.build_kw or {},
+            base_sim=calib.sim,
+            sim_kwargs=sim_kwargs,
+            analyzers=analyzers,
+            extract_fn=extract_fn,
+        ),
+        ncpus=n_workers, serial=False,
+    )
 
 
 def default_eval_fn(sim, data, weights=None, gof_kwargs=None):

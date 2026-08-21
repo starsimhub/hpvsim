@@ -153,42 +153,15 @@ _PREV_KEYS = ('hpv_prevalence', 'precin_prevalence', 'cin_prevalence')
 
 
 def _run_top_n_trials(calib, n):
-    """Re-run the top-``n`` trials from ``calib.df`` in parallel; return a
-    list of per-trial DataFrames shaped like ``calib.eval_kw['data']``.
-
-    Each per-trial DataFrame has the same year index + dot-scoped columns
-    as the target data; values are the sim's extracted-per-column
-    predictions at that trial's parameters.
-    """
-    import pandas as pd
-    from .calibration import _extract_columns
+    """Re-run the top-``n`` trials via ``make_calib_sims`` and return a list
+    of per-trial DataFrames shaped like ``calib.eval_kw['data']`` (year
+    index + dot-scoped columns). Uses ``extract_fn`` so full sims are not
+    pickled back to the parent process."""
+    from .calibration import make_calib_sims, _extract_columns
     data = calib.eval_kw['data']
-    n = min(n, len(calib.df))
-    top = calib.df.nsmallest(n, 'mismatch')
-    # Optuna leaks 'rand_seed' when reseed=True; not a calibratable model par.
-    par_cols = [c for c in top.columns if c not in ('index', 'mismatch', 'rand_seed')]
-    par_sets = [{c: row[c] for c in par_cols} for _, row in top.iterrows()]
-
-    calib_pars = calib.calib_pars
-    build_fn = calib.build_fn
-    build_kw = calib.build_kw or {}
-    base_sim = calib.sim
-
-    def _worker(pars):
-        spec = sc.dcp(calib_pars)
-        for parname, s in spec.items():
-            if parname in pars:
-                s['value'] = pars[parname]
-        sim = build_fn(sc.dcp(base_sim), calib_pars=spec, **build_kw)
-        sim.run()
-        if isinstance(sim, ss.MultiSim):
-            sim = sim.sims[0]
-        return _extract_columns(sim, data)
-
-    ncpus = min(len(par_sets), sc.cpu_count())
-    frames = sc.parallelize(_worker, iterkwargs=[{'pars': p} for p in par_sets],
-                            ncpus=ncpus, serial=False)
-    return frames
+    return make_calib_sims(
+        calib, n=n, extract_fn=lambda sim: _extract_columns(sim, data),
+    )
 
 
 def _group_columns(cols):

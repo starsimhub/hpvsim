@@ -5,6 +5,26 @@ the term "Regression information".
 
 ## Version 3.1.0 (2026-08-20)
 
+### `hpv.make_calib_sims`: rerun top-N calibration trials
+
+New public helper that reruns the top-`n` best-fit trials from a
+`hpv.Calibration` (or shrunk objdict) in parallel and returns the run sims —
+enabling post-calibration analysis of results the calibration itself doesn't
+store (e.g. `asr_cancer_incidence` trajectory, custom by_age analyzer output).
+
+```python
+sims = hpv.make_calib_sims(calib, n=50,
+                           sim_kwargs=dict(stop=2045),
+                           analyzers=lambda: [hpv.by_age(['precin_prevalence'], ...)])
+```
+
+Accepts `sim_kwargs` (applied to `sim.pars` before build_fn), `analyzers`
+(callable or list, appended to any analyzers already on the base sim), and
+`extract_fn` (worker returns `extract_fn(sim)` instead of the full sim —
+strongly recommended, since 50 full sims can be many GB pickled back to the
+parent process). `hpv.plot_calibration` now uses this internally via
+`extract_fn=_extract_columns`.
+
 ### `hpv.Calibration`: per-bin-scheme `by_age` analyzers
 
 Age-stratified calibration targets can now have different bin schemes across
