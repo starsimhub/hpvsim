@@ -5,6 +5,39 @@ the term "Regression information".
 
 ## Version 3.1.0 (2026-08-20)
 
+### `HPV`: default `transm2f` reduced from 3.69 → 2.0
+
+The 3.69 factor came from an older meta-analysis and turns out to be
+poorly supported by the current literature. Reducing to 2.0 keeps a
+moderate m→f asymmetry (m2f > f2m) without pushing the default per-act
+m2f probability so close to 1 that any upward calibration knob spills
+over.
+
+Concrete impact with defaults: `beta * rel_beta * transm2f` for hpv16
+drops from 0.9225 → 0.5, meaning the max safe scalar `beta` via
+`route_pars` rises from ~0.271 → 0.5.
+
+**Regression information**: this is a model-behavior change. Existing
+parameter sets calibrated against the old 3.69 default will now
+produce lower m→f transmission unless callers pin `transm2f=3.69` on
+each genotype explicitly.
+
+### `HPV`: per-act beta clipped to `[0, 1]` at construction
+
+`HPV.__init__` (and the `rel_beta` recompute) now clip
+`beta * rel_beta * transm2f` per direction via a new `_clip_beta`
+helper that emits a `RuntimeWarning` on clip.
+`parameters.apply_beta_scalar` (the `route_pars` broadcast path) uses
+the same helper.
+
+Motivation: without a clip, any parameter combination pushing per-act
+transmission above 1 silently NaN'd the sim — the network's per-act
+calculation `1 - (1 - p) ** acts` returns NaN for `p > 1`, so the sim
+ran to completion with garbage prevalence rather than erroring. With
+the new `transm2f=2.0` default the clip rarely fires; it protects
+against users pinning `transm2f` higher, passing `rel_beta > 1`, or
+setting per-genotype `beta` above 0.5.
+
 ### `hpv.make_calib_sims`: rerun top-N calibration trials
 
 New public helper that reruns the top-`n` best-fit trials from a

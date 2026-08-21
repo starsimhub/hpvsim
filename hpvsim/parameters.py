@@ -109,7 +109,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=1.0,
         sero_prob=0.75,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
     'hpv18': dict(
         beta=0.25,
@@ -124,7 +124,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=0.75,
         sero_prob=0.56,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
     'hi5': dict(
         beta=0.25,
@@ -139,7 +139,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=0.9,
         sero_prob=0.60,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
     'ohr': dict(
         beta=0.25,
@@ -154,7 +154,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=0.9,
         sero_prob=0.60,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
 }
 
@@ -461,7 +461,11 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
 
     def apply_beta_scalar(disease, value):
         """Broadcast a scalar beta onto pars.beta ({'sexualnetwork': [f2m, m2f]}),
-        preserving the F/M ratio."""
+        preserving the F/M ratio. Per-act probabilities are clipped to
+        [0, 1] via ``HPV._clip_beta`` (matches the construction-time clip);
+        transm2f=3.69 defaults mean any scalar > ~0.271 would push m2f > 1
+        and silently NaN transmission."""
+        from .hpv import _clip_beta
         old = disease.pars.beta
         if not (sc.isnumber(value) and isinstance(old, dict)):
             disease.pars.beta = value
@@ -469,10 +473,16 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
         first = next(iter(old.values()))
         ref = first[0] if isinstance(first, list) else first
         scale = 1.0 if ref == 0 else value / ref
-        disease.pars.beta = {
-            net: ([v[0] * scale, v[1] * scale] if isinstance(v, list) else v * scale)
-            for net, v in old.items()
-        }
+        new_beta = {}
+        for net_name, v in old.items():
+            if isinstance(v, list):
+                new_beta[net_name] = _clip_beta(
+                    v[0] * scale, v[1] * scale,
+                    getattr(disease, 'genotype', getattr(disease, 'name', '?')),
+                )
+            else:
+                new_beta[net_name] = min(1.0, v * scale)
+        disease.pars.beta = new_beta
 
     unmatched = {}
 

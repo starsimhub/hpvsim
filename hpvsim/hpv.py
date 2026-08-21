@@ -78,6 +78,29 @@ def _clone_agents(sim, src_uids, new_uids):
     return
 
 
+def _clip_beta(f2m, m2f, genotype='?'):
+    """Clip HPV per-act transmission probabilities to [0, 1].
+
+    Guards against ``gpars.beta * rel_beta * transm2f`` exceeding 1 when
+    default ``transm2f=3.69`` is combined with a ``beta`` (or ``rel_beta``)
+    high enough to push m2f above 1: the network's per-act calc
+    ``1 - (1 - p) ** acts`` silently produces NaN, so the sim runs to
+    completion with garbage prevalence rather than erroring. Warn on clip
+    so calibrator priors that hit this cap are visible.
+    """
+    if f2m > 1.0 or m2f > 1.0:
+        import warnings
+        warnings.warn(
+            f'HPV[{genotype}] beta clipped to [0, 1]: '
+            f'raw f2m={f2m:.4f}, m2f={m2f:.4f} '
+            f'-> clipped f2m={min(f2m, 1.0):.4f}, m2f={min(m2f, 1.0):.4f}. '
+            f'(default transm2f=3.69 amplifies m2f; a beta scalar > ~0.271 '
+            f'via route_pars will hit this cap.)',
+            RuntimeWarning, stacklevel=2,
+        )
+    return [min(1.0, f2m), min(1.0, m2f)]
+
+
 def _normalize_genotype(key):
     """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
     s = str(key).lower().strip()
@@ -119,10 +142,11 @@ class HPV(ss.Infection):
             # males in p2 (see hpvsim/network.py:185). validate_beta accepts
             # this dict shape natively (ss.Infection.validate_beta).
             beta={
-                'sexualnetwork': [
+                'sexualnetwork': _clip_beta(
                     gpars.beta * gpars.rel_beta * gpars.transf2m,
                     gpars.beta * gpars.rel_beta * gpars.transm2f,
-                ],
+                    genotype,
+                ),
             },
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
@@ -154,10 +178,11 @@ class HPV(ss.Infection):
         _beta_overridden = ('beta' in kwargs) or (pars is not None and 'beta' in pars)
         if not _beta_overridden:
             self.pars.beta = {
-                'sexualnetwork': [
+                'sexualnetwork': _clip_beta(
                     gpars.beta * self.pars.rel_beta * gpars.transf2m,
                     gpars.beta * self.pars.rel_beta * gpars.transm2f,
-                ],
+                    genotype,
+                ),
             }
 
         # Guard against unit-less duration distributions: a duration given
