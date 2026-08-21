@@ -183,6 +183,37 @@ class Calibration(ss.Calibration):
             return super().remove_db()
         return
 
+    def shrink(self, n_results=100):
+        """Return a lightweight ``sc.objdict`` with the top-``n_results``
+        trials (by mismatch) + the metadata needed to replot / rebuild sims.
+
+        Use for committing calibration results to source control: a full
+        1000-5000-trial ``calib.obj`` is many MB (Optuna study, tempdir
+        storage refs, per-trial state); the shrunken version drops all of
+        that while remaining a drop-in for ``hpv.plot_calibration`` and
+        ``utils.run_top_n``.
+
+        Preserved attributes (accessed by plotting/rebuild code paths):
+          - ``df``          : top-N rows of the trial DataFrame, sorted by
+                              mismatch ascending.
+          - ``best_pars``   : the best-fit par dict.
+          - ``eval_kw``     : the eval kwargs (holds ``data`` for plotting).
+          - ``calib_pars``  : the Optuna spec dict.
+          - ``build_fn``    : how to reconstruct a sim from a par set.
+          - ``build_kw``    : build_fn kwargs (defaults to ``{}``).
+          - ``sim``         : base sim template.
+        """
+        cal = sc.objdict()
+        n = min(n_results, len(self.df))
+        cal.df = self.df.nsmallest(n, 'mismatch').reset_index(drop=True)
+        cal.best_pars = self.best_pars
+        cal.eval_kw = self.eval_kw
+        cal.calib_pars = self.calib_pars
+        cal.build_fn = self.build_fn
+        cal.build_kw = self.build_kw or {}
+        cal.sim = self.sim
+        return cal
+
     def worker(self):
         """Run a single worker.
 

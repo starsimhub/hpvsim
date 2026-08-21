@@ -98,6 +98,22 @@ and `sim` template. `top_n=50` is the default; pass `top_n=1` to plot
 just the best. Old plot-config kwargs (`res_to_plot`, per-panel dicts)
 are gone.
 
+### `hpv.Calibration.shrink(n_results=100)`
+
+Returns a lightweight ``sc.objdict`` with the top-``n_results`` trials
+(by mismatch) plus the metadata needed to replot / rebuild sims: ``df``,
+``best_pars``, ``eval_kw``, ``calib_pars``, ``build_fn``, ``build_kw``,
+``sim``. Drop-in for ``hpv.plot_calibration`` and downstream ribbon
+plotting code. Intended for committing calibration outputs to source
+control: a full 1000-5000-trial ``calib.obj`` is many MB (Optuna study,
+tempdir storage refs, per-trial state); the shrunken version drops all
+of that.
+
+Unlike ``stisim.Calibration.shrink``, this uses ``nsmallest(n, 'mismatch')``
+(not ``iloc[0:n]``, which would return first-N chronological trials) and
+doesn't require ``self.sim_results`` from ``ss.Calibration`` components
+(``hpv.Calibration`` uses ``eval_fn=default_eval_fn``, not components).
+
 ### `hpv.Calibration` default `reseed=False`; top-N trial selection
 
 Two related fixes:
