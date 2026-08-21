@@ -78,23 +78,37 @@ from .seeding import _ExclusiveSeeder
 class Sim(ss.Sim):
     """HPVsim simulation."""
 
-    def __init__(self, location='nigeria', genotypes=None, genotype_pars=None,
+    def __init__(self, location=None, genotypes=None, genotype_pars=None,
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, ms_agent_ratio=1, pars=None, v2_compat_demographics=False,
-                 end=None, **kwargs):
+                 end=None, datafolder=None, **kwargs):
         # Legacy alias: HPVsim v2 used ``end`` for the final sim year; Starsim
         # renamed it ``stop``. Accept ``end`` so v2 scripts keep running, but
         # nudge toward ``stop``. If given, ``end`` wins over ``stop``.
         if end is not None:
             ss.warn("hpv.Sim: `end` is a deprecated alias for `stop`; use `stop=` instead.")
             stop = end
-        # Pass start year so the age pyramid matches sim.start (loader
-        # defaults to year 2000 with a materially different distribution).
-        country = hpv.load_country(location, year=int(start))
+        # Dispatch on location: string -> load country data (bundled or
+        # datafolder); None -> uniform ages, no vitals, location-agnostic
+        # network (stisim pattern: no location => no auto pop scaling).
+        if location is None:
+            country = None
+            ss.warn(
+                'hpv.Sim: no location supplied; using uniform ages 0-60, no '
+                'births/deaths/migration, location-agnostic sexual-network '
+                'defaults, pop_scale=1. Pass location= or demographics= to '
+                'model a real population, or call hpv.demo() for a canonical '
+                'Nigeria sim.'
+            )
+        else:
+            country = hpv.load_country(location, year=int(start), datafolder=datafolder)
+            if total_pop is None:
+                total_pop = country['age_data']['value'].sum()
         people = kwargs.pop('people', None)
         if people is None:
-            people = ss.People(n_agents, age_data=country['age_data'],
+            age_data = country['age_data'] if country is not None else None
+            people = ss.People(n_agents, age_data=age_data,
                                extra_states=[ss.BoolArr('fine', default=False)])
 
         user_diseases = kwargs.pop('diseases', None) or []
@@ -182,31 +196,49 @@ class Sim(ss.Sim):
 
         networks = kwargs.pop('networks', None)
         if networks is None:
-            networks = [hpv.SexualNetwork(**country['network_pars'])]
+            # Network calibration is location-agnostic (see hpv.NetworkPars);
+            # country['network_pars'] is just NetworkPars() defaults.
+            network_pars = country['network_pars'] if country is not None else {}
+            networks = [hpv.SexualNetwork(**network_pars)]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
-            births_cls = hpv.AnnualBirths if v2_compat_demographics else hpv.Births
-            # The raw mortality table spans ~1950-2100, but ss.Deaths only ever
-            # queries years within the sim window (and otherwise retains the
-            # whole frame). Trim to [start, stop] (+/-1yr pad for boundary
-            # interpolation) so the module carries only what it uses.
-            death_rate = country['death_rate']
-            death_rate = death_rate[
-                (death_rate['Time'] >= int(start) - 1)
-                & (death_rate['Time'] <= int(stop) + 1)
-            ]
-            demographics = [
-                births_cls(birth_rate=country['birth_rate']),
-                ss.Deaths(death_rate=death_rate),
-                hpv.AgeMigration(v2_compat=v2_compat_demographics),
-            ]
+            if country is None:
+                demographics = []  # bare Sim: no births/deaths/migration
+            else:
+                births_cls = hpv.AnnualBirths if v2_compat_demographics else hpv.Births
+                # The raw mortality table spans ~1950-2100, but ss.Deaths only
+                # ever queries years within the sim window (and otherwise
+                # retains the whole frame). Trim to [start, stop] (+/-1yr pad
+                # for boundary interpolation) so the module carries only what
+                # it uses.
+                death_rate = country['death_rate']
+                death_rate = death_rate[
+                    (death_rate['Time'] >= int(start) - 1)
+                    & (death_rate['Time'] <= int(stop) + 1)
+                ]
+                demographics = [
+                    births_cls(birth_rate=country['birth_rate']),
+                    ss.Deaths(death_rate=death_rate),
+                    hpv.AgeMigration(v2_compat=v2_compat_demographics),
+                ]
 
         analyzers = auto_analyzers + user_analyzers
 
         # AgeMigration.init_pre reads sim.location to load country data.
-        self.location = location.lower()
+        self.location = location.lower() if location is not None else None
         # Stored for use in init() to discretize initial ages.
         self._v2_compat_demographics = v2_compat_demographics
+
+        # Split pars into (a) starsim-recognized sim-level keys forwarded to
+        # super() so pre-init state (People/timeline) picks them up, and
+        # (b) hpv module-level keys (per-genotype pars, network flat pars,
+        # connector pars) routed after super().__init__ via hpv.route_pars.
+        sim_pars, mod_pars = None, None
+        if pars:
+            sim_par_keys = set(ss.SimPars().keys())
+            sim_pars = {k: v for k, v in pars.items() if k in sim_par_keys}
+            mod_pars = {k: v for k, v in pars.items() if k not in sim_par_keys}
+
         super().__init__(
             start=ss.years(start),
             stop=ss.years(stop),
@@ -217,10 +249,13 @@ class Sim(ss.Sim):
             networks=networks,
             demographics=demographics,
             analyzers=analyzers,
-            pars=pars,
+            pars=sim_pars,
             total_pop=total_pop,
             **kwargs,
         )
+        if mod_pars:
+            from .parameters import route_pars
+            route_pars(self, mod_pars, verbose=False)
 
     def init(self, **kwargs):
         """Initialize the sim, then discretize initial ages if v2_compat_demographics is set.

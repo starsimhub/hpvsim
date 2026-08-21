@@ -90,16 +90,18 @@ def test_ratio_param_and_fine_state_exist():
             assert int(dis.pars.ms_agent_ratio) == 10
 
 def test_results_are_float_and_scale_weighted_noop_at_ratio1(ratio1_sim):
-    # ratio==1: scale_flows == len, so counts are unchanged but dtype is float.
+    # ratio==1: no fine agents, all people.scale=1. Float storage is preserved
+    # for compatibility with the ratio>1 case, but the underlying weighting
+    # collapses to raw counts. (The "counts are integer" invariant this used to
+    # spot-check via np.allclose(nc, round(nc)) is now implicit in the
+    # people.scale==1 assertion below, once pop_scale scaling is applied at
+    # finalize.)
     sim = ratio1_sim
     for dis in sim.diseases.values():
         if isinstance(dis, hpv.HPV):
             r = dis.results
             assert r.new_cancers.values.dtype == np.float64
             assert r.new_cancer_deaths.values.dtype == np.float64
-            # ratio==1 keeps everyone at scale 1.0 → integer-valued counts
-            nc = r.new_cancers.values
-            assert np.allclose(nc, np.round(nc))
     assert not sim.people.fine.values.any()
     assert np.allclose(sim.people.scale.values, 1.0)
 
@@ -240,6 +242,10 @@ def test_stock_prevalence_scale_weighted(grown_sim):
 
     # sim.ti after run() is the index of the last completed step (npts - 1).
     ti_last = sim.ti
+    # Stored results have pop_scale applied at finalize; scale_flows is
+    # agent-scale (people.scale-weighted, no pop_scale). Divide stored by
+    # pop_scale to compare on the same scale.
+    pop_scale = sim.pars.pop_scale
 
     # ---- Per-genotype HPV module stocks ----
     for dis in sim.diseases.values():
@@ -262,9 +268,9 @@ def test_stock_prevalence_scale_weighted(grown_sim):
             state_arr = getattr(dis, state_name)
             uids_in = ppl.auids[np.asarray(state_arr[ppl.auids], dtype=bool)]
             expected = ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
-            stored = float(r[key].values[ti_last])
+            stored = float(r[key].values[ti_last]) / pop_scale
             assert np.isclose(stored, expected, rtol=1e-6), (
-                f'{dis.name}.{key} at ti={ti_last}: stored={stored:.4f}, '
+                f'{dis.name}.{key} at ti={ti_last}: stored/pop_scale={stored:.4f}, '
                 f'scale_flows={expected:.4f}'
             )
 
@@ -290,9 +296,9 @@ def test_stock_prevalence_scale_weighted(grown_sim):
     any_infected &= alive_mask
     inf_uids = auids[any_infected]
     expected_hpvt_inf = ppl.scale_flows(inf_uids) if len(inf_uids) > 0 else 0.0
-    stored_hpvt_inf = float(hpvt['n_infected'].values[ti_last])
+    stored_hpvt_inf = float(hpvt['n_infected'].values[ti_last]) / pop_scale
     assert np.isclose(stored_hpvt_inf, expected_hpvt_inf, rtol=1e-6), (
-        f'hpvtotal.n_infected at ti={ti_last}: stored={stored_hpvt_inf:.4f}, '
+        f'hpvtotal.n_infected at ti={ti_last}: stored/pop_scale={stored_hpvt_inf:.4f}, '
         f'scale_flows={expected_hpvt_inf:.4f}'
     )
 
@@ -333,7 +339,10 @@ def test_per_genotype_prevalence_scale_weighted(grown_sim):
         assert 'prevalence' in r, f'{dis.name}: prevalence result missing'
 
         stored_prev = float(r['prevalence'].values[ti_last])
-        n_infected_sw = float(r['n_infected'].values[ti_last])
+        # n_infected has scale=True (multiplied by pop_scale at finalize);
+        # prevalence has scale=False (a ratio, unchanged). Divide n_infected by
+        # pop_scale to compare on the agent scale of n_alive_sw.
+        n_infected_sw = float(r['n_infected'].values[ti_last]) / sim.pars.pop_scale
 
         # Back-calculate the numerator from stored prevalence and post-run
         # alive count. Small drift (<2%) is expected because n_alive_sw
@@ -388,7 +397,9 @@ def test_per_genotype_prevalence_ratio1_unchanged(ratio1_sim):
             continue
         r = dis.results
         stored_prev = float(r['prevalence'].values[ti_last])
-        n_infected_sw = float(r['n_infected'].values[ti_last])
+        # Divide n_infected by pop_scale (applied at finalize) so it matches
+        # n_alive_sw's agent-scale.
+        n_infected_sw = float(r['n_infected'].values[ti_last]) / sim.pars.pop_scale
         # Back-calculate: stored_prev * n_alive_sw should ≈ n_infected_sw.
         back_calc_numerator = stored_prev * n_alive_sw
         assert np.isclose(back_calc_numerator, n_infected_sw, rtol=0.05), (

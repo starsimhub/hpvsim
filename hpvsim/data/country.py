@@ -15,145 +15,31 @@ Reshaping summary:
 - Network parameters: 2 layers (m=marital, c=casual). partners and
   cross_layer are stored split by sex; this adapter exposes both sexes
   per layer.
-- Distributions: ``{'dist': name, 'par1': ..., 'par2': ...}`` dicts are
-  converted to Starsim Dist instances via
-  ``hpvsim.migration_utils._v2_dist_to_starsim``.
+- Distributions: ``ss.Dist`` instances (see ``hpv.NetworkPars`` for the
+  default set).
 """
 
 import numpy as np
 import pandas as pd
 import sciris as sc
-import starsim as ss
 
-from ..migration_utils import _v2_dist_to_starsim
+from ..parameters import NetworkPars
 from . import loaders as _loaders
 
 
 def _default_network_pars(location=None, pars=None, **kwargs):  # noqa: ARG001  (location accepted for API symmetry)
-    """Default network parameters consumed by SexualNetwork construction.
+    """Return the flat ``hpv.NetworkPars`` defaults, merged with ``pars`` /
+    ``**kwargs`` overrides. Kept as a thin wrapper so callers using the pre-3.0.1
+    factory continue to work; new code should call ``hpv.NetworkPars`` directly.
 
-    Network calibration is intentionally location-agnostic: HPVsim ships
-    demographic data per country but not network calibration. The ``location``
-    argument is accepted for API symmetry.
-
-    Overrides follow the Starsim ``update_pars`` convention: pass a ``pars``
-    dict and/or keyword arguments, which are merged over the defaults via
-    ``sc.mergedicts`` (later values win). Keys carry the raw pre-shaping forms
-    (``debut``/``*_partners`` as distribution dicts, ``layer_probs`` as the
-    (3, N) arrays, ``*_cross_layer`` as annual floats), so an analysis script
-    supplies its per-country calibration in the same shape as the defaults::
-
-        raw = _default_network_pars('rwanda', pars=rwanda_network_overrides())
-
-    Keys returned:
-        debut, f_cross_layer, m_cross_layer,
-        f_partners, m_partners, acts, dur_pship,
-        mixing, layer_probs
+    Network calibration is intentionally location-agnostic (HPVsim ships
+    demographic data per country but not network calibration); ``location``
+    is accepted for API symmetry.
     """
-    debut = dict(
-        f=dict(dist='normal', par1=15.0, par2=2.1),
-        m=dict(dist='normal', par1=17.6, par2=1.8),
-    )
-    f_cross_layer = 0.185  # Annual prob of females having concurrent cross-layer relationships
-    m_cross_layer = 0.760  # Annual prob of males having concurrent cross-layer relationships
-
-    m_partners = dict(
-        m=dict(dist='poisson1', par1=0.01),
-        c=dict(dist='poisson1', par1=0.5),
-    )
-    f_partners = dict(
-        m=dict(dist='poisson1', par1=0.01),
-        c=dict(dist='poisson', par1=1),
-    )
-    acts = dict(
-        m=dict(dist='neg_binomial', par1=80, par2=40),
-        c=dict(dist='neg_binomial', par1=50, par2=5),
-    )
-    dur_pship = dict(
-        m=dict(dist='neg_binomial', par1=80, par2=3),
-        c=dict(dist='lognormal', par1=1, par2=2),
-    )
-
-    # Age-based act modulation. Marital peaks at 30, casual at 25; both ramp
-    # linearly from debut_ratio at debut age to 1.0 at peak, then linearly to
-    # retirement_ratio at retirement, then 0 beyond retirement.
-    age_act_pars = dict(
-        m=dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1),
-        c=dict(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1),
-    )
-
-    # Age-mixing matrices (rows = female age band start, cols = male age band).
-    mixing = dict(
-        m=np.array([
-            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
-            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [10,    0,  0, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [15,    0,  0, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [20,    0,  0, .1, .1, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [25,    0,  0, .5, .1, .5, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [30,    0,  0,  1, .5, .5, .5, .5, .1,  0,  0,  0,  0,  0,  0,  0,  0],
-            [35,    0,  0, .5,  1,  1, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
-            [40,    0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
-            [45,    0,  0,  0,  0, .1,  1,  1,  2,  1,  1, .5,  0,  0,  0,  0,  0],
-            [50,    0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0,  0],
-            [55,    0,  0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0],
-            [60,    0,  0,  0,  0,  0,  0,  0, .1, .5,  1,  1,  1,  2, .5,  0,  0],
-            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0],
-            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1, .5],
-            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],
-        ], dtype=float),
-        c=np.array([
-            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
-            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [15,    0,  0,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [20,    0,  0,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [25,    0,  0, .5,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0],
-            [30,    0,  0,  0, .5,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
-            [35,    0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
-            [40,    0,  0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
-            [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
-            [50,    0,  0,  0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
-            [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
-            [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
-            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
-            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5],
-            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
-        ], dtype=float),
-    )
-    layer_probs = dict(
-        m=np.array([
-            [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
-            [ 0,    0,  0.0394, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394],  # Annual prob of females seeking marriage if underpartnered
-            [ 0,    0,  0.0394, 0.590, 0.760, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394], # Annual prob of males seeking marriage if underpartnered
-        ], dtype=float),
-        c=np.array([
-            [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
-            [ 0,    0,  0.590, 0.974, 0.998, 0.974, 0.870, 0.870, 0.870, 0.344, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776],  # Annual prob of females seeking casual relationships if underpartnered
-            [ 0,    0,  0.590, 0.870, 0.870, 0.870, 0.870, 0.974, 0.998, 0.974, 0.590, 0.344, 0.185, 0.0776, 0.0776, 0.0776],    # Annual prob of males seeking casual relationships if underpartnered
-        ], dtype=float),
-    )
-
-    defaults = dict(
-        debut=debut,
-        f_cross_layer=f_cross_layer,
-        m_cross_layer=m_cross_layer,
-        f_partners=f_partners,
-        m_partners=m_partners,
-        acts=acts,
-        dur_pship=dur_pship,
-        age_act_pars=age_act_pars,
-        mixing=mixing,
-        layer_probs=layer_probs,
-    )
-    # Merge overrides over the defaults, matching Starsim's update_pars
-    # (sc.mergedicts(pars, kwargs) — later values win).
-    return sc.mergedicts(defaults, pars, kwargs)
+    return dict(NetworkPars(**sc.mergedicts(pars, kwargs)))
 
 
-def load_country(location, year=None):
+def load_country(location, year=None, datafolder=None):
     """Return Starsim-shaped data for ``location``.
 
     Any country in the bundled UN WPP 2024 data is valid; see
@@ -168,60 +54,86 @@ def load_country(location, year=None):
     Args:
         location (str): country name (case-insensitive).
         year (int): year to load the initial age distribution for.
+        datafolder (str/Path): if provided, look for user CSVs named
+            ``age_data.csv``, ``birth_rate.csv``, ``death_rate.csv``,
+            ``pop_total.csv`` in this folder. Missing files fall back to
+            the bundled UN WPP data for ``location`` with a warning; the
+            demographic indicator is preserved for any file that IS
+            present so users can mix bundled and custom data.
 
     Returns:
-        dict with keys:
-            - 'age_data': DataFrame [age, value]
-            - 'birth_rate': DataFrame [Year, CBR]
-            - 'death_rate': DataFrame [Time, AgeGrpStart, Sex, mx]
-            - 'network_pars': dict ``{'layer_pars': {layer: {...}}, 'debut': {sex: Dist}}``
-              consumed by ``hpv.SexualNetwork(**network_pars)``.
-            - 'pop_total': DataFrame [year, pop_size] (total population trajectory)
-            - 'pop_by_age': DataFrame [year, age, male, female] (age pyramid over time)
+        dict with the same keys as before (age_data, birth_rate, death_rate,
+        network_pars, pop_total, pop_by_age). Any indicator whose file is
+        missing AND whose bundled fallback also fails is returned as None,
+        and the caller (typically ``hpv.Sim``) is responsible for skipping
+        the corresponding module.
     """
     location = location.lower()
 
     return dict(
-        age_data=_age_data(location, year=year),
-        birth_rate=_birth_rate(location),
-        death_rate=_death_rate(location),
+        age_data=_age_data(location, year=year, datafolder=datafolder),
+        birth_rate=_birth_rate(location, datafolder=datafolder),
+        death_rate=_death_rate(location, datafolder=datafolder),
         network_pars=_network_pars(location),
-        pop_total=_pop_total(location),
+        pop_total=_pop_total(location, datafolder=datafolder),
         pop_by_age=_pop_by_age(location),
     )
 
 
-def _age_data(location, year=None):
-    """Reshape the age distribution to a (age, value) long-form DataFrame.
+def _datafile(datafolder, name):
+    """Path to a datafolder CSV if it exists; None otherwise."""
+    if datafolder is None:
+        return None
+    path = sc.path(datafolder) / name
+    return path if path.exists() else None
 
-    ``get_age_distribution`` returns an (N, 3) ndarray of
-    ``(age_lower, age_upper, count)``. The data is at single-year resolution
-    (age_upper == age_lower + 1), so age_lower IS the age and we don't need
-    to expand bins.
 
-    ``year`` is forwarded to ``_loaders.get_age_distribution``; if omitted,
-    the loader defaults to year 2000 with a warning, producing a materially
-    different age distribution than the sim-start year would.
-    """
-    arr = _loaders.get_age_distribution(location=location, year=year)
+def _warn_missing_indicator(indicator, filename, datafolder):
+    """Warn that a datafolder indicator is missing (bundle fallback used)."""
+    import warnings
+    warnings.warn(
+        f'hpv.load_country: {indicator} file {filename!r} not found in '
+        f'datafolder {sc.path(datafolder)!s}; falling back to bundled UN '
+        f'WPP data for the location.',
+        stacklevel=3,
+    )
+
+
+def _age_data(location, year=None, datafolder=None):
+    """Reshape the age distribution to a (age, value) long-form DataFrame."""
+    csv = _datafile(datafolder, 'age_data.csv')
+    if datafolder is not None and csv is None:
+        _warn_missing_indicator('age_data', 'age_data.csv', datafolder)
+    arr = _loaders.get_age_distribution(location=location, year=year,
+                                        age_datafile=str(csv) if csv else None)
     return pd.DataFrame({
         'age': arr[:, 0].astype(int),
         'value': arr[:, 2].astype(float),
     })
 
 
-def _birth_rate(location):
+def _birth_rate(location, datafolder=None):
     """Birth rates as [Year, CBR] for ``ss.Births``. CBR is per 1000."""
-    raw = _loaders.get_birth_rates(location=location)
+    csv = _datafile(datafolder, 'birth_rate.csv')
+    if datafolder is not None and csv is None:
+        _warn_missing_indicator('birth_rate', 'birth_rate.csv', datafolder)
+    raw = _loaders.get_birth_rates(location=location,
+                                   birth_datafile=str(csv) if csv else None)
     return pd.DataFrame({
         'Year': np.asarray(raw['year'], dtype=int),
         'CBR': np.asarray(raw['cbr'], dtype=float),
     })
 
 
-def _death_rate(location):
+def _death_rate(location, datafolder=None):
     """Death rates as ``ss.Deaths``-shaped UN-style columns."""
-    df = _loaders.map_entries(_loaders.load_file(_loaders.files.death), location)
+    csv = _datafile(datafolder, 'death_rate.csv')
+    if csv is not None:
+        df = pd.read_csv(csv)
+    else:
+        if datafolder is not None:
+            _warn_missing_indicator('death_rate', 'death_rate.csv', datafolder)
+        df = _loaders.map_entries(_loaders.load_file(_loaders.files.death), location)
     df = df[df['Sex'].isin(('Male', 'Female'))]  # drop 'Total'
     return pd.DataFrame({
         'Time': df['Time'].astype(int).values,
@@ -232,77 +144,18 @@ def _death_rate(location):
 
 
 def _network_pars(location, pars=None, **kwargs):
-    """Build ``hpv.SexualNetwork`` parameters from a location's defaults.
-
-    ``pars``/``kwargs`` are network overrides in the raw ``_default_network_pars``
-    form; they are merged over the defaults (Starsim ``update_pars`` convention)
-    before the result is shaped into SexualNetwork inputs.
-    """
-    return _shape_network_pars(_default_network_pars(location, pars=pars, **kwargs))
+    """Return the flat ``NetworkPars`` dict for ``location`` with overrides.
+    Location is currently unused (see ``_default_network_pars``)."""
+    return _default_network_pars(location, pars=pars, **kwargs)
 
 
-def _shape_network_pars(default_pars):
-    """Shape a raw network-pars dict into ``hpv.SexualNetwork`` inputs.
-
-    ``default_pars`` is a raw dict shaped like the ``_default_network_pars``
-    result: ``debut``/``*_partners`` as distribution dicts, ``layer_probs`` as
-    the (3, N) arrays, ``*_cross_layer`` as annual floats. Returns
-    ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ..., 'm': ...}}``.
-    Each layer dict carries: partners, mixing, layer_probs, cross_layer,
-    duration, acts. ``debut`` is shared across layers (one per-agent sample).
-
-    An analysis script supplying a per-location network calibration merges its
-    raw overrides onto ``_default_network_pars(location)`` and passes the merged
-    dict here, reusing this shaping rather than reimplementing it.
-    """
-    annual = ss.years(1)  # unit shared by all annual probability params
-
-    # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` for a
-    # dt-correct per-step probability: 1 - exp(-rate*dt) == 1-(1-p)^dt.
-    cross_layer_by_sex = {
-        'm': ss.prob(default_pars['m_cross_layer'], annual),
-        'f': ss.prob(default_pars['f_cross_layer'], annual),
-    }
-
-    debut_by_sex = {
-        'm': _v2_dist_to_starsim(default_pars['debut']['m']),
-        'f': _v2_dist_to_starsim(default_pars['debut']['f']),
-    }
-
-    layer_pars = {}
-    for layer in ('m', 'c'):
-        # layer_probs[layer] is a (3, N) ndarray: row 0 = age-bin lower
-        # bounds, row 1 = annual female participation prob, row 2 = annual
-        # male participation prob. Split into a per-sex dict so each row
-        # carries its annual unit explicitly.
-        lp = default_pars['layer_probs'][layer]
-        layer_probs = dict(
-            bins=lp[0, :],
-            f=ss.prob(lp[1, :], annual),
-            m=ss.prob(lp[2, :], annual),
-        )
-        layer_pars[layer] = dict(
-            partners={
-                'm': _v2_dist_to_starsim(default_pars['m_partners'][layer]),
-                'f': _v2_dist_to_starsim(default_pars['f_partners'][layer]),
-            },
-            mixing=default_pars['mixing'][layer],
-            layer_probs=layer_probs,
-            cross_layer=cross_layer_by_sex,
-            duration=_v2_dist_to_starsim(default_pars['dur_pship'][layer]),
-            acts=_v2_dist_to_starsim(default_pars['acts'][layer]),
-            age_act_pars=default_pars['age_act_pars'][layer],
-        )
-    return dict(layer_pars=layer_pars, debut=debut_by_sex)
-
-
-def _pop_total(location):
-    """Total population trajectory: DataFrame [year, pop_size].
-
-    Wraps ``get_total_pop`` which already returns a DataFrame with the canonical
-    column names (year, pop_size) scaled to real-world counts.
-    """
-    df = _loaders.get_total_pop(location=location)
+def _pop_total(location, datafolder=None):
+    """Total population trajectory: DataFrame [year, pop_size]."""
+    csv = _datafile(datafolder, 'pop_total.csv')
+    if datafolder is not None and csv is None:
+        _warn_missing_indicator('pop_total', 'pop_total.csv', datafolder)
+    df = _loaders.get_total_pop(location=location,
+                                pop_datafile=str(csv) if csv else None)
     return pd.DataFrame({
         'year': np.asarray(df['year'], dtype=int),
         'pop_size': np.asarray(df['pop_size'], dtype=float),

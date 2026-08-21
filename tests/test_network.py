@@ -13,18 +13,32 @@ from hpvsim.network import SexualNetwork
 # ---------------------------------------------------------------------------- #
 
 
-def test_constructs_with_no_layers():
-    """Empty constructor — useful for scaffold/test paths."""
+def test_default_construction_exposes_flat_pars():
+    """SexualNetwork() populates the two fixed layers and every flat par."""
     net = SexualNetwork()
-    assert net.layers == ()
-
-
-def test_constructs_with_layer_pars():
-    """layer_pars dict establishes layer ordering and per-layer FloatArr."""
-    net = SexualNetwork(layer_pars={'m': {}, 'c': {}})
     assert net.layers == ('m', 'c')
     assert hasattr(net, 'partners_target_m')
     assert hasattr(net, 'partners_target_c')
+    # NetworkPars-shaped flat pars discoverable on the module.
+    for k in ('m_cross_layer', 'f_cross_layer',
+              'm_partners_marital', 'm_partners_casual',
+              'f_partners_marital', 'f_partners_casual',
+              'debut_f', 'debut_m',
+              'layer_probs_marital', 'layer_probs_casual',
+              'mixing_marital', 'mixing_casual',
+              'acts_marital', 'acts_casual',
+              'dur_pship_marital', 'dur_pship_casual',
+              'age_act_pars_marital', 'age_act_pars_casual'):
+        assert k in net.pars, f'missing par: {k}'
+
+
+def test_overrides_merge_over_defaults():
+    """Kwarg overrides mutate specific flat pars without touching the others."""
+    net = SexualNetwork(m_cross_layer=0.0, f_cross_layer=0.0)
+    assert net.pars.m_cross_layer == 0.0
+    assert net.pars.f_cross_layer == 0.0
+    # Untouched pars keep NetworkPars defaults.
+    assert float(net.pars.debut_f.pars.loc) == 15.0
 
 
 # ---------------------------------------------------------------------------- #
@@ -73,12 +87,8 @@ def test_cross_layer_concurrency_filter():
     """With cross_layer=0, no agent should appear in both m and c."""
     country = hpvsim.data.load_country('nigeria')
     network_pars = sc.dcp(country['network_pars'])
-    zero_xlayer = {
-        'm': ss.prob(0.0, ss.years(1)),
-        'f': ss.prob(0.0, ss.years(1)),
-    }
-    for lkey in ('m', 'c'):
-        network_pars['layer_pars'][lkey]['cross_layer'] = zero_xlayer
+    network_pars['m_cross_layer'] = 0.0
+    network_pars['f_cross_layer'] = 0.0
     net = SexualNetwork(**network_pars)
     sim = ss.Sim(networks=[net], n_agents=2000, diseases=None,
                  dur=ss.years(2), dt=ss.years(0.5), rand_seed=0, verbose=0,
@@ -103,22 +113,26 @@ def test_cross_layer_concurrency_filter():
 
 
 def test_age_mixing_assortativity():
-    """Sampled pairs concentrate on/near the mixing-matrix diagonal."""
+    """Sampled pairs concentrate on/near the mixing-matrix diagonal.
+
+    Filtered to marital edges only so casual pairs don't dilute the signal
+    (layers ('m', 'c') are now fixed on ``SexualNetwork``).
+    """
     country = hpvsim.data.load_country('nigeria')
-    # Single-layer sim: drop 'c' so we only test 'm' assortativity.
-    network_pars = sc.dcp(country['network_pars'])
-    network_pars['layer_pars'] = {'m': network_pars['layer_pars']['m']}
-    net = SexualNetwork(**network_pars)
+    net = SexualNetwork(**country['network_pars'])
     sim = ss.Sim(networks=[net], n_agents=5000, diseases=None,
                  dur=ss.years(5), dt=ss.years(0.5), rand_seed=0, verbose=0,
                  copy_inputs=False)
     sim.run()
-    if len(net) < 100:
+    m_mask = net.edges_for_layer('m')
+    if m_mask.sum() < 100:
         return
     people = sim.people
-    f_at_p1 = people.female[net.edges.p1]
-    f_uids = np.where(f_at_p1, net.edges.p1, net.edges.p2)
-    m_uids = np.where(f_at_p1, net.edges.p2, net.edges.p1)
+    p1 = np.asarray(net.edges.p1)[m_mask]
+    p2 = np.asarray(net.edges.p2)[m_mask]
+    f_at_p1 = people.female[p1]
+    f_uids = np.where(f_at_p1, p1, p2)
+    m_uids = np.where(f_at_p1, p2, p1)
     f_ages = people.age[ss.uids(f_uids)]
     m_ages = people.age[ss.uids(m_uids)]
     bins = np.arange(0, 81, 5)

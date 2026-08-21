@@ -79,16 +79,19 @@ def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
 
     genotypes = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
     per_module_sums = {
-        mod.genotype: int(mod.results.new_cancers[:].sum())
+        mod.genotype: float(mod.results.new_cancers[:].sum())
         for mod in genotypes
     }
     total_from_modules = sum(per_module_sums.values())
-    total_hpvtotal = int(sim.results.all_hpv.new_cancers[:].sum())
+    total_hpvtotal = float(sim.results.all_hpv.new_cancers[:].sum())
 
     assert total_hpvtotal > 0, 'no cancers recorded — aggregation is untested here'
 
-    # 1. Aggregation invariant.
-    assert total_from_modules == total_hpvtotal, (
+    # 1. Aggregation invariant. Use isclose rather than exact equality: under
+    # pop_scale != 1, floats can drift in the last bit from different
+    # summation orders. rtol=1e-9 catches real aggregation bugs while
+    # tolerating pop-scale-multiplication FP noise.
+    assert np.isclose(total_from_modules, total_hpvtotal, rtol=1e-9), (
         f'Sum of per-module new_cancers ({total_from_modules}) != '
         f'hpvtotal.new_cancers ({total_hpvtotal}). '
         f'Per-module breakdown: {per_module_sums}.'

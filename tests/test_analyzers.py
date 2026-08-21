@@ -96,12 +96,17 @@ def test_grow_analyzer_matches_engine_cancer_total(grow_sim):
     is the acceptance test the abandoned ledger path used to paper over.
     """
     aci = grow_sim.analyzers['age_causal_infection']
+    # Both aci.weights and sim.results.<gt>.cum_cancers are pop-scaled in v3.0.1:
+    # aci multiplies by pop_scale in finalize; sim.results Result(scale=True)
+    # is multiplied by starsim's finalize.
     engine_total = float(hpv.results_by_genotype(grow_sim, key='cum_cancers').iloc[-1].sum())
     analyzer_total = float(aci.weights.sum())
     assert engine_total > 0
     assert abs(analyzer_total - engine_total) / engine_total < 0.05
-    # Raw fine-agent samples greatly exceed the scaled total at ratio>1.
-    assert len(aci.age_cancer) > analyzer_total
+    # Raw fine-agent samples (agent-scale count) exceed the pop-scaled total
+    # only in agent-scale terms: len is a raw agent count, analyzer_total
+    # includes pop_scale. Compare after dividing out pop_scale.
+    assert len(aci.age_cancer) > analyzer_total / grow_sim.pars.pop_scale
 
 
 def test_resolve_date_ticks_nearest():
@@ -165,14 +170,20 @@ def test_age_pyramid_bins_sum_to_alive(base_sim):
         ww = w[mask] if w is not None else None
         return np.histogram(ages[mask], bins=PYRAMID_EDGES, weights=ww)[0]
 
-    exp_male = hist(alive & ~female)
-    exp_female = hist(alive & female)
+    # Analyzer output is pop-scaled (v3.0.1); the histogram ground truth is
+    # agent-scale (people.scale only). Compare after multiplying expected by
+    # pop_scale.
+    pop_scale = base_sim.pars.pop_scale
+    exp_male = hist(alive & ~female) * pop_scale
+    exp_female = hist(alive & female) * pop_scale
     assert np.allclose(arr[:, 0], exp_male), 'male column mismatch (possible male/female swap)'
     assert np.allclose(arr[:, 1], exp_female), 'female column mismatch (possible male/female swap)'
 
-    # Named invariant: total binned count == scale-weighted alive within [0, 100).
+    # Named invariant: total binned count == scale-weighted-and-pop-scaled
+    # alive within [0, 100).
     in_range = alive & (ages >= PYRAMID_EDGES[0]) & (ages < PYRAMID_EDGES[-1])
-    expected_total = float(w[in_range].sum()) if w is not None else float(in_range.sum())
+    expected_total = (float(w[in_range].sum()) if w is not None
+                      else float(in_range.sum())) * pop_scale
     assert abs(arr.sum() - expected_total) < 1e-6
 
     # tidy-frame sanity
@@ -191,8 +202,9 @@ def test_age_causal_infection_single_scale(base_sim):
     assert np.all(a.dwelltime['total'] >= -1e-9)
     assert np.allclose(a.dwelltime['total'],
                        a.dwelltime['precin'] + a.dwelltime['cin'], atol=1e-6)
-    # At ratio==1 every event has weight 1 (people.scale is all 1).
-    assert np.allclose(a.weights, 1.0)
+    # At ratio==1 every event has agent-scale weight 1 (people.scale is all 1),
+    # multiplied by pop_scale at finalize.
+    assert np.allclose(a.weights, base_sim.pars.pop_scale)
 
 
 def test_dalys_basic_and_av_disutility(base_sim):
@@ -223,7 +235,7 @@ def test_results_by_genotype_stacks_and_normalizes(base_sim):
 
 def test_public_api_exports():
     for name in ['snapshot', 'age_pyramid', 'age_causal_infection', 'dalys',
-                 'results_by_genotype', 'AgeResults']:
+                 'results_by_genotype', 'by_age']:
         assert hasattr(hpv, name), f'hpv.{name} not exported'
 
 

@@ -1,4 +1,4 @@
-"""Sub-annual accumulation gate for AgeResults.cancer_incidence.
+"""Sub-annual accumulation gate for by_age.cancer_incidence.
 
 Needs ms_agent_ratio=50 over 5000 agents and 35 years to resolve enough cancers
 per single tick for the 4x ratio to be distinguishable from noise, so it lives
@@ -22,13 +22,13 @@ def test_cancer_incidence_accumulates_over_full_year_at_subannual_dt():
     years within one run isolates the accumulation from dt-dependent dynamics.
     """
     edges = np.array([0., 30., 50., 70., 100.])
-    az = hpv.AgeResults(result_args=sc.objdict(
+    az = hpv.by_age(result_args=sc.objdict(
         cancer_incidence=sc.objdict(years=[2019, 2020], edges=edges)))
     sim = hpv.Sim(n_agents=5000, location='nigeria', genotypes=[16, 18],
                   start=1985, stop=2020, dt=0.25, ms_agent_ratio=50,
                   rand_seed=0, analyzers=[az], verbose=0)
     sim.run()
-    ar = sim.analyzers['ageresults']
+    ar = sim.analyzers['by_age']
     full_year = float(np.sum(ar.outputs['cancer_incidence'][2019.0]))
     terminal = float(np.sum(ar.outputs['cancer_incidence'][2020.0]))
     assert terminal > 0, 'expected some cancers at the terminal tick'

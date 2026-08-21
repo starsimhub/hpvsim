@@ -460,8 +460,8 @@ class HIVStratifiedResults(ss.Analyzer):
         self.define_results(
             ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'),
             ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'),
-            ss.Result('hpv_prevalence_with_hiv', dtype=float, label='HPV prevalence (HIV+)'),
-            ss.Result('hpv_prevalence_no_hiv', dtype=float, label='HPV prevalence (HIV-)'),
+            ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
+            ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
         )
 
     def step(self):

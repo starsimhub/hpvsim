@@ -4,7 +4,16 @@ import pytest
 import starsim as ss
 
 import hpvsim as hpv
-from hpvsim.parameters import get_cross_immunity, GENOTYPE_KEYS
+from hpvsim.parameters import GENOTYPE_KEYS
+
+
+def _default_matrices(**overrides):
+    """Test helper: hpv.CrossImmunity().make_cross_immunity() with optional
+    par overrides applied via update_pars before matrix construction."""
+    conn = hpv.CrossImmunity()
+    if overrides:
+        conn.pars.update({k: v for k, v in overrides.items() if k != 'keys'})
+    return conn.make_cross_immunity(keys=overrides.get('keys'))
 
 
 def test_genotype_keys_are_canonical_four():
@@ -18,16 +27,17 @@ def test_genotype_registries_agree_on_canonical_keys():
     registry; this test prevents drift.
 
     Registries:
-      - ``hpvsim.parameters.GENOTYPE_KEYS``      (tuple, canonical ordering)
-      - ``hpvsim.parameters.genotype_aliases``   (dict: canonical -> aliases)
-      - ``hpvsim.parameters._GENOTYPE_DEFAULTS`` (dict: canonical -> defaults)
-      - ``hpvsim.parameters._FULL_OWN_IMM_KEYS`` (frozenset; subset of canonical)
-      - ``hpvsim.hpv._KNOWN_GENOTYPES``          (tuple)
-      - ``hpvsim.seeding._INIT_PREV``            (dict; includes 'total' meta-key)
+      - ``hpvsim.parameters.GENOTYPE_KEYS``       (tuple, canonical ordering)
+      - ``hpvsim.parameters.genotype_aliases``    (dict: canonical -> aliases)
+      - ``hpvsim.parameters._GENOTYPE_DEFAULTS``  (dict: canonical -> defaults)
+      - ``hpvsim.cross_genotype._FULL_OWN_IMM_KEYS`` (frozenset; subset of canonical)
+      - ``hpvsim.hpv._KNOWN_GENOTYPES``           (tuple)
+      - ``hpvsim.seeding._INIT_PREV``             (dict; includes 'total' meta-key)
     """
     from hpvsim.parameters import (
-        GENOTYPE_KEYS, genotype_aliases, _GENOTYPE_DEFAULTS, _FULL_OWN_IMM_KEYS,
+        GENOTYPE_KEYS, genotype_aliases, _GENOTYPE_DEFAULTS,
     )
+    from hpvsim.cross_genotype import _FULL_OWN_IMM_KEYS
     from hpvsim.hpv import _KNOWN_GENOTYPES
     from hpvsim.seeding import _INIT_PREV
 
@@ -49,7 +59,7 @@ def test_genotype_registries_agree_on_canonical_keys():
 def test_get_cross_immunity_default_shape_and_diagonal():
     """Default cross-immunity matrices are (4, 4) float32; diagonal = 1.0
     for hpv16/hpv18, 0.9 (v2 own_imm_hr default) for hi5/ohr."""
-    m_sus, m_sev = get_cross_immunity()
+    m_sus, m_sev = _default_matrices()
     keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
     idx = {k: i for i, k in enumerate(keys)}
     expected_diag = [1.0, 1.0, 0.9, 0.9]
@@ -62,7 +72,7 @@ def test_get_cross_immunity_default_shape_and_diagonal():
 def test_get_cross_immunity_default_values():
     """Defaults: cross_imm_sus_med=0.3, cross_imm_sus_high=0.5,
     cross_imm_sev_med=0.5, cross_imm_sev_high=0.7, own_imm_hr=0.9."""
-    m_sus, m_sev = get_cross_immunity()
+    m_sus, m_sev = _default_matrices()
     keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
     idx = {k: i for i, k in enumerate(keys)}
     # Off-diagonal hpv16<->hpv18 = high (0.5 sus, 0.7 sev); both directions.
@@ -80,7 +90,7 @@ def test_get_cross_immunity_default_values():
 
 def test_get_cross_immunity_own_imm_hr_override():
     """own_imm_hr kwarg overrides the 0.9 default for non-canonical genotypes."""
-    m_sus, _ = get_cross_immunity(own_imm_hr=0.7)
+    m_sus, _ = _default_matrices(own_imm_hr=0.7)
     keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
     idx = {k: i for i, k in enumerate(keys)}
     # hpv16/hpv18 still 1.0; hi5/ohr now use the override.
@@ -91,7 +101,7 @@ def test_get_cross_immunity_own_imm_hr_override():
 
 def test_get_cross_immunity_custom_keys():
     """Caller-supplied genotype ordering controls matrix layout."""
-    m_sus, _ = get_cross_immunity(keys=('hi5', 'hpv16'))
+    m_sus, _ = _default_matrices(keys=('hi5', 'hpv16'))
     assert m_sus.shape == (2, 2)
     # m_sus[1, 0] is "from hi5 source to hpv16 target" — medium scalar.
     assert m_sus[1, 0] == pytest.approx(0.3)
@@ -395,7 +405,7 @@ def test_cross_immunity_step_writes_survive_dead_agents():
 
 
 def test_cross_immunity_top_level_import():
-    """hpv.CrossImmunity and hpv.get_cross_immunity are importable from package root."""
+    """hpv.CrossImmunity + its make_cross_immunity factory are reachable from the root."""
     assert hasattr(hpv, 'CrossImmunity')
-    assert hasattr(hpv, 'get_cross_immunity')
+    assert hasattr(hpv.CrossImmunity(), 'make_cross_immunity')
     assert hasattr(hpv, 'GENOTYPE_KEYS')

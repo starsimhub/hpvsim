@@ -4,7 +4,7 @@ import sciris as sc
 import starsim as ss
 import matplotlib.pyplot as plt
 
-from .analyzers import AgeResults, results_by_genotype
+from .analyzers import by_age, results_by_genotype
 
 
 __all__ = ['plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim',
@@ -30,10 +30,10 @@ def _new_fig_ax(fig=None, figsize=(7, 5)):
 
 
 def plot_by_age(age_results, key, years=None, kind='line', fig=None, **kwargs):
-    """Plot an AgeResults result as a series per year over age bins.
+    """Plot an by_age result as a series per year over age bins.
 
     Args:
-        age_results: a run ``hpv.AgeResults`` analyzer.
+        age_results: a run ``hpv.by_age`` analyzer.
         key: a result name recorded by that analyzer (e.g. 'cancers').
         years: scalar/list of years to plot; default = all recorded years.
         kind: 'line' or 'bar'.
@@ -83,19 +83,10 @@ def plot_by_genotype(sim, key='cum_cancers', normalize=False, fig=None, **kwargs
 def plot_type_distribution(source, year=None, key='cum_cancers', fig=None, **kwargs):
     """Bar chart of each genotype's share of `key` at a given year.
 
-    `source` may be a run ``hpv.Sim`` (uses ``results_by_genotype``) or an
-    ``hpv.AgeResults`` analyzer (uses its type-distribution result `key`, e.g.
-    'cancerous_genotype_dist'). `year` defaults to the last recorded year.
-
-    Note: the default ``key='cum_cancers'`` is only valid for the Sim source;
-    for an AgeResults source pass a type-distribution key like
-    'cancerous_genotype_dist'.
-    For a year with zero cancers the normalized shares are all 0 (not 1).
+    `source` is a run ``hpv.Sim``. Delegates to ``results_by_genotype``. For
+    a year with zero cancers the normalized shares are all 0 (not 1).
     """
-    if isinstance(source, AgeResults):
-        df = source.to_dataframe(key, normalize=True)  # index=year, cols=genotypes
-    else:
-        df = results_by_genotype(source, key=key, normalize=True)
+    df = results_by_genotype(source, key=key, normalize=True)
     if year is None:
         row = df.iloc[-1]
     else:
@@ -161,68 +152,153 @@ def plot_intervention_impact(baseline, scenario, key='cum_cancers',
 _PREV_KEYS = ('hpv_prevalence', 'precin_prevalence', 'cin_prevalence')
 
 
-def _best_fit_sim(calib):
-    """Rebuild and run the sim at the calibration's best parameters
-    (mirrors ss.Calibration.plot_final)."""
-    pars = sc.dcp(calib.calib_pars)
-    for parname, spec in pars.items():
-        # Only overwrite 'value' for parameters that Optuna actually sampled
-        # (i.e. those present in best_pars). Parameters supplied with a fixed
-        # 'value' in the spec are skipped by _sample_from_trial and therefore
-        # never appear in study.best_params.
-        if parname in calib.best_pars:
-            spec['value'] = calib.best_pars[parname]
-    sim = calib.build_fn(calib.sim.copy(), calib_pars=pars, **calib.build_kw)
-    sim.run()
-    if isinstance(sim, ss.MultiSim):
-        sim = sim.sims[0]
-    return sim
+def _run_top_n_trials(calib, n):
+    """Re-run the top-``n`` trials via ``make_calib_sims`` and return a list
+    of per-trial DataFrames shaped like ``calib.eval_kw['data']`` (year
+    index + dot-scoped columns). Uses ``extract_fn`` so full sims are not
+    pickled back to the parent process."""
+    from .calibration import make_calib_sims, _extract_columns
+    data = calib.eval_kw['data']
+    return make_calib_sims(
+        calib, n=n, extract_fn=lambda sim: _extract_columns(sim, data),
+    )
 
 
-def plot_calibration(calib, sim=None, fig=None):
-    """Overlay simulated vs observed for each calibration target (data-vs-fit).
+def _group_columns(cols):
+    """Group standardized calib data columns by (scope, name). Preserves
+    within-group column order."""
+    groups = {}
+    for c in cols:
+        parts = c.split('.')
+        key = (parts[0], parts[1])
+        groups.setdefault(key, []).append(c)
+    return groups
 
-    `calib` is a run ``hpv.Calibration`` (after ``calibrate()``). If `sim` is
-    None, the best-fit sim is rebuilt at ``calib.best_pars`` and run once.
-    `fig` is honored if provided. Convergence and parameter-distribution views
-    are available directly via ``calib.plot_optuna()`` and ``calib.plot_final()``.
+
+def _plot_age_panel(ax, name, cols, expected, actual_list, top_n):
+    """Age-stratified panel: x = age bins, y = value. Median + 95% PI band
+    across top-N trials; data as diamonds."""
+    bin_labels = [c.split('.', 2)[-1] for c in cols]
+    x = np.arange(len(bin_labels))
+    for yr in expected.index:
+        exp = expected.loc[yr, cols].to_numpy(dtype=float)
+        stack = np.array([a.loc[yr, cols].to_numpy(dtype=float) for a in actual_list])
+        med = np.median(stack, axis=0)
+        lo = np.percentile(stack, 2.5, axis=0)
+        hi = np.percentile(stack, 97.5, axis=0)
+        yr_lab = f' ({int(yr)})' if len(expected.index) > 1 else ''
+        ax.fill_between(x, lo, hi, alpha=0.25,
+                        label=f'Top-{top_n} 95% PI{yr_lab}')
+        ax.plot(x, med, marker='o', lw=2,
+                label=f'Top-{top_n} median{yr_lab}')
+        ax.scatter(x, exp, marker='d', s=60, color='k', zorder=3,
+                   label=f'Data{yr_lab}')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bin_labels, rotation=45, ha='right')
+    ax.set_xlabel('Age')
+    ax.set_ylabel(name)
+    ax.set_title(name)
+    ax.legend(fontsize=8, loc='best')
+
+
+def _plot_scalar_ts(ax, name, col, expected, actual_list, top_n):
+    """Scalar-per-year panel: x = year, y = value. Timeseries with
+    median + 95% PI ribbon; data as diamonds. Single-year targets get an
+    errorbar-style point instead of a ribbon."""
+    years = expected.index.values
+    stack = np.array([a[col].reindex(expected.index).to_numpy(dtype=float)
+                      for a in actual_list])
+    med = np.median(stack, axis=0)
+    lo = np.percentile(stack, 2.5, axis=0)
+    hi = np.percentile(stack, 97.5, axis=0)
+    if len(years) > 1:
+        ax.fill_between(years, lo, hi, alpha=0.25, label=f'Top-{top_n} 95% PI')
+        ax.plot(years, med, lw=2, label=f'Top-{top_n} median')
+        ax.scatter(years, expected[col].values, marker='d', s=60, color='k',
+                   label='Data', zorder=3)
+        ax.set_xlim(years.min(), years.max())
+    else:
+        y0 = float(years[0])
+        yerr = np.array([[med[0] - lo[0]], [hi[0] - med[0]]])
+        ax.errorbar([y0], [med[0]], yerr=yerr, marker='o', capsize=6, lw=2,
+                    label=f'Top-{top_n} median (95% PI)')
+        ax.scatter([y0], [expected[col].iloc[0]], marker='d', s=80,
+                   color='k', zorder=3, label='Data')
+    ax.set_xlabel('Year')
+    ax.set_ylabel(name)
+    ax.set_title(name)
+    ax.legend(fontsize=8, loc='best')
+
+
+def _plot_genotype_box(ax, name, cols, expected, actual_list, top_n):
+    """Per-genotype panel: x = genotype, y = value. Box plot of top-N
+    trial distributions (aggregated across any years in the data);
+    data as diamonds."""
+    genotypes = [c.split('.', 2)[-1] for c in cols]
+    boxes = []
+    for c in cols:
+        vals = np.concatenate([a[c].reindex(expected.index).dropna().to_numpy()
+                               for a in actual_list])
+        boxes.append(vals)
+    x = np.arange(1, len(genotypes) + 1)
+    ax.boxplot(boxes, tick_labels=genotypes, showfliers=False, widths=0.5)
+    for i, c in enumerate(cols):
+        exp_vals = expected[c].dropna().values
+        ax.scatter([x[i]] * len(exp_vals), exp_vals, marker='d', s=70,
+                   color='k', zorder=3, label='Data' if i == 0 else None)
+    ax.set_xlabel('Genotype')
+    ax.set_ylabel(name)
+    ax.set_title(f'{name} (top-{top_n} trials)')
+    ax.legend(fontsize=8, loc='best')
+
+
+def plot_calibration(calib, top_n=50, fig=None, ncols=None):
+    """Data-vs-fit plot for a run ``hpv.Calibration``.
+
+    Auto-inspects ``calib.eval_kw['data']`` and renders one panel per
+    (scope, name) target group, overlaying a top-``top_n``-trial model
+    ribbon / box on the observed data.
+
+    Panel layout by scope:
+      - ``all_hpv.<name>.<bin>``   age-stratified: line + 95% PI band vs.
+        data scatter, x = age bins.
+      - ``all_hpv.<name>``         scalar: timeseries if multi-year, else
+        an errorbar point.
+      - ``by_genotype.<name>.<g>`` box plot per genotype vs. data markers.
+
+    Args:
+        calib: run ``hpv.Calibration``.
+        top_n (int): number of best-mismatch trials to re-run for the
+            ribbon (default 50). Clamped to available trials.
+        fig: matplotlib Figure to draw into (default: new).
+        ncols (int): grid ncols (default: min(n_panels, 3)).
     """
-    from .calibration import _find_age_results as _find_ar, _extract_actual
     data = (calib.eval_kw or {}).get('data')
-    if not data:
+    if data is None or data.empty:
         raise ValueError('plot_calibration: calibration has no target data '
                          "(expected calib.eval_kw['data']).")
-    if sim is None:
-        sim = _best_fit_sim(calib)
-    elif isinstance(sim, ss.MultiSim):
-        sim = sim.sims[0]
-    ar = _find_ar(sim)
-    keys = list(data.keys())
-    fig = fig or plt.figure(figsize=(5 * len(keys), 4))
-    for i, key in enumerate(keys):
-        ax = fig.add_subplot(1, len(keys), i + 1)
-        expected = data[key]
-        actual = _extract_actual(ar, key, expected)
-        if len(expected.index) == 1:
-            # Single-year, age-stratified target (the common HPV cancer-incidence
-            # case): plot the age profile (age bins on x), data vs fit, rather
-            # than collapsing every age bin to a point at one year.
-            yr = expected.index[0]
-            x = np.arange(len(expected.columns))
-            ax.plot(x, expected.iloc[0].values, 'o-', label=f'data {yr:g}')
-            ax.plot(x, actual.iloc[0].values, 's--', label=f'fit {yr:g}')
-            ax.set_xticks(x)
-            ax.set_xticklabels(list(expected.columns), rotation=45, ha='right')
-            ax.set_xlabel('Age group')
+
+    groups = _group_columns(data.columns)
+    actual_list = _run_top_n_trials(calib, top_n)
+    top_n_actual = len(actual_list)
+
+    n_panels = len(groups)
+    ncols = ncols or min(n_panels, 3)
+    nrows = -(-n_panels // ncols)
+    fig = fig or plt.figure(figsize=(6.0 * ncols, 4.5 * nrows))
+
+    for i, ((scope, name), cols) in enumerate(groups.items()):
+        ax = fig.add_subplot(nrows, ncols, i + 1)
+        if scope == 'all_hpv':
+            is_age = all(len(c.split('.')) == 3 for c in cols)
+            if is_age:
+                _plot_age_panel(ax, name, cols, data, actual_list, top_n_actual)
+            else:
+                _plot_scalar_ts(ax, name, cols[0], data, actual_list, top_n_actual)
+        elif scope == 'by_genotype':
+            _plot_genotype_box(ax, name, cols, data, actual_list, top_n_actual)
         else:
-            # Multi-year target: one data + one fit series per age-bin column,
-            # over time.
-            for col in expected.columns:
-                ax.plot(expected.index, expected[col].values, 'o', label=f'data {col}')
-                ax.plot(actual.index, actual[col].values, '-', label=f'fit {col}')
-            ax.set_xlabel('Year')
-        ax.set_title(key)
-        ax.legend()
+            ax.set_title(f'{scope}.{name} (unknown scope)')
     fig.tight_layout()
     return fig
 
@@ -285,10 +361,10 @@ def plot_dalys(dal, fig=None):
     return fig
 
 
-def _find_age_results_or_none(sim):
-    """Return the first AgeResults analyzer on `sim`, or None."""
+def _find_by_age_or_none(sim):
+    """Return the first by_age analyzer on `sim`, or None."""
     for a in sim.analyzers.values():
-        if isinstance(a, AgeResults):
+        if isinstance(a, by_age):
             return a
     return None
 
@@ -298,7 +374,7 @@ def plot_sim(sim, which='default', fig=None, **kwargs):
 
     which='default': 4-panel canonical figure (cumulative cancers over time,
     prevalence by age, cancers by age, genotype distribution). Requires an
-    AgeResults analyzer recording a prevalence key and 'cancers'.
+    by_age analyzer recording a prevalence key and 'cancers'.
     Any other value (e.g. 'all') delegates to ss.Sim.plot.
     `fig` is honored in both modes (a new figure is created if None).
     Pass a fresh/empty figure: multi-panel helpers add subplots rather than
@@ -307,18 +383,18 @@ def plot_sim(sim, which='default', fig=None, **kwargs):
     if which != 'default':
         return sim.plot(fig=fig, **kwargs)
 
-    ar = _find_age_results_or_none(sim)
+    ar = _find_by_age_or_none(sim)
     if ar is None:
         raise ValueError(
-            "plot_sim(which='default') needs an AgeResults analyzer recording "
+            "plot_sim(which='default') needs a by_age analyzer recording "
             "'cancers' and a prevalence key (one of %s). Add e.g. "
-            "hpv.AgeResults(result_args=...) to the sim, or call "
+            "hpv.by_age(['cancers', 'hpv_prevalence']) to the sim, or call "
             "plot_sim(sim, which='all')." % (_PREV_KEYS,))
-    prev_key = next((k for k in _PREV_KEYS if k in ar.outputs), None)
-    if prev_key is None or 'cancers' not in ar.outputs:
+    prev_key = next((k for k in _PREV_KEYS if k in ar.keys), None)
+    if prev_key is None or 'cancers' not in ar.keys:
         raise ValueError(
-            "plot_sim(which='default') needs the AgeResults analyzer to record "
-            "'cancers' and one of %s; found %s." % (_PREV_KEYS, list(ar.outputs)))
+            "plot_sim(which='default') needs the by_age analyzer to record "
+            "'cancers' and one of %s; found %s." % (_PREV_KEYS, ar.keys))
 
     fig = fig or plt.figure(figsize=(12, 9))
     # Panel 1: total cumulative cancers over time (summed across genotypes).
