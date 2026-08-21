@@ -396,14 +396,19 @@ def _setup_analyzers(sim, data):
         raise ValueError(f'hpv.Calibration: unrecognized data columns: {unknown}')
 
     if age_result_names:
-        label_sets = list(age_labels_by_result.values())
-        if any(s != label_sets[0] for s in label_sets[1:]):
-            raise ValueError(
-                f'hpv.Calibration: age-stratified targets have inconsistent '
-                f'bin labels across result names: {age_labels_by_result!r}')
-        edges = _edges_from_labels(label_sets[0])
+        # Group result names by their bin-label set. Targets that share bins
+        # go on the same by_age analyzer; distinct bin schemes each get their
+        # own (all_hpv_by_age, all_hpv_by_age_1, ...). Preserves the ordered
+        # appearance of names in the data columns.
+        groups = {}  # bin-set key -> list of result names in insertion order
+        for name in age_result_names:
+            key = frozenset(age_labels_by_result[name])
+            groups.setdefault(key, []).append(name)
         years = sorted(float(y) for y in data.index)
-        _get_or_create_all_hpv_by_age(sim, age_result_names, years, edges)
+        for i, (labels, names) in enumerate(groups.items()):
+            edges = _edges_from_labels(labels)
+            aname = ALL_HPV_BY_AGE if i == 0 else f'{ALL_HPV_BY_AGE}_{i}'
+            _get_or_create_all_hpv_by_age(sim, names, years, edges, name=aname)
 
     if len(data):
         target_stop = int(float(data.index.max())) + 1
@@ -412,19 +417,21 @@ def _setup_analyzers(sim, data):
             sim.pars.stop = target_stop
 
 
-def _get_or_create_all_hpv_by_age(sim, result_keys, years, edges):
-    """Return the ``all_hpv_by_age`` by_age analyzer on ``sim`` (create +
-    attach if absent; edges-validated if present)."""
+def _get_or_create_all_hpv_by_age(sim, result_keys, years, edges, name=ALL_HPV_BY_AGE):
+    """Return a ``by_age`` analyzer with the given ``name`` on ``sim`` (create +
+    attach if absent; edges-validated if present). Multiple analyzers can
+    coexist under distinct names (``all_hpv_by_age``, ``all_hpv_by_age_1``, ...)
+    for targets that need different bin schemes."""
     existing = sim.pars.get('analyzers', []) or []
     for a in existing:
-        if getattr(a, 'name', None) == ALL_HPV_BY_AGE:
+        if getattr(a, 'name', None) == name:
             if not np.array_equal(a.edges, edges):
                 raise ValueError(
-                    f'hpv.Calibration: existing {ALL_HPV_BY_AGE} analyzer has '
+                    f'hpv.Calibration: existing {name} analyzer has '
                     f'edges {list(a.edges)}, incompatible with data-derived '
                     f'edges {list(edges)}.')
             return a
-    ar = by_age(result_keys, years=years, edges=edges, name=ALL_HPV_BY_AGE)
+    ar = by_age(result_keys, years=years, edges=edges, name=name)
     sim.pars.analyzers = list(existing) + [ar]
     return ar
 
@@ -437,7 +444,16 @@ def _extract_columns(sim, data):
     """
     tv_years = np.asarray(sim.timevec.years).astype(int)
     all_hpv_results = sim.results['all_hpv'] if 'all_hpv' in sim.results else None
-    all_hpv_by_age = sim.analyzers.get(ALL_HPV_BY_AGE)
+    # Build a name -> analyzer map across all all_hpv_by_age* analyzers.
+    # A single scheme uses just 'all_hpv_by_age'; multi-scheme calibrations
+    # also have 'all_hpv_by_age_1', '_2', ... (one per distinct bin set).
+    result_to_analyzer = {}
+    for a in sim.analyzers.values():
+        aname = getattr(a, 'name', None) or ''
+        if isinstance(a, by_age) and (aname == ALL_HPV_BY_AGE
+                                       or aname.startswith(f'{ALL_HPV_BY_AGE}_')):
+            for k in a.keys:
+                result_to_analyzer[k] = a
     cache = {}
     out = pd.DataFrame(np.nan, index=data.index.copy(), columns=data.columns)
     for col in data.columns:
@@ -445,7 +461,7 @@ def _extract_columns(sim, data):
         if scope == ALL_HPV and subkey is not None:
             key = ('by_age', name)
             if key not in cache:
-                cache[key] = all_hpv_by_age.to_dataframe(name)
+                cache[key] = result_to_analyzer[name].to_dataframe(name)
             out[col] = cache[key][subkey].reindex(data.index)
         elif scope == ALL_HPV and subkey is None:
             if all_hpv_results is None or name not in all_hpv_results:

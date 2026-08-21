@@ -5,6 +5,21 @@ the term "Regression information".
 
 ## Version 3.1.0 (2026-08-20)
 
+### `hpv.Calibration`: per-bin-scheme `by_age` analyzers
+
+Age-stratified calibration targets can now have different bin schemes across
+result names. `_setup_analyzers` groups age-stratified names by their bin-label
+set and attaches one `by_age` analyzer per distinct scheme: the first stays
+`all_hpv_by_age` (backward-compatible), and additional schemes get
+`all_hpv_by_age_1`, `_2`, .... `_extract_columns` builds a result→analyzer map
+from all `all_hpv_by_age*` analyzers, so per-target lookup is transparent to
+the eval / plot paths.
+
+Enables mixing e.g. Globocan cancer bins (16 fine bins 0-15…85+) with a coarser
+HPV-prevalence survey (6 bins 19-24…64+) in the same calibration; the previous
+"inconsistent bin labels" ValueError only fires now if the same *result name*
+appears with conflicting bins.
+
 ### `hpv.Calibration`: single `data=` kwarg, standardized wide DataFrame
 
 `hpv.Calibration(sim, calib_pars, data=...)` now takes a single `data=`
