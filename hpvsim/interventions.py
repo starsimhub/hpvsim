@@ -325,11 +325,6 @@ class BaseTreatment(ss.BaseTreatment):
         # Late import to avoid circular
         from hpvsim.products import radiation as _radiation
         self.treat_cancer = isinstance(self.product, _radiation)
-        # Cancer treatments are not sex-restricted by default (radiation is
-        # post-triage; both sexes can have cervical/other HPV-related cancers
-        # in multi-site models). CIN treatments default to female only.
-        if self.treat_cancer and sex == 'f':
-            sex = None
         self.sex_raw = sex
         self.sex = _cast_sex(sex)
         self.eligibility_user = eligibility
