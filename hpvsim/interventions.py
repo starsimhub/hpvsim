@@ -160,7 +160,7 @@ class BaseVaccination(ss.BaseVaccination):
     ``hpv.vx(name='bivalent')``.
     """
 
-    def __init__(self, *args, age_range=None, sex=None, eligibility=None,
+    def __init__(self, *args, age_range=None, sex='f', eligibility=None,
                  **kwargs):
         composed = _compose_vaccine_eligibility(age_range, sex, eligibility)
         super().__init__(*args, eligibility=composed, **kwargs)

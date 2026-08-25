@@ -5,6 +5,41 @@ the term "Regression information".
 
 ## Version 3.1.0 (2026-08-20)
 
+### Interventions: `sex='f'` is now the default across vax + screening + treatment
+
+Every HPV-specific intervention constructor (`routine_vx`, `campaign_vx`,
+`routine_screening`, `campaign_screening`, `routine_triage`,
+`campaign_triage`, `treat_num`, `treat_delay`) now defaults `sex='f'`.
+Previously vaccination interventions defaulted `sex=None` (both sexes),
+which required every caller building a cervical-cancer scenario to
+pass `sex='f'` explicitly. Screening / triage / `treat_num` already
+defaulted `sex='f'` — this change harmonises vaccination with them so
+"HPV vaccination in Nigerian girls" no longer risks silently vaxing
+boys because the caller forgot the `sex` kwarg.
+
+**Regression information**: model-behavior change for existing scripts
+that instantiated `routine_vx` / `campaign_vx` without `sex` and
+relied on the both-sexes default. To restore, pass `sex=None`
+explicitly on each call.
+
+### Products: `ablation` + `excision` now clear precin (parity with CIN)
+
+`hpvsim/data/products_tx.csv` — `ablation.precin` efficacy lifted from
+0 → 0.936 and `excision.precin` lifted from 0 → 0.81, matching each
+product's CIN efficacy. The product's `administer` method already
+clears `precin` / `cin` / `cancerous` flags and schedules HPV clearance
+(`ti_clearance = ti + 1`) on successful treatment, so this change lets
+screen-and-treat programs actually intercept pre-cancerous lesions.
+
+Rationale: with efficacy 0 on precin, tx_assigner-routed precin cases
+consumed a slot in the treatment cascade without touching disease
+state — a silent no-op that made large screening scale-ups look
+implausibly weak (14% cancer reduction at 70% coverage).
+
+**Regression information**: model-behavior change. Scenarios with
+screen-and-treat interventions will now avert substantially more
+cervical cancers.
+
 ### `HPV`: default `transm2f` reduced from 3.69 → 2.0
 
 The 3.69 factor came from an older meta-analysis and turns out to be
