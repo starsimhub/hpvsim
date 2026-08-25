@@ -40,17 +40,21 @@ def test_treat_num_excludes_cancer_when_not_treat_cancer():
 
 
 def test_treat_num_only_treats_cancer_when_treat_cancer():
-    """A treat_num(radiation) must ONLY treat cancerous agents."""
+    """A treat_num(radiation) must ONLY treat cancerous agents.
+
+    Cancer treatments default to sex='f' (cervical cancer program), so the
+    state-gating check uses female UIDs to isolate it from the sex filter.
+    """
     treat = hpv.treat_num(name='cancer_rx', product=hpv.radiation(), prob=1.0)
     sim = _four_genotype_sim_with([treat])
     sim.init()
-    uids = sim.people.alive.uids[:5]
+    uids = sim.people.female.uids[:5]
     sim.diseases['hpv16'].cancerous[uids] = True
     live = sim.interventions['cancer_rx']
     eligible = live.check_eligibility()
     for u in uids:
         assert u in eligible
-    other = sim.people.alive.uids[10]
+    other = sim.people.female.uids[10]
     assert other not in eligible
 
 
