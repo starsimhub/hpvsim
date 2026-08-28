@@ -118,7 +118,7 @@ def test_resolve_date_ticks_nearest():
     # Keys are ss.date; values are tick indices whose year matches the request.
     keys = list(out.keys())
     assert all(isinstance(k, ss.date) for k in keys)
-    tol = float(sim.t.dt) / 2 + 1e-9
+    tol = sim.t.dt_year / 2 + 1e-9
     assert abs(sim.timevec[out[keys[0]]].years - 2020) <= tol
     assert abs(sim.timevec[out[keys[1]]].years - 2021) <= tol
 

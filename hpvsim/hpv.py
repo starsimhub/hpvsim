@@ -261,17 +261,19 @@ class HPV(ss.Infection):
         # regardless of how many fine agents are grown). They are drawn by size
         # (non-CRN); cross-scenario CRN is out of scope for multiscale.
         #
-        # The live dists' mean/std are ss.years TimePars. float() strips the
+        # The live dists' mean/std are ss.years TimePars. .years strips the
         # TimePar so these dists stay UNITLESS and .rvs() returns plain YEARS —
         # which is what compute_severity and the grow math expect. Without the
         # cast, starsim's convert_timepars would divide by dt at init (a TimePar
         # duration becomes a number of TIMESTEPS), so .rvs() would be 1/dt too
         # large (4x at dt=0.25) and _grow_fine_agents does NOT re-multiply by
         # dt_yr on this path (unlike the live dur_cin path in set_prognoses).
+        def _yr(v):
+            return v.years if hasattr(v, 'years') else v
         pc = self.pars.dur_precin.pars
         cn = self.pars.dur_cin.pars
-        self._extra_dur_precin = ss.lognorm_ex(mean=float(pc['mean']), std=float(pc['std']))
-        self._extra_dur_cin = ss.lognorm_ex(mean=float(cn['mean']), std=float(cn['std']))
+        self._extra_dur_precin = ss.lognorm_ex(mean=_yr(pc['mean']), std=_yr(pc['std']))
+        self._extra_dur_cin = ss.lognorm_ex(mean=_yr(cn['mean']), std=_yr(cn['std']))
         self._extra_cin_unif = ss.random()
         self._extra_cancer_unif = ss.random()
         return
@@ -531,7 +533,7 @@ class HPV(ss.Infection):
 
         # 2. P(CIN) per female. Distributions return durations in starsim
         #    timesteps; convert to years before passing (cin_fn's ttc=50 is years).
-        dt_yr = float(self.t.dt)
+        dt_yr = self.t.dt_year
         p_cin = compute_severity(dur_precin * dt_yr,
                                    rel_sev=rel_sev_uids, pars=p.cin_fn)
         self._cin_bern.set(p=p_cin)
@@ -864,7 +866,7 @@ class HPV(ss.Infection):
             # here gives the age at step start (initial + T*dt); adding dt_yr
             # records the age the agent has after this step's increment
             # (initial + (T+1)*dt), the intended age at cancer death.
-            dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
+            dt_yr = self.t.dt_year
             ppl = self.sim.people
             ages_at_death = ppl.age[to_dead] + dt_yr
             w = ppl.scale[to_dead]

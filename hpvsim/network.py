@@ -303,7 +303,7 @@ class SexualNetwork(ss.SexualNetwork):
         target = getattr(self, f'partners_target_{lkey}')
         dists = self._dists[lkey]
         dt = self.t.dt
-        dt_yr = float(dt)
+        dt_yr = self.t.dt_year
 
         # Eligibility: alive & past debut & participant & wants partners
         # & not already at target.

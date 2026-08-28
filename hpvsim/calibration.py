@@ -414,7 +414,8 @@ def _setup_analyzers(sim, data):
     if len(data):
         target_stop = int(float(data.index.max())) + 1
         cur_stop = sim.pars.get('stop')
-        if cur_stop is None or float(cur_stop) < target_stop:
+        cur_stop_year = cur_stop.years if hasattr(cur_stop, 'years') else cur_stop
+        if cur_stop_year is None or cur_stop_year < target_stop:
             sim.pars.stop = target_stop
 
 

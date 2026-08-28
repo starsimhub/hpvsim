@@ -434,9 +434,9 @@ class age_causal_infection(ss.Analyzer):
     def step(self):
         sim = self.sim
         ti = sim.ti
-        if float(sim.timevec[ti].years) < self.start_year:
+        if sim.t.year < self.start_year:
             return
-        dt = float(sim.t.dt)
+        dt = sim.t.dt_year
         people = sim.people
         scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:
@@ -543,10 +543,10 @@ class dalys(ss.Analyzer):
     def step(self):
         sim = self.sim
         ti = sim.ti
-        year = int(np.floor(sim.timevec[ti].years))
+        year = int(np.floor(sim.t.year))
         if year < self.start_year:
             return
-        dt = float(sim.t.dt)
+        dt = sim.t.dt_year
         people = sim.people
         scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:

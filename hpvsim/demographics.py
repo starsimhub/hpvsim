@@ -87,17 +87,18 @@ class AgeMigration(ss.Demographics):
     def init_pre(self, sim):
         super().init_pre(sim)
 
-        # Resolve sim start year once. ss.years supports float() but not
-        # int() directly, so cast through float. Used both for load_country
-        # (so age_data samples at the right year) and for _scale below.
-        sim_start = sim.pars.start
-        sim_start_year = float(
-            sim_start.year if hasattr(sim_start, 'year') else sim_start
-        )
-        sim_stop = sim.pars.stop
-        sim_stop_year = float(
-            sim_stop.year if hasattr(sim_stop, 'year') else sim_stop
-        )
+        # Resolve sim start year once. sim.pars.start/stop may be an ss.date
+        # (has .year), an ss.years TimePar (has .years), or a plain number.
+        # Used both for load_country (so age_data samples at the right year)
+        # and for _scale below.
+        def _as_year(t):
+            if hasattr(t, 'year'):
+                return float(t.year)
+            elif hasattr(t, 'years'):
+                return float(t.years)
+            return float(t)
+        sim_start_year = _as_year(sim.pars.start)
+        sim_stop_year = _as_year(sim.pars.stop)
 
         # Pull from country data if not explicitly supplied, then build a
         # {year: {age, male, female}} lookup of compact numpy arrays so step()
