@@ -5,6 +5,17 @@ the term "Regression information".
 
 ## Version 3.1.0 (2026-08-20)
 
+### `starsim` floor raised to `>=3.6`
+
+Starsim 3.6.0 makes `float()` on an `ss.TimePar` raise a `TypeError` (previously it
+silently discarded the unit). Fixed the resulting breakage in `hpv.py`, `network.py`,
+`demographics.py`, `calibration.py`, and `analyzers.py` by switching to `.dt_year`,
+`.years`, and `sim.t.year` — the same idioms starsim itself uses internally — in
+place of `float(...)` on a duration/timestep.
+
+**Regression information**: none — these are like-for-like unit-preserving
+replacements of calls that previously stripped the unit via `float()`.
+
 ### Interventions: `sex='f'` is now the default across vax + screening + treatment
 
 Every HPV-specific intervention constructor (`routine_vx`, `campaign_vx`,
