@@ -16,6 +16,18 @@ place of `float(...)` on a duration/timestep.
 **Regression information**: none — these are like-for-like unit-preserving
 replacements of calls that previously stripped the unit via `float()`.
 
+### `hpv.route_pars`: drop the manual `_preserve_units` workaround
+
+Starsim 3.6 ([starsimhub/starsim#1420](https://github.com/starsimhub/starsim/issues/1420))
+made `Pars.update()`/`Dist.set()` preserve `ss.TimePar` units on scalar overrides
+natively (e.g. `dur_cin=6` against an existing `mean=years(5)` now correctly gives
+`years(6)`, not a bare unitless `6`). `route_pars`'s `apply_nested` had a hand-rolled
+`_preserve_units` helper doing the same thing pre-3.6; removed now that starsim
+handles it directly.
+
+**Regression information**: none — behavior is unchanged, starsim now does natively
+what hpvsim was doing manually.
+
 ### Interventions: `sex='f'` is now the default across vax + screening + treatment
 
 Every HPV-specific intervention constructor (`routine_vx`, `campaign_vx`,

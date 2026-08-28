@@ -419,10 +419,13 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
         Terminal cases:
         - ``target`` is an ``ss.Dist``: ``target.set(**{leaf: value})`` —
           used e.g. for ``cross_immunity.rel_sev.scale`` (leaf is a Dist par).
-        - ``target`` is an ``ss.Pars``: delegate to ``Pars.update`` so
-          starsim's ``_update_dist`` handles dict-to-Dist merges (e.g.
-          ``dur_cin={'mean': 5}`` calls ``lognorm_ex.set(mean=5)`` without
-          clobbering ``std``).
+        - ``target`` is an ``ss.Pars``: delegate to ``Pars.update``, which
+          handles dict-to-Dist merges (e.g. ``dur_cin={'mean': 5}`` calls
+          ``lognorm_ex.set(mean=5)`` without clobbering ``std``) and
+          preserves ``ss.TimePar`` units on scalar overrides (e.g.
+          ``dur_cin=6`` on an existing ``mean=years(5)`` gives ``years(6)``,
+          not a bare unitless ``6``) natively as of starsim 3.6
+          (starsimhub/starsim#1420).
         - Otherwise (plain dict): direct assignment.
         """
         target = container
@@ -432,29 +435,9 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
             target = target[p]
         leaf = parts[-1]
 
-        # Preserve TimePar wrapping on scalar overrides. Dist.set(pars) writes
-        # via plain dict update, dropping any ss.TimePar wrapping on the
-        # existing par — e.g. dur_cin=6 turns `mean=years(5)` into `mean=6`
-        # (unitless), which starsim then reads as timesteps, not years.
-        def _preserve_units(cur, val):
-            if sc.isnumber(val) and isinstance(cur, ss.TimePar):
-                return cur.__class__(val)
-            if isinstance(cur, ss.Dist) and sc.isnumber(val):
-                first_key = next(iter(cur.pars))
-                first = cur.pars[first_key]
-                if isinstance(first, ss.TimePar):
-                    return first.__class__(val)
-            if isinstance(val, dict) and isinstance(cur, ss.Dist):
-                return {k: _preserve_units(cur.pars.get(k), v) for k, v in val.items()}
-            return val
-
         if isinstance(target, ss.Dist):
-            cur = target.pars.get(leaf)
-            value = _preserve_units(cur, value)
             target.set(**{leaf: value})
         elif isinstance(target, ss.Pars):
-            cur = target.get(leaf)
-            value = _preserve_units(cur, value)
             target.update({leaf: value})
         else:
             target[leaf] = value
