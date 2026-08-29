@@ -7,7 +7,7 @@ import sciris as sc
 import starsim as ss
 import hpvsim as hpv
 
-# Age-bin edges shared by the AgeResults recorders and the by-age assertions
+# Age-bin edges shared by the by_age recorders and the by-age assertions
 # (5 edges -> 4 bins -> 4 age ticks).
 EDGES = np.array([0., 15., 30., 50., 100.])
 
@@ -18,19 +18,16 @@ def rich_sim():
     shared (read-only) across the structure-only plotting tests.
 
     Recording ``cancers`` / ``hpv_prevalence`` / ``cancerous_genotype_dist`` in
-    AgeResults plus ``age_pyramid`` / ``age_causal_infection`` / ``dalys`` covers
+    by_age plus ``age_pyramid`` / ``age_causal_infection`` / ``dalys`` covers
     every plot_* entry point except the intervention-impact pair (needs a
     scenario arm) and the two ``plot_sim`` negative cases (need a sim that lacks
-    the required AgeResults keys). 6000 agents at dt=0.5 keeps enough cancer
+    the required by_age keys). 6000 agents at dt=0.5 keeps enough cancer
     signal for cancerous_genotype_dist and the dalys/age_causal panels — a wide,
     coarse run is cheaper than a narrow, fine one for the same signal, since
     cost is dominated by a fixed per-timestep overhead.
     """
-    ar = hpv.AgeResults(result_args=sc.objdict(
-        cancers=sc.objdict(years=[2015, 2025], edges=EDGES),
-        hpv_prevalence=sc.objdict(years=[2015, 2025], edges=EDGES),
-        cancerous_genotype_dist=sc.objdict(years=[2025], edges=EDGES),
-    ))
+    ar = hpv.by_age(['cancers', 'hpv_prevalence'],
+                    years=[2015, 2025], edges=EDGES)
     sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria', start=2000,
                   stop=2030, dt=0.5, n_agents=6000, rand_seed=1,
                   analyzers=[ar,
@@ -46,7 +43,7 @@ def teardown_function():
 
 
 def test_plot_by_age_one_series_per_year(rich_sim):
-    ar = rich_sim.analyzers['ageresults']
+    ar = rich_sim.analyzers['by_age']
     fig = hpv.plot_by_age(ar, 'cancers')
     ax = fig.axes[0]
     # One line per recorded year (2015, 2025).
@@ -75,13 +72,9 @@ def test_plot_type_distribution_bars_sum_to_one(rich_sim):
     assert np.isclose(sum(heights), 1.0)              # normalized shares
 
 
-def test_plot_type_distribution_age_results_source(rich_sim):
-    ar = rich_sim.analyzers['ageresults']
-    fig = hpv.plot_type_distribution(ar, key='cancerous_genotype_dist')
-    ax = fig.axes[0]
-    heights = [p.get_height() for p in ax.patches]
-    assert len(heights) == 2                  # one bar per genotype
-    assert np.isclose(sum(heights), 1.0)      # normalized shares
+# test_plot_type_distribution_age_results_source removed:
+# by_age no longer supports type-distribution keys; plot_type_distribution
+# takes only an hpv.Sim source now (delegates to results_by_genotype).
 
 
 def test_plot_sim_default_four_panels_and_requires_age_results(rich_sim):
@@ -89,7 +82,7 @@ def test_plot_sim_default_four_panels_and_requires_age_results(rich_sim):
     assert len(fig.axes) == 4
     # 'all' delegates to ss.Sim.plot and still returns a Figure.
     assert hpv.plot_sim(rich_sim, which='all') is not None
-    # Without an AgeResults analyzer, 'default' raises a clear error.
+    # Without an by_age analyzer, 'default' raises a clear error.
     bare = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
                    stop=2000, dt=1.0, n_agents=200, rand_seed=1)
     bare.run()
@@ -98,10 +91,9 @@ def test_plot_sim_default_four_panels_and_requires_age_results(rich_sim):
 
 
 def test_plot_sim_default_raises_when_age_results_lacks_keys():
-    # AgeResults present but recording neither 'cancers' nor a prevalence key.
+    # by_age present but recording neither 'cancers' nor a prevalence key.
     edges = np.array([0., 50., 100.])
-    ar = hpv.AgeResults(result_args=sc.objdict(
-        cin_incidence=sc.objdict(years=[2005], edges=edges)))
+    ar = hpv.by_age('n_cancerous', edges=edges)
     sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2006,
                   dt=1.0, n_agents=200, rand_seed=1, analyzers=[ar])
     sim.run()

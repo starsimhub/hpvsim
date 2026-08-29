@@ -52,18 +52,22 @@ def test_death_rate_shape():
 
 
 def test_network_pars_shape():
-    """network_pars carries layer_pars for the two layers (m, c) plus shared debut."""
+    """network_pars is the flat NetworkPars dict — every knob at the top level."""
     out = hpvsim.data.load_country('nigeria')
     np_pars = out['network_pars']
-    assert set(np_pars.keys()) == {'layer_pars', 'debut'}, \
-        f'top-level keys: {list(np_pars.keys())}'
-    layer_pars = np_pars['layer_pars']
-    assert set(layer_pars.keys()) == {'m', 'c'}, f'layers: {list(layer_pars.keys())}'
-    expected = {'partners', 'mixing', 'layer_probs', 'cross_layer', 'duration', 'acts'}
-    for layer, lp in layer_pars.items():
-        assert expected.issubset(lp.keys()), \
-            f'layer {layer} missing keys: {expected - set(lp.keys())}'
-    assert set(np_pars['debut'].keys()) == {'f', 'm'}
+    expected_top = {
+        'm_cross_layer', 'f_cross_layer',
+        'debut_f', 'debut_m',
+        'm_partners_marital', 'm_partners_casual',
+        'f_partners_marital', 'f_partners_casual',
+        'acts_marital', 'acts_casual',
+        'dur_pship_marital', 'dur_pship_casual',
+        'age_act_pars_marital', 'age_act_pars_casual',
+        'mixing_marital', 'mixing_casual',
+        'layer_probs_marital', 'layer_probs_casual',
+    }
+    assert set(np_pars.keys()) == expected_top, \
+        f'top-level keys: {sorted(np_pars.keys())}'
 
 
 def test_unknown_location_raises():

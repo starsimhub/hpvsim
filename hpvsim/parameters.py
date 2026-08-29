@@ -14,8 +14,11 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['SimPars', 'GenotypePars', 'get_genotype_pars',
-           'get_cross_immunity', 'genotype_aliases', 'GENOTYPE_KEYS']
+__all__ = ['SimPars', 'GenotypePars', 'NetworkPars', 'get_genotype_pars',
+           'genotype_aliases', 'GENOTYPE_KEYS', 'route_pars']
+
+# Sexual-network layer keys (marital, casual).
+NETWORK_LAYERS = ('m', 'c')
 
 # Canonical 4-genotype ordering. The Connector uses this order as the
 # default when no genotype list is supplied.
@@ -106,7 +109,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=1.0,
         sero_prob=0.75,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
     'hpv18': dict(
         beta=0.25,
@@ -121,7 +124,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=0.75,
         sero_prob=0.56,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
     'hi5': dict(
         beta=0.25,
@@ -136,7 +139,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=0.9,
         sero_prob=0.60,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
     'ohr': dict(
         beta=0.25,
@@ -151,7 +154,7 @@ _GENOTYPE_DEFAULTS = {
         rel_beta=0.9,
         sero_prob=0.60,
         transf2m=1.0,
-        transm2f=3.69,
+        transm2f=2.0,
     ),
 }
 
@@ -215,50 +218,336 @@ def get_genotype_pars(genotype='hpv16'):
     return GenotypePars(genotype=genotype)
 
 
-# Genotypes whose own-immunity is hardcoded to 1.0; hi5/ohr use ``own_imm_hr``.
-_FULL_OWN_IMM_KEYS = frozenset({'hpv16', 'hpv18'})
-
-# Pairwise cross-protection clade map. 'high' = hpv16 <-> hpv18 (same clade);
-# everything else is 'med'.
-_CLADE_HIGH_PAIRS = frozenset({
-    ('hpv16', 'hpv18'),
-    ('hpv18', 'hpv16'),
-})
+# Sim-level keys route_pars will pass through to sim.pars. Explicit allowlist
+# so a typo raises rather than silently creating a new sim par.
+_SIM_KEYS = frozenset({'n_agents', 'dt', 'start', 'stop', 'rand_seed',
+                       'ms_agent_ratio', 'total_pop', 'verbose'})
 
 
-def _build_cross_matrix(keys, scalar_med, scalar_high, own_imm_hr):
-    """Pairwise cross-protection matrix.
+# --------------------------------------------------------------------------- #
+# Network mixing & participation matrices (data — used by NetworkPars)        #
+# --------------------------------------------------------------------------- #
 
-    Diagonal: 1.0 for keys in ``_FULL_OWN_IMM_KEYS`` (hpv16, hpv18); else
-    ``own_imm_hr`` (0.9 by default).
-    Off-diagonal: ``scalar_high`` for clade-high pairs, ``scalar_med`` else.
+# Age-mixing (rows = female age band start, cols = male age band start; first
+# column is the female age-band label).
+_MIXING_M = np.array([
+    #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+    [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [10,    0,  0, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [15,    0,  0, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [20,    0,  0, .1, .1, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [25,    0,  0, .5, .1, .5, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [30,    0,  0,  1, .5, .5, .5, .5, .1,  0,  0,  0,  0,  0,  0,  0,  0],
+    [35,    0,  0, .5,  1,  1, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+    [40,    0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+    [45,    0,  0,  0,  0, .1,  1,  1,  2,  1,  1, .5,  0,  0,  0,  0,  0],
+    [50,    0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0,  0],
+    [55,    0,  0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0],
+    [60,    0,  0,  0,  0,  0,  0,  0, .1, .5,  1,  1,  1,  2, .5,  0,  0],
+    [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0],
+    [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1, .5],
+    [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],
+], dtype=float)
+_MIXING_C = np.array([
+    #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+    [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [15,    0,  0,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [20,    0,  0,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+    [25,    0,  0, .5,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0],
+    [30,    0,  0,  0, .5,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+    [35,    0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+    [40,    0,  0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+    [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
+    [50,    0,  0,  0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
+    [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
+    [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
+    [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
+    [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5],
+    [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
+], dtype=float)
+
+# Age-band participation probabilities: row 0 = age-bin lower bounds,
+# row 1 = annual female prob, row 2 = annual male prob.
+_LAYER_PROBS_M = np.array([
+    [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
+    [ 0,    0,  0.0394, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394],
+    [ 0,    0,  0.0394, 0.590, 0.760, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394],
+], dtype=float)
+_LAYER_PROBS_C = np.array([
+    [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
+    [ 0,    0,  0.590, 0.974, 0.998, 0.974, 0.870, 0.870, 0.870, 0.344, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776],
+    [ 0,    0,  0.590, 0.870, 0.870, 0.870, 0.870, 0.974, 0.998, 0.974, 0.590, 0.344, 0.185, 0.0776, 0.0776, 0.0776],
+], dtype=float)
+
+
+def _nbinom_mean_k(mean, k):
+    """``ss.nbinom`` parametrized as (mean, dispersion k).
+
+    Scipy uses (n=successes, p=success-prob); modellers think in
+    (mean, dispersion). Mapping: n=k, p=k/(k+mean).
     """
-    n = len(keys)
-    m = np.full((n, n), scalar_med, dtype=np.float32)
-    for i, ki in enumerate(keys):
-        for j, kj in enumerate(keys):
-            if i == j:
-                m[i, j] = 1.0 if ki in _FULL_OWN_IMM_KEYS else own_imm_hr
-            elif (ki, kj) in _CLADE_HIGH_PAIRS:
-                m[i, j] = scalar_high
-    return m
+    return ss.nbinom(n=k, p=k/(k+mean))
 
 
-def get_cross_immunity(keys=None,
-                       cross_imm_sus_med=0.3, cross_imm_sus_high=0.5,
-                       cross_imm_sev_med=0.5, cross_imm_sev_high=0.7,
-                       own_imm_hr=0.9):
-    """Build (cross_immunity_sus, cross_immunity_sev) matrices for the given
-    genotype ordering.
+class NetworkPars(sc.objdict):
+    """Default parameters for ``hpv.SexualNetwork``.
 
-    Returns a tuple of two ``(n, n)`` float32 arrays. ``keys`` defaults to
-    ``GENOTYPE_KEYS``.
+    All values are location-agnostic (HPVsim ships demographic data per
+    country but not network calibration). Analysis scripts supply
+    per-country overrides.
 
-    Diagonal: 1.0 for hpv16 and hpv18 (canonical own-immunity); ``own_imm_hr``
-    for everyone else.
+    Naming convention: per-layer pars carry a ``_marital`` / ``_casual``
+    suffix; per-sex pars carry a ``_f`` / ``_m`` suffix. All Dist-typed
+    pars are ``ss.Dist`` instances directly (no v2 ``{'dist': ..., 'par1':
+    ...}`` dicts).
+
+    Per-agent, per-layer partner-count targets are **always shifted by +1**
+    in the network's sampling code (``set_network_states``). A participating
+    agent in a layer wants at least one partner by definition; the ``lam``
+    values below govern only the tail of *additional* concurrent partners.
+
+    Keys:
+        ``m_cross_layer``, ``f_cross_layer``: scalar annual probability of
+            male/female cross-layer concurrency.
+        ``debut_f``, ``debut_m``: per-sex debut-age ``ss.Dist``.
+        ``{sex}_partners_{layer}``: per-layer per-sex partner-count Dist
+            (``ss.poisson``; sampled value has +1 added at use).
+        ``acts_{layer}``: per-partnership annual act-count Dist.
+        ``dur_pship_{layer}``: partnership duration Dist (years).
+        ``age_act_pars_{layer}``: per-layer age-based act modulation
+            (peak, retirement, debut_ratio, retirement_ratio) dict.
+        ``mixing_{layer}``: age-mixing matrix (rows = female age band start,
+            cols = male age band; first column is female age label).
+        ``layer_probs_{layer}``: (3, N) array of age-band participation:
+            row 0 = age-bin lower bounds, rows 1/2 = annual f/m prob.
     """
-    if keys is None:
-        keys = GENOTYPE_KEYS
-    m_sus = _build_cross_matrix(keys, cross_imm_sus_med, cross_imm_sus_high, own_imm_hr)
-    m_sev = _build_cross_matrix(keys, cross_imm_sev_med, cross_imm_sev_high, own_imm_hr)
-    return m_sus, m_sev
+    def __init__(self, **overrides):
+        super().__init__()
+
+        self.m_cross_layer = 0.760
+        self.f_cross_layer = 0.185
+
+        self.debut_f = ss.normal(loc=15.0, scale=2.1)
+        self.debut_m = ss.normal(loc=17.6, scale=1.8)
+
+        # Concurrent-partner-count Poisson lambda; +1 shift applied in network.
+        self.m_partners_marital = ss.poisson(lam=0.01)
+        self.m_partners_casual  = ss.poisson(lam=0.5)
+        self.f_partners_marital = ss.poisson(lam=0.01)
+        self.f_partners_casual  = ss.poisson(lam=0.5)
+
+        self.acts_marital = _nbinom_mean_k(mean=80, k=40)
+        self.acts_casual  = _nbinom_mean_k(mean=50, k=5)
+
+        self.dur_pship_marital = _nbinom_mean_k(mean=80, k=3)
+        self.dur_pship_casual  = ss.lognorm_ex(mean=1, std=2)
+
+        # Age-based act modulation per layer. Ramp linearly from
+        # debut_ratio at debut age to 1.0 at peak, then to retirement_ratio
+        # at retirement, then 0 beyond.
+        self.age_act_pars_marital = dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
+        self.age_act_pars_casual  = dict(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
+
+        self.mixing_marital = _MIXING_M
+        self.mixing_casual  = _MIXING_C
+
+        self.layer_probs_marital = _LAYER_PROBS_M
+        self.layer_probs_casual  = _LAYER_PROBS_C
+
+        self.update(overrides)
+
+
+def _par_registry():
+    """Category -> par-name-set (built lazily; lightweight)."""
+    from .hpv import HPV
+    from .cross_genotype import CrossImmunity
+    from .network import SexualNetwork
+    hpv_keys = set()
+    for g in GENOTYPE_KEYS:
+        hpv_keys.update(HPV(g).pars.keys())
+    return {'sim': set(_SIM_KEYS), 'hpv': hpv_keys,
+            'connector': set(CrossImmunity().pars.keys()),
+            'network': set(SexualNetwork().pars.keys())}
+
+
+def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
+    """Route a flat ``{key: value}`` dict to the correct modules on ``sim``.
+
+    Rules:
+      - ``<genotype>.<par>[.<sub>]``: scoped to one HPV disease.
+      - ``cross_immunity.<par>[.<sub>]``: scoped to ``CrossImmunity``.
+        Legacy form ``cross_immunity.<matrix>.<tgt>.<src>`` (4 parts)
+        writes a single matrix cell.
+      - ``network.<par>[.<sub>]`` / ``sexualnetwork.<par>[.<sub>]``:
+        scoped to ``SexualNetwork``. Also accepts a nested dict value.
+      - Bare key: registry lookup (see ``_par_registry``); broadcast to
+        every matching category. ``beta`` scalar broadcasts to every HPV
+        module, preserving each genotype's F/M ratio.
+      - Optuna spec dicts ``{'low','high','guess','value'}`` are unwrapped
+        to their ``value``.
+    """
+    from .hpv import HPV
+    from .cross_genotype import CrossImmunity
+    from .network import SexualNetwork
+
+    pars = pars if pars is not None else calib_pars
+    if not pars:
+        return sim
+    pars = {k: (v['value'] if isinstance(v, dict) and 'value' in v else v)
+            for k, v in pars.items()}
+
+    if hasattr(sim, 'diseases') and sim.diseases is not None:
+        diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, HPV)}
+        connectors = [c for c in sim.connectors.values() if isinstance(c, CrossImmunity)]
+        networks = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
+    else:
+        diseases = {d.name: d for d in sc.tolist(sim.pars.get('diseases'))
+                    if isinstance(d, HPV)}
+        connectors = [c for c in sc.tolist(sim.pars.get('connectors'))
+                      if isinstance(c, CrossImmunity)]
+        networks = [n for n in sc.tolist(sim.pars.get('networks'))
+                    if isinstance(n, SexualNetwork)]
+
+    registry = _par_registry()
+
+    def apply_nested(container, parts, value):
+        """Walk into nested pars/Dist to set at the leaf.
+
+        Terminal cases:
+        - ``target`` is an ``ss.Dist``: ``target.set(**{leaf: value})`` —
+          used e.g. for ``cross_immunity.rel_sev.scale`` (leaf is a Dist par).
+        - ``target`` is an ``ss.Pars``: delegate to ``Pars.update``, which
+          handles dict-to-Dist merges (e.g. ``dur_cin={'mean': 5}`` calls
+          ``lognorm_ex.set(mean=5)`` without clobbering ``std``) and
+          preserves ``ss.TimePar`` units on scalar overrides (e.g.
+          ``dur_cin=6`` on an existing ``mean=years(5)`` gives ``years(6)``,
+          not a bare unitless ``6``) natively as of starsim 3.6
+          (starsimhub/starsim#1420).
+        - Otherwise (plain dict): direct assignment.
+        """
+        target = container
+        for p in parts[:-1]:
+            if isinstance(target, ss.Dist):
+                target = target.pars
+            target = target[p]
+        leaf = parts[-1]
+
+        if isinstance(target, ss.Dist):
+            target.set(**{leaf: value})
+        elif isinstance(target, ss.Pars):
+            target.update({leaf: value})
+        else:
+            target[leaf] = value
+
+    def apply_beta_scalar(disease, value):
+        """Broadcast a scalar beta onto pars.beta ({'sexualnetwork': [f2m, m2f]}),
+        preserving the F/M ratio. Per-act probabilities are clipped to
+        [0, 1] via ``HPV._clip_beta`` (matches the construction-time clip)
+        to protect against unusual parameter combinations pushing a per-act
+        probability above 1 (would silently NaN transmission)."""
+        from .hpv import _clip_beta
+        old = disease.pars.beta
+        if not (sc.isnumber(value) and isinstance(old, dict)):
+            disease.pars.beta = value
+            return
+        first = next(iter(old.values()))
+        ref = first[0] if isinstance(first, list) else first
+        scale = 1.0 if ref == 0 else value / ref
+        new_beta = {}
+        for net_name, v in old.items():
+            if isinstance(v, list):
+                new_beta[net_name] = _clip_beta(
+                    v[0] * scale, v[1] * scale,
+                    getattr(disease, 'genotype', getattr(disease, 'name', '?')),
+                )
+            else:
+                new_beta[net_name] = min(1.0, v * scale)
+        disease.pars.beta = new_beta
+
+    unmatched = {}
+
+    def apply_scope(container_pars, key, value):
+        """Apply a scoped key (either 'a.b.c' dotted or 'a' with dict value)
+        onto ``container_pars``. Dict values are unpacked one level so each
+        sub-key gets its own apply_nested; the caller has already stripped
+        the module-scope prefix."""
+        if isinstance(value, dict):
+            for sub_k, sub_v in value.items():
+                apply_nested(container_pars, [key, *sub_k.split('.')], sub_v)
+        else:
+            apply_nested(container_pars, key.split('.'), value)
+
+    for key, value in pars.items():
+        parts = key.split('.')
+        head = parts[0]
+
+        # Scoped: <module>.<par>[.<sub>] OR bare <module> with a dict of pars.
+        if head in diseases and (len(parts) > 1 or isinstance(value, dict)):
+            if len(parts) > 1:
+                apply_nested(diseases[head].pars, parts[1:], value)
+            else:
+                for sub_k, sub_v in value.items():
+                    apply_scope(diseases[head].pars, sub_k, sub_v)
+            continue
+        if head in ('cross_immunity', 'crossimmunity') and (len(parts) > 1 or isinstance(value, dict)):
+            if not connectors:
+                raise ValueError(f'route_pars: {key!r} needs a CrossImmunity connector.')
+            # Legacy: cross_immunity.<matrix>.<tgt>.<src> -> matrix cell.
+            if len(parts) == 4 and parts[1] in ('cross_imm_sus', 'cross_imm_sev'):
+                conn = connectors[0]
+                idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
+                getattr(conn, parts[1])[idx[parts[2]], idx[parts[3]]] = value
+            elif len(parts) > 1:
+                for c in connectors:
+                    apply_nested(c.pars, parts[1:], value)
+            else:
+                for c in connectors:
+                    for sub_k, sub_v in value.items():
+                        apply_scope(c.pars, sub_k, sub_v)
+            continue
+        if head in ('network', 'sexualnetwork') and (len(parts) > 1 or isinstance(value, dict)):
+            if not networks:
+                raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
+            if len(parts) > 1:
+                for n in networks:
+                    apply_nested(n.pars, parts[1:], value)
+            else:
+                for n in networks:
+                    for sub_k, sub_v in value.items():
+                        apply_scope(n.pars, sub_k, sub_v)
+            continue
+
+        # Flat: registry lookup. Broadcast if a key lives in more than one category.
+        cats = [c for c, kk in registry.items() if head in kk]
+        if not cats:
+            unmatched[key] = value
+            continue
+        if len(cats) > 1 and verbose:
+            print(f'route_pars: {key!r} broadcast to {cats}')
+        for cat in cats:
+            if cat == 'sim':
+                apply_nested(sim.pars, parts, value)
+            elif cat == 'hpv':
+                for d in diseases.values():
+                    if parts == ['beta']:
+                        apply_beta_scalar(d, value)
+                    else:
+                        apply_nested(d.pars, parts, value)
+            elif cat == 'connector':
+                if not connectors:
+                    raise ValueError(f'route_pars: {key!r} needs a CrossImmunity connector.')
+                for c in connectors:
+                    apply_nested(c.pars, parts, value)
+            elif cat == 'network':
+                if not networks:
+                    raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
+                for n in networks:
+                    apply_nested(n.pars, parts, value)
+
+    if unmatched and strict:
+        raise ValueError(f'route_pars: unrecognized par(s): {sorted(unmatched)}')
+
+    return sim

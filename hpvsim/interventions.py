@@ -153,19 +153,19 @@ class BaseVaccination(ss.BaseVaccination):
     Wraps Starsim's ``ss.BaseVaccination`` to add ``age_range`` / ``sex`` /
     ``eligibility`` constructor args. These compose into a single Starsim
     eligibility callable. The originals are stored on the instance for
-    introspection (e.g. AgeResults consumption).
+    introspection (e.g. by_age consumption).
 
     Also overrides ``_parse_product_str`` so that
     ``routine_vx(product='bivalent', ...)`` resolves through
     ``hpv.vx(name='bivalent')``.
     """
 
-    def __init__(self, *args, age_range=None, sex=None, eligibility=None,
+    def __init__(self, *args, age_range=None, sex='f', eligibility=None,
                  **kwargs):
         composed = _compose_vaccine_eligibility(age_range, sex, eligibility)
         super().__init__(*args, eligibility=composed, **kwargs)
         # Raw constructor args, preserved for introspection (e.g.
-        # M04 AgeResults stratification by vaccination cohort).
+        # M04 by_age stratification by vaccination cohort).
         self.age_range = age_range
         self.sex_raw = sex
         self.sex = _cast_sex(sex)
@@ -325,11 +325,6 @@ class BaseTreatment(ss.BaseTreatment):
         # Late import to avoid circular
         from hpvsim.products import radiation as _radiation
         self.treat_cancer = isinstance(self.product, _radiation)
-        # Cancer treatments are not sex-restricted by default (radiation is
-        # post-triage; both sexes can have cervical/other HPV-related cancers
-        # in multi-site models). CIN treatments default to female only.
-        if self.treat_cancer and sex == 'f':
-            sex = None
         self.sex_raw = sex
         self.sex = _cast_sex(sex)
         self.eligibility_user = eligibility

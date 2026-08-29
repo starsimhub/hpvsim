@@ -41,8 +41,8 @@ def test_rel_beta_override_scales_beta():
 def test_rel_beta_override_via_sim_genotype_pars():
     """rel_beta override flows through hpv.Sim(genotype_pars=...).
 
-    Use rel_beta<1: the default male->female beta (0.25*3.69=0.9225) is already
-    near the per-act probability ceiling of 1.0, so scaling up would exceed it.
+    Use rel_beta<1: keeps directional beta below the per-act probability
+    ceiling of 1.0 (default m->f beta = 0.25 * transm2f = 0.5 at rel_beta=1.0).
     """
     sim = hpv.Sim(genotypes=[16], genotype_pars={'hpv16': {'rel_beta': 0.5}},
                   n_agents=200, start=2000, stop=2001, dt=1.0)
@@ -63,7 +63,7 @@ def test_higher_rel_beta_raises_prevalence():
     """Behavioral check: higher rel_beta -> more transmission.
 
     Both values keep the directional beta below the per-act probability ceiling
-    of 1.0 (default m->f beta is 0.9225 at rel_beta=1.0).
+    of 1.0 (default m->f beta = 0.25 * transm2f = 0.5 at rel_beta=1.0).
     """
     def prev(rb):
         sim = hpv.Sim(genotypes=[16], genotype_pars={'hpv16': {'rel_beta': rb}},

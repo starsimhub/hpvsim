@@ -45,14 +45,23 @@ def test_tx_ablation_flips_cin_to_false():
 
 
 def test_tx_zero_efficacy_row_means_zero_successful():
-    """ablation row for precin has efficacy=0; precin agents must be all
-    classified unsuccessful for that state contribution."""
+    """ablation row for cancerous has efficacy=0; cancerous-only agents must
+    all be classified unsuccessful for that state contribution.
+
+    All four genotype modules are cleared and only hpv16 set to cancerous —
+    otherwise agents with a residual precin flag on hpv18 (from the Nigeria
+    init prevalence) would hit the now-nonzero ablation.precin path.
+    """
     sim = _four_genotype_sim()
     t = _attach_tx_and_init(sim, hpv_tx(name='ablation'))
     uids = sim.people.alive.uids[:3]
-    sim.diseases['hpv16'].precin[uids] = True
+    for g in ('hpv16', 'hpv18', 'hi5', 'ohr'):
+        sim.diseases[g].precin[uids] = False
+        sim.diseases[g].cin[uids] = False
+        sim.diseases[g].cancerous[uids] = False
+    sim.diseases['hpv16'].cancerous[uids] = True
     out = t.administer(uids)
-    # ablation efficacy on precin = 0, so no agent should be classified successful from this path
+    # ablation efficacy on cancerous = 0, so no agent should be classified successful from this path
     assert len(out['successful']) == 0
     assert len(out['unsuccessful']) == len(uids)
 
@@ -70,10 +79,20 @@ def test_tx_disjoint_outcomes_keys():
 
 
 def test_tx_clears_ti_cin_and_ti_cancerous_on_success():
-    """Successful treatment clears ti_cin and ti_cancerous to NaN."""
+    """Successful treatment clears ti_cin and ti_cancerous to NaN.
+
+    All four genotype modules are cleared and only hpv16 set to cin —
+    otherwise agents with a residual precin flag on hpv18 (from Nigeria
+    init prevalence) would land in the excision.precin path first, clear
+    precin, and never touch hpv16.ti_cin.
+    """
     sim = _four_genotype_sim()
     t = _attach_tx_and_init(sim, hpv_tx(name='excision'))
     uids = sim.people.alive.uids[:3]
+    for g in ('hpv16', 'hpv18', 'hi5', 'ohr'):
+        sim.diseases[g].precin[uids] = False
+        sim.diseases[g].cin[uids] = False
+        sim.diseases[g].cancerous[uids] = False
     sim.diseases['hpv16'].cin[uids] = True
     sim.diseases['hpv16'].ti_cin[uids] = 5.0
     sim.diseases['hpv16'].ti_cancerous[uids] = 10.0

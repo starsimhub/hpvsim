@@ -12,6 +12,11 @@ so no sibling-network coordination is needed.
 import numpy as np
 import starsim as ss
 
+from .parameters import NETWORK_LAYERS, NetworkPars
+
+# Runtime layer keys → NetworkPars suffix.
+_LAYER_SUFFIX = {'m': 'marital', 'c': 'casual'}
+
 
 def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
     """Age-scaled acts: piecewise-linear modulation by couple's average age.
@@ -44,16 +49,13 @@ def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
 
 
 class SexualNetwork(ss.SexualNetwork):
-    """Multi-layer heterosexual partnership network.
+    """Multi-layer (marital ``m``, casual ``c``) heterosexual partnership network.
 
-    Args:
-        layer_pars: dict ``{layer_name: layer_pars_dict}``. Each layer dict
-            (when supplied via ``hpv.data.load_country``) carries:
-            ``partners`` (per-sex Dist dict), ``mixing`` (2D ndarray),
-            ``layer_probs`` (dict with bins/f/m), ``cross_layer`` (per-sex
-            ss.prob dict), ``duration``, ``acts`` (Dist instances).
-        debut: per-sex debut-age distribution dict ``{'f': Dist, 'm': Dist}``.
-            Sampled once per agent and shared across all layers.
+    Pars live flat on ``self.pars`` — see ``hpv.NetworkPars`` for the full
+    default set. Naming: per-layer pars use ``_marital`` / ``_casual``
+    suffix; per-sex pars use ``_f`` / ``_m``. All Dist-typed pars are
+    ``ss.Dist`` instances (no v2 dict form). ``init_pre`` groups them
+    into ``self._layer_pars`` / ``self._debut`` for runtime access.
 
     Overrides ``net_beta`` to compound the per-act probability across the
     per-edge ``acts`` count: ``1 - (1 - edges.beta * disease_beta)^acts``.
@@ -86,26 +88,21 @@ class SexualNetwork(ss.SexualNetwork):
         p_per_act = self.edges.beta[inds] * disease_beta
         return 1 - (1 - p_per_act) ** self.edges.acts[inds]
 
-    def __init__(self, layer_pars=None, debut=None, **kwargs):
+    def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.define_pars(
-            layer_pars=layer_pars,
-            debut=debut,
-        )
-        self.update_pars(**kwargs)
-        # Layer ordering: tuple keys in insertion order. Empty when the
-        # network is constructed without layer_pars (scaffold tests).
-        self.layers = tuple(self.pars.layer_pars.keys()) if self.pars.layer_pars else ()
+        self.define_pars(**NetworkPars())
+        self.update_pars(pars=pars, **kwargs)
+
+        self.layers = NETWORK_LAYERS  # ('m', 'c')
         self._layer_idx = {lkey: i for i, lkey in enumerate(self.layers)}
         # Per-layer partners_target — partners are sampled with independent
         # Poisson draws per layer, so per-layer state is required.
-        if self.layers:
-            target_states = [
-                ss.FloatArr(f'partners_target_{lkey}', default=np.nan,
-                            label=f'Desired partner count ({lkey})')
-                for lkey in self.layers
-            ]
-            self.define_states(*target_states)
+        target_states = [
+            ss.FloatArr(f'partners_target_{lkey}', default=np.nan,
+                        label=f'Desired partner count ({lkey})')
+            for lkey in self.layers
+        ]
+        self.define_states(*target_states)
         # Edge metadata: per-edge layer tag + formation timestep. start_ti
         # lets diagnostics reconstruct age-at-formation and original duration.
         self.meta.layer_id = int
@@ -125,6 +122,54 @@ class SexualNetwork(ss.SexualNetwork):
             )
             for lkey in self.layers
         }
+        # Runtime shaped-pars cache. Populated at init_pre from the flat
+        # pars; the network reads self._layer_pars[lkey] / self._debut['f'|'m']
+        # rather than the flat pars during simulation.
+        self._layer_pars = None
+        self._debut = None
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self._shape_pars()
+
+    def _shape_pars(self):
+        """Build ``self._layer_pars`` / ``self._debut`` from flat ``self.pars``.
+
+        Groups per-layer entries into the
+        ``partners/mixing/layer_probs/cross_layer/duration/acts/age_act_pars``
+        dict the pair-formation code expects. Annual probabilities
+        (``cross_layer``, ``layer_probs``) are wrapped in ``ss.prob`` (with
+        an ``ss.years(1)`` unit so ``.to_prob(dt)`` gives a dt-correct
+        per-step probability). All Dist-typed pars are passed through as
+        ``ss.Dist`` instances.
+        """
+        p = self.pars
+        annual = ss.years(1)
+        cross_layer_by_sex = {
+            'm': ss.prob(p.m_cross_layer, annual),
+            'f': ss.prob(p.f_cross_layer, annual),
+        }
+        self._debut = {'f': p.debut_f, 'm': p.debut_m}
+        self._layer_pars = {}
+        for layer in self.layers:
+            sfx = _LAYER_SUFFIX[layer]
+            lp = getattr(p, f'layer_probs_{sfx}')
+            self._layer_pars[layer] = dict(
+                partners={
+                    'm': getattr(p, f'm_partners_{sfx}'),
+                    'f': getattr(p, f'f_partners_{sfx}'),
+                },
+                mixing=getattr(p, f'mixing_{sfx}'),
+                layer_probs=dict(
+                    bins=lp[0, :],
+                    f=ss.prob(lp[1, :], annual),
+                    m=ss.prob(lp[2, :], annual),
+                ),
+                cross_layer=cross_layer_by_sex,
+                duration=getattr(p, f'dur_pship_{sfx}'),
+                acts=getattr(p, f'acts_{sfx}'),
+                age_act_pars=getattr(p, f'age_act_pars_{sfx}'),
+            )
 
     # ------------------------------------------------------------------ #
     # Public per-layer accessors (used by tests / diagnostics)             #
@@ -172,20 +217,21 @@ class SexualNetwork(ss.SexualNetwork):
         f_uids = unset[is_female]
         m_uids = unset[~is_female]
 
-        # Per-layer partners_target — independent samples per layer.
+        # Per-layer partners_target — independent samples per layer, +1 shift.
+        # A participating agent always wants at least one partner; the Poisson
+        # lam governs only the tail of *additional* concurrent partners.
         for lkey in self.layers:
-            lpars = self.pars.layer_pars[lkey]
+            lpars = self._layer_pars[lkey]
             partners = lpars.get('partners') if lpars else None
             if partners is None:
                 continue
             arr = getattr(self, f'partners_target_{lkey}')
-            arr[f_uids] = partners['f'].rvs(f_uids)
-            arr[m_uids] = partners['m'].rvs(m_uids)
+            arr[f_uids] = partners['f'].rvs(f_uids) + 1
+            arr[m_uids] = partners['m'].rvs(m_uids) + 1
 
         # Single shared debut sample per agent (across layers).
-        if self.pars.debut is not None:
-            self.debut[f_uids] = self.pars.debut['f'].rvs(f_uids)
-            self.debut[m_uids] = self.pars.debut['m'].rvs(m_uids)
+        self.debut[f_uids] = self._debut['f'].rvs(f_uids)
+        self.debut[m_uids] = self._debut['m'].rvs(m_uids)
 
         self.participant[unset] = True
 
@@ -248,7 +294,7 @@ class SexualNetwork(ss.SexualNetwork):
 
         Females are placed in ``p1``, males in ``p2``.
         """
-        lpars = self.pars.layer_pars[lkey]
+        lpars = self._layer_pars[lkey]
         # Scaffolding short-circuit: layers with no pars (test fixtures) skip.
         if not lpars or lpars.get('partners') is None or lpars.get('layer_probs') is None:
             return
@@ -257,7 +303,7 @@ class SexualNetwork(ss.SexualNetwork):
         target = getattr(self, f'partners_target_{lkey}')
         dists = self._dists[lkey]
         dt = self.t.dt
-        dt_yr = float(dt)
+        dt_yr = self.t.dt_year
 
         # Eligibility: alive & past debut & participant & wants partners
         # & not already at target.

@@ -394,7 +394,8 @@ def test_directional_beta_sets_per_network_pair():
         f'beta missing sexualnetwork key; got keys {list(beta.keys())}'
     pair = beta['sexualnetwork']
     assert len(pair) == 2, f'beta pair length {len(pair)}'
-    # F→M = gpars.beta * 1.0 = 0.25; M→F = gpars.beta * 3.69 = 0.9225.
+    # F→M = gpars.beta * transf2m = 0.25 * 1.0 = 0.25;
+    # M→F = gpars.beta * transm2f = 0.25 * 2.0 = 0.5.
     assert float(pair[0]) == pytest.approx(0.25, abs=1e-9)
-    assert float(pair[1]) == pytest.approx(0.25 * 3.69, abs=1e-9)
+    assert float(pair[1]) == pytest.approx(0.25 * 2.0, abs=1e-9)
 

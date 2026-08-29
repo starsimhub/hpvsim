@@ -37,7 +37,7 @@ def test_importer_builds_hiv_epidemic():
     prev = np.asarray(hivmod.results['prevalence'])
     tv = np.asarray(sim.results.timevec, dtype=float)
     if len(tv) != len(prev):
-        tv = np.linspace(float(sim.t.start), float(sim.t.stop), len(prev))
+        tv = np.linspace(sim.t.start.years, sim.t.stop.years, len(prev))
     years = np.floor(tv).astype(int)
 
     def prev_at(year):

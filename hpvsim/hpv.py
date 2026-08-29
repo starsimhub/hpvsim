@@ -78,6 +78,31 @@ def _clone_agents(sim, src_uids, new_uids):
     return
 
 
+def _clip_beta(f2m, m2f, genotype='?'):
+    """Clip HPV per-act transmission probabilities to [0, 1].
+
+    Guards against ``gpars.beta * rel_beta * transm2f`` exceeding 1: the
+    network's per-act calc ``1 - (1 - p) ** acts`` silently produces NaN
+    for p > 1, so the sim would run to completion with garbage
+    prevalence rather than erroring. Warn on clip so unusual parameter
+    combinations that hit this cap are visible. With defaults
+    (``transm2f=2.0``, ``beta=0.25``) no clip triggers; it fires when
+    users pin transm2f higher, set ``rel_beta > 1``, or pass a very
+    high per-genotype beta.
+    """
+    if f2m > 1.0 or m2f > 1.0:
+        import warnings
+        warnings.warn(
+            f'HPV[{genotype}] beta clipped to [0, 1]: '
+            f'raw f2m={f2m:.4f}, m2f={m2f:.4f} '
+            f'-> clipped f2m={min(f2m, 1.0):.4f}, m2f={min(m2f, 1.0):.4f}. '
+            f'(transm2f amplifies m2f; verify transm2f, rel_beta, and '
+            f'top-level beta scalar are consistent with per-act probs ≤ 1.)',
+            RuntimeWarning, stacklevel=2,
+        )
+    return [min(1.0, f2m), min(1.0, m2f)]
+
+
 def _normalize_genotype(key):
     """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
     s = str(key).lower().strip()
@@ -119,10 +144,11 @@ class HPV(ss.Infection):
             # males in p2 (see hpvsim/network.py:185). validate_beta accepts
             # this dict shape natively (ss.Infection.validate_beta).
             beta={
-                'sexualnetwork': [
+                'sexualnetwork': _clip_beta(
                     gpars.beta * gpars.rel_beta * gpars.transf2m,
                     gpars.beta * gpars.rel_beta * gpars.transm2f,
-                ],
+                    genotype,
+                ),
             },
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
@@ -154,10 +180,11 @@ class HPV(ss.Infection):
         _beta_overridden = ('beta' in kwargs) or (pars is not None and 'beta' in pars)
         if not _beta_overridden:
             self.pars.beta = {
-                'sexualnetwork': [
+                'sexualnetwork': _clip_beta(
                     gpars.beta * self.pars.rel_beta * gpars.transf2m,
                     gpars.beta * self.pars.rel_beta * gpars.transm2f,
-                ],
+                    genotype,
+                ),
             }
 
         # Guard against unit-less duration distributions: a duration given
@@ -234,17 +261,19 @@ class HPV(ss.Infection):
         # regardless of how many fine agents are grown). They are drawn by size
         # (non-CRN); cross-scenario CRN is out of scope for multiscale.
         #
-        # The live dists' mean/std are ss.years TimePars. float() strips the
+        # The live dists' mean/std are ss.years TimePars. .years strips the
         # TimePar so these dists stay UNITLESS and .rvs() returns plain YEARS —
         # which is what compute_severity and the grow math expect. Without the
         # cast, starsim's convert_timepars would divide by dt at init (a TimePar
         # duration becomes a number of TIMESTEPS), so .rvs() would be 1/dt too
         # large (4x at dt=0.25) and _grow_fine_agents does NOT re-multiply by
         # dt_yr on this path (unlike the live dur_cin path in set_prognoses).
+        def _yr(v):
+            return v.years if hasattr(v, 'years') else v
         pc = self.pars.dur_precin.pars
         cn = self.pars.dur_cin.pars
-        self._extra_dur_precin = ss.lognorm_ex(mean=float(pc['mean']), std=float(pc['std']))
-        self._extra_dur_cin = ss.lognorm_ex(mean=float(cn['mean']), std=float(cn['std']))
+        self._extra_dur_precin = ss.lognorm_ex(mean=_yr(pc['mean']), std=_yr(pc['std']))
+        self._extra_dur_cin = ss.lognorm_ex(mean=_yr(cn['mean']), std=_yr(cn['std']))
         self._extra_cin_unif = ss.random()
         self._extra_cancer_unif = ss.random()
         return
@@ -504,7 +533,7 @@ class HPV(ss.Infection):
 
         # 2. P(CIN) per female. Distributions return durations in starsim
         #    timesteps; convert to years before passing (cin_fn's ttc=50 is years).
-        dt_yr = float(self.t.dt)
+        dt_yr = self.t.dt_year
         p_cin = compute_severity(dur_precin * dt_yr,
                                    rel_sev=rel_sev_uids, pars=p.cin_fn)
         self._cin_bern.set(p=p_cin)
@@ -837,7 +866,7 @@ class HPV(ss.Infection):
             # here gives the age at step start (initial + T*dt); adding dt_yr
             # records the age the agent has after this step's increment
             # (initial + (T+1)*dt), the intended age at cancer death.
-            dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
+            dt_yr = self.t.dt_year
             ppl = self.sim.people
             ages_at_death = ppl.age[to_dead] + dt_yr
             w = ppl.scale[to_dead]
