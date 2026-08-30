@@ -16,7 +16,7 @@ and both must be scaled by the same hiv_rel_imm factor.
 """
 import numpy as np
 import hpvsim as hpv
-from hpvsim.hiv import hpv_hiv_connector, _HIV_EFFECTS
+from hpvsim.hiv import hpv_hiv_connector
 
 
 def _build(seed, make_positive):
@@ -55,6 +55,6 @@ def test_clearance_immunity_scaled_by_hiv_rel_imm():
     nab_pos, cell_pos = _build(seed=1, make_positive=True)
     assert nab_neg > 0   # seroconversion fired (sero_prob=1.0)
     assert cell_neg > 0  # cell_imm always set for first-clearance females
-    factor = _HIV_EFFECTS['rel_imm']['lt200']  # == 0.36 (lt200 immunity multiplier)
+    factor = hpv_hiv_connector().pars.rel_imm_lo  # == 0.36 (lo-stratum immunity multiplier)
     assert np.isclose(nab_pos, nab_neg * factor, rtol=1e-6)
     assert np.isclose(cell_pos, cell_neg * factor, rtol=1e-6)

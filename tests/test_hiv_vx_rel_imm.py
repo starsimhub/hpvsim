@@ -8,7 +8,7 @@ connector (covered by the no-HIV vaccine guards, which run without HIV).
 import numpy as np
 import starsim as ss
 import hpvsim as hpv
-from hpvsim.hiv import hpv_hiv_connector, _HIV_EFFECTS
+from hpvsim.hiv import hpv_hiv_connector
 from hpvsim.products import vx as hpv_vx, txvx as hpv_txvx
 
 
@@ -39,7 +39,7 @@ def _coinfection_sim(product=None):
 def test_connector_rel_imm_factors():
     """Sanity: the connector sets the expected per-agent rel_imm factors."""
     sim, conn, uid_pos, uid_neg, _ = _coinfection_sim()
-    assert np.isclose(conn.hiv_rel_imm[uid_pos], _HIV_EFFECTS['rel_imm']['lt200'])  # 0.36
+    assert np.isclose(conn.hiv_rel_imm[uid_pos], hpv_hiv_connector().pars.rel_imm_lo)  # 0.36
     assert np.isclose(conn.hiv_rel_imm[uid_neg], 1.0)
 
 

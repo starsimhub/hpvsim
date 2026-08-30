@@ -1,6 +1,6 @@
 """Incidence-driven HIV importer tests.
 
-The ``hpv.hiv_incidence_import`` intervention drives STIsim's HIV by imposing
+The ``hpv.hiv_incidence`` intervention drives STIsim's HIV by imposing
 the Rwanda HIV incidence curve: each step it selects HIV-negative susceptibles
 per the (year, sex, age) incidence rate and calls ``hiv.set_prognoses`` on them
 (which flips them to infected AND wires the full CD4 trajectory). With HIV
@@ -24,7 +24,7 @@ def _build_sim(seed=0, n_agents=3000, start=1985, stop=2010, dt=0.25):
         stop=stop,
         dt=dt,
         diseases=[hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)],
-        interventions=[hpv.hiv_incidence_import.from_location('rwanda')],
+        interventions=[hpv.hiv_incidence.from_location('rwanda')],
     )
 
 

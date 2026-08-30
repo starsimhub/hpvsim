@@ -133,17 +133,11 @@ def test_reactivations_are_not_double_counted_as_new_infections():
 def test_hiv_shortens_time_to_reactivation():
     """HIV+ agents (rel_reactivation forced high) reactivate faster than HIV-."""
     from hpvsim.hiv import hpv_hiv_connector
-    effects = dict(
-        rel_sus={'lt200': 2.2, 'gt200': 2.2},
-        rel_sev={'lt200': 1.5, 'gt200': 1.2},
-        rel_imm={'lt200': 0.36, 'gt200': 0.76},
-        rel_reactivation={'lt200': 20.0, 'gt200': 20.0},
-    )
     sim = hpv.Sim(n_agents=1000, location='nigeria', genotypes=[16],
                   start=1975, stop=2000, dt=0.5, rand_seed=0,
                   pars=dict(hpv_control_prob=1.0, hpv_reactivation=ss.probperyear(0.1)),
                   diseases=[hpv.HIV(beta_m2f=0.02, rel_beta_f2m=1.0)],
-                  connectors=[hpv_hiv_connector(effects=effects)])
+                  connectors=[hpv_hiv_connector(rel_reactivation_lo=20.0, rel_reactivation_hi=20.0)])
     sim.run()
     hpvmod = sim.diseases.hpv16
     hivmod = sim.diseases.hiv

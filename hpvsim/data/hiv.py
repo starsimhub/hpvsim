@@ -10,7 +10,7 @@ used to build a co-infection sim:
 - ``incidence``: tidy long DataFrame ``[age, sex, year, incidence]`` — the
   per-year HIV acquisition rate among susceptibles by single-year age, sex
   ('f'/'m'), and calendar year. Consumed by the incidence-driven HIV importer
-  (``hpv.hiv_incidence_import``).
+  (``hpv.hiv_incidence``).
 
 Data layout: ``hpvsim/data/hiv/<location>/`` holds four location-agnostic
 filenames — ``hiv_incidence.csv``, ``art_coverage_by_age_females.csv``,

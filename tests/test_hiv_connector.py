@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 import hpvsim as hpv
-from hpvsim.hiv import hpv_hiv_connector, HIVStratifiedResults, _HIV_EFFECTS
+from hpvsim.hiv import hpv_hiv_connector, HIVStratifiedResults
+
+_DEFAULTS = hpv_hiv_connector().pars
 
 
 def test_cd4_stratum_boundaries():
@@ -29,15 +31,15 @@ def test_rel_sus_scaled_for_hiv_positive():
     hpvmod.rel_sus[sim.people.auids] = 1.0
 
     conn.step()
-    assert np.isclose(hpvmod.rel_sus[uid], _HIV_EFFECTS['rel_sus']['lt200'])
+    assert np.isclose(hpvmod.rel_sus[uid], _DEFAULTS.rel_sus_lo)
     other = sim.people.auids[1]
     assert np.isclose(hpvmod.rel_sus[other], 1.0)  # HIV- unchanged
 
     # The stored connector states (consumed by Tasks 4-6) are populated too.
-    assert np.isclose(conn.hiv_rel_sus[uid], _HIV_EFFECTS['rel_sus']['lt200'])
-    assert np.isclose(conn.hiv_rel_sev[uid], _HIV_EFFECTS['rel_sev']['lt200'])
-    assert np.isclose(conn.hiv_rel_imm[uid], _HIV_EFFECTS['rel_imm']['lt200'])
-    assert np.isclose(conn.hiv_rel_reactivation[uid], _HIV_EFFECTS['rel_reactivation']['lt200'])
+    assert np.isclose(conn.hiv_rel_sus[uid], _DEFAULTS.rel_sus_lo)
+    assert np.isclose(conn.hiv_rel_sev[uid], _DEFAULTS.rel_sev_lo)
+    assert np.isclose(conn.hiv_rel_imm[uid], _DEFAULTS.rel_imm_lo)
+    assert np.isclose(conn.hiv_rel_reactivation[uid], _DEFAULTS.rel_reactivation_lo)
     # Absolute-value anchor (documents the expected lt200 acquisition factor).
     assert np.isclose(hpvmod.rel_sus[uid], 2.2)
     # HIV- agent's stored factors stay neutral.
@@ -60,8 +62,8 @@ def test_rel_sus_gt200_stratum():
     hivmod.cd4[uid] = 350.0  # gt200
     hpvmod.rel_sus[sim.people.auids] = 1.0
     conn.step()
-    assert np.isclose(hpvmod.rel_sus[uid], _HIV_EFFECTS['rel_sus']['gt200'])
-    assert np.isclose(conn.hiv_rel_sev[uid], _HIV_EFFECTS['rel_sev']['gt200'])
+    assert np.isclose(hpvmod.rel_sus[uid], _DEFAULTS.rel_sus_hi)
+    assert np.isclose(conn.hiv_rel_sev[uid], _DEFAULTS.rel_sev_hi)
 
 
 def test_cd4_above_500_gets_no_effect():
@@ -86,20 +88,19 @@ def test_cd4_above_500_gets_no_effect():
     assert np.isclose(conn.hiv_rel_imm[uid], 1.0)      # no immunity reduction
 
 
-# --- Configurable effects (location calibration override) -------------------
+# --- Configurable pars (location calibration override) ----------------------
 
-_RWANDA_EFFECTS = {
-    'rel_sus': {'lt200': 4.75, 'gt200': 2.75},
-    'rel_sev': {'lt200': 2.5, 'gt200': 3.5},
-    'rel_imm': {'lt200': 0.36, 'gt200': 0.76},
-    'rel_reactivation': {'lt200': 1.0, 'gt200': 1.0},
-}
+_RWANDA_PARS = dict(
+    rel_sus_lo=4.75, rel_sus_hi=2.75,
+    rel_sev_lo=2.5,  rel_sev_hi=3.5,
+    rel_imm_lo=0.36, rel_imm_hi=0.76,
+)
 
 
 def test_effects_override_applied():
-    """A connector built with custom effects= uses those multipliers, not defaults."""
+    """A connector built with custom pars uses those multipliers, not defaults."""
     h = hpv.HIV(beta_m2f=0.0)
-    conn = hpv_hiv_connector(effects=_RWANDA_EFFECTS)
+    conn = hpv_hiv_connector(pars=_RWANDA_PARS)
     sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25,
                   location='nigeria', genotypes=[16], diseases=[h],
                   connectors=[conn])
@@ -112,17 +113,25 @@ def test_effects_override_applied():
     conn = conns[0]
     uid = sim.people.auids[0]
     hivmod.infected[uid] = True
-    hivmod.cd4[uid] = 100.0  # lt200
+    hivmod.cd4[uid] = 100.0  # lo stratum
     hpvmod.rel_sus[sim.people.auids] = 1.0
     conn.step()
-    assert np.isclose(hpvmod.rel_sus[uid], 4.75)          # Rwanda lt200 rel_sus
-    assert np.isclose(conn.hiv_rel_sev[uid], 2.5)         # Rwanda lt200 rel_sev
+    assert np.isclose(hpvmod.rel_sus[uid], 4.75)          # Rwanda lo rel_sus
+    assert np.isclose(conn.hiv_rel_sev[uid], 2.5)         # Rwanda lo rel_sev
     assert np.isclose(conn.hiv_rel_imm[uid], 0.36)
+    # A partial override (only rel_sus/rel_sev/rel_imm given) leaves
+    # rel_reactivation and cd4_threshold at their class defaults -- unlike the
+    # old effects= dict, individual pars don't need to be restated.
+    assert np.isclose(conn.pars.rel_reactivation_lo, _DEFAULTS.rel_reactivation_lo)
+    assert np.isclose(conn.pars.cd4_threshold, _DEFAULTS.cd4_threshold)
 
 
-def test_effects_override_validates_shape():
-    with pytest.raises(ValueError, match='rel_sus'):
-        hpv_hiv_connector(effects={'rel_sus': {'lt200': 2.0}})  # missing keys
+def test_unrecognized_par_raises():
+    """An unrecognized par name raises (update_pars's built-in guard),
+    same as any other hpvsim module -- there is no more effects= dict to
+    validate the shape of."""
+    with pytest.raises(ValueError, match='bogus_par'):
+        hpv_hiv_connector(bogus_par=2.0)
 
 
 def test_user_supplied_analyzer_not_duplicated():

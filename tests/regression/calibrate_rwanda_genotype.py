@@ -101,9 +101,9 @@ def build_sim(seed, n_agents, start, stop, p):
         {'hpv18': p['tp_rel_18'], 'hi5': p['tp_rel_hi5'], 'ohr': p['tp_rel_ohr']},
         {'hpv18': p['rb_18'], 'hi5': p['rb_hi5'], 'ohr': p['rb_ohr']})
     connectors = [CrossImmunity(rel_sev_loc=rc.REL_SEV_LOC),
-                  hpv_hiv_connector(effects=effects)]
+                  hpv_hiv_connector(pars=rc.effects_to_connector_pars(effects))]
     hiv = hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)
-    interventions = [hpv.hiv_incidence_import.from_location('rwanda'),
+    interventions = [hpv.hiv_incidence.from_location('rwanda'),
                      hpv.hiv_art.from_location('rwanda')]
     return hpv.Sim(location='rwanda', rand_seed=seed, n_agents=n_agents,
                    start=start, stop=stop, dt=_DT, genotypes=rc.GENOTYPES,

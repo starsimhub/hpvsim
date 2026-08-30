@@ -35,7 +35,7 @@ directional scalars (``transf2m=1.0``, ``transm2f=3.69``) and base ``beta=0.25``
 also match v2's defaults.  So the genotype port is: set base ``beta=0.12`` and
 fix the two ``cin_fn.k`` (and the duplicate ``cancer_fn.k``).  The HIV effect
 strengths differ from the generic connector defaults and are supplied via
-``hpv_hiv_connector(effects=RWANDA_HIV_EFFECTS)``; the severity-scaler location
+``hpv_hiv_connector(pars=effects_to_connector_pars(RWANDA_HIV_EFFECTS))``; the severity-scaler location
 via ``CrossImmunity(rel_sev_loc=0.87)``.
 """
 
@@ -102,6 +102,17 @@ RWANDA_HIV_EFFECTS = {
     'rel_sev': {'lt200': 5.23, 'gt200': 1.98},
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76},
 }
+
+
+def effects_to_connector_pars(effects):
+    """Convert the {effect: {'lt200':.., 'gt200':..}} shape above into the
+    flat {effect}_lo / {effect}_hi kwargs hpv_hiv_connector's define_pars-based
+    __init__ takes (v3.2 dropped the old effects= dict constructor arg)."""
+    out = {}
+    for eff, strata in effects.items():
+        out[f'{eff}_lo'] = strata['lt200']
+        out[f'{eff}_hi'] = strata['gt200']
+    return out
 
 # Initial genotype mix among seeded infections (run_sim.make_sim init_hpv_dist).
 RWANDA_INIT_HPV_DIST = dict(hpv16=0.4, hpv18=0.25, hi5=0.25, ohr=0.1)
@@ -220,7 +231,7 @@ def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,
 
     Args:
         incidence_driven: if True (default, v2-faithful), HIV transmission is
-            off and the epidemic is imposed by ``hpv.hiv_incidence_import``;
+            off and the epidemic is imposed by ``hpv.hiv_incidence``;
             otherwise HIV transmits at ``beta_m2f`` over the sexual network.
         ms_agent_ratio: grow-multiscale ratio. Defaults to 5 -- the ratio the
             HIV rel_sus/rel_sev effects were re-fit at, where fine agents
@@ -230,12 +241,12 @@ def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,
     """
     connectors = [
         CrossImmunity(rel_sev_loc=REL_SEV_LOC),
-        hpv_hiv_connector(effects=RWANDA_HIV_EFFECTS),
+        hpv_hiv_connector(pars=effects_to_connector_pars(RWANDA_HIV_EFFECTS)),
     ]
     if incidence_driven:
         hiv = hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)
         interventions = [
-            hpv.hiv_incidence_import.from_location('rwanda'),
+            hpv.hiv_incidence.from_location('rwanda'),
             hpv.hiv_art.from_location('rwanda'),
         ]
     else:

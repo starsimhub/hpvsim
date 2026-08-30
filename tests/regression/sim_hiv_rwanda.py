@@ -35,7 +35,7 @@ def build_rwanda_sim_incidence(seed=0, n_agents=5000, start=1985, stop=2020, dt=
 
     HIV transmission is OFF (``beta_m2f=0``) and there is no seeding
     (``init_prev_data=0``); the epidemic is built entirely by imposing the
-    Rwanda HIV incidence curve via ``hpv.hiv_incidence_import``, so the
+    Rwanda HIV incidence curve via ``hpv.hiv_incidence``, so the
     prevalence trajectory tracks the target by construction. The coverage-based
     ``hpv.hiv_art`` shortcut still supplies ART/CD4 reconstitution.
     """
@@ -49,7 +49,7 @@ def build_rwanda_sim_incidence(seed=0, n_agents=5000, start=1985, stop=2020, dt=
         dt=dt,
         diseases=[hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)],
         interventions=[
-            hpv.hiv_incidence_import.from_location('rwanda'),
+            hpv.hiv_incidence.from_location('rwanda'),
             hpv.hiv_art.from_location('rwanda'),
         ],
     )

@@ -17,29 +17,18 @@ from . import misc
 from .hpv import HPV
 from .network import SexualNetwork
 
-__all__ = ['HIV', 'hiv_incidence_import', 'hiv_art', 'hpv_hiv_connector',
+__all__ = ['HIV', 'hiv_incidence', 'hiv_art', 'hpv_hiv_connector',
            'HIVStratifiedResults']
 
 
-# CD4-stratified HIV→HPV effect multipliers. The CD4 strata are 'lt200' =
-# [0, 200) and 'gt200' = [200, 500); agents with CD4 >= 500 fall in NEITHER
-# stratum and so receive NO HIV→HPV effect (factor 1.0, biological). This is
-# load-bearing: HIV+ agents start at CD4~594 and ART reconstitutes CD4 above
-# 500, so most HIV+ person-time is CD4 >= 500 — applying gt200 there (as an
-# earlier draft did) over-amplifies HIV+ cancer ~10x.
-#
-# These are the generic class defaults. A *location calibration* may
-# override them with its own per-stratum values (same
-# ``{effect: {'lt200':.., 'gt200':..}}`` shape) by passing them via
-# ``hpv_hiv_connector(effects=...)``.
-_HIV_EFFECTS = {
-    'rel_sus': {'lt200': 2.2, 'gt200': 2.2},   # increased HPV acquisition
-    'rel_sev': {'lt200': 1.5, 'gt200': 1.2},   # faster/worse CIN->cancer progression
-    'rel_imm': {'lt200': 0.36, 'gt200': 0.76}, # reduced post-infection/vaccine immunity
-    'rel_reactivation': {'lt200': 1.0, 'gt200': 1.0}, # latent reactivation hazard multiplier (neutral default; no prior calibrated value exists for this new effect)
-}
-_CD4_THRESHOLD = 200.0   # lt200 / gt200 boundary
-_CD4_UPPER = 500.0       # CD4 >= this -> no HIV→HPV effect (gt200 ceiling)
+# CD4 strata for the HIV->HPV effects below: 'lo' = [0, cd4_threshold),
+# 'hi' = [cd4_threshold, cd4_upper); agents with CD4 >= cd4_upper fall in
+# NEITHER stratum and so receive NO HIV->HPV effect (factor 1.0, biological).
+# This is load-bearing: HIV+ agents start at CD4~594 and ART reconstitutes
+# CD4 above 500, so most HIV+ person-time is CD4 >= cd4_upper -- applying the
+# hi-stratum value there (as an earlier draft did) over-amplifies HIV+ cancer
+# ~10x. Both boundaries are ``hpv_hiv_connector`` pars (``cd4_threshold``,
+# ``cd4_upper``), not module constants -- see its define_pars.
 
 
 class HIV(sti.HIV):
@@ -51,19 +40,22 @@ class HIV(sti.HIV):
     STIsim's ``structuredsexual``), and (2) a per-location init-prevalence seed
     (via ``from_location``).
 
-    Note: ``beta_m2f`` / ``rel_beta_f2m`` are taken as constructor arguments and
-    applied directly to ``pars.beta`` in ``init_pre``. STIsim's same-named
-    ``pars.beta_m2f`` / ``pars.rel_beta_f2m`` are NOT used here — its
-    ``validate_beta`` only applies them to a network named ``'structuredsexual'``,
-    which hpvsim does not use. Set the transmission rate via the constructor args,
-    not via ``pars``.
+    Note: ``beta_m2f`` / ``rel_beta_f2m`` reuse STIsim's own same-named pars
+    (``HIVPars``), just with hpvsim-appropriate defaults. STIsim's own
+    ``validate_beta``/``init_pre`` usage of them only applies to a network
+    named ``'structuredsexual'``, which hpvsim does not use, so they are
+    otherwise inert there -- ``init_pre`` below reads them directly to build
+    the per-network beta dict on ``hpv.SexualNetwork``. Being real pars (not
+    private constructor attributes) makes them reachable via ``route_pars``.
     """
 
-    def __init__(self, beta_m2f=0.0035, rel_beta_f2m=0.5, init_prev_data=None,
-                 pars=None, **kwargs):
-        super().__init__(pars=pars, init_prev_data=init_prev_data, **kwargs)
-        self._beta_m2f = beta_m2f
-        self._rel_beta_f2m = rel_beta_f2m
+    def __init__(self, init_prev_data=None, pars=None, **kwargs):
+        super().__init__(init_prev_data=init_prev_data)
+        self.define_pars(
+            beta_m2f=0.0035,
+            rel_beta_f2m=0.5,
+        )
+        self.update_pars(pars, **kwargs)
 
     @classmethod
     def from_location(cls, location, beta_m2f=0.0035, **kwargs):
@@ -104,11 +96,11 @@ class HIV(sti.HIV):
             return
         beta = {}
         for net in nets:
-            beta[net.name] = [self._beta_m2f * self._rel_beta_f2m, self._beta_m2f]
+            beta[net.name] = [self.pars.beta_m2f * self.pars.rel_beta_f2m, self.pars.beta_m2f]
         self.pars.beta = beta
 
 
-class hiv_incidence_import(ss.Intervention):
+class hiv_incidence(ss.Intervention):
     """Incidence-driven HIV importer.
 
     Imposes a per-(year, sex, age) HIV incidence curve directly onto STIsim's
@@ -123,7 +115,7 @@ class hiv_incidence_import(ss.Intervention):
 
     The incidence DataFrame has columns ``[age, sex, year, incidence]`` (sex
     'f'/'m'; ``incidence`` = the per-year HIV acquisition rate among
-    susceptibles). Use ``hiv_incidence_import.from_location(location)`` for a
+    susceptibles). Use ``hiv_incidence.from_location(location)`` for a
     bundled curve, or pass a frame of that shape via ``incidence``.
 
     Pass explicitly via ``interventions=[...]``; it is NOT auto-wired. If no HIV
@@ -141,7 +133,7 @@ class hiv_incidence_import(ss.Intervention):
         super().__init__(**kwargs)
         if incidence is None:
             raise ValueError(
-                'hiv_incidence_import requires an incidence DataFrame '
+                'hiv_incidence requires an incidence DataFrame '
                 '[age, sex, year, incidence]; use from_location() or pass incidence=.'
             )
         self.incidence = incidence
@@ -163,7 +155,7 @@ class hiv_incidence_import(ss.Intervention):
         Args:
             location (str): country name with bundled HIV data (see
                 ``hpv.data.load_hiv``; currently ``'rwanda'``).
-            **kwargs: forwarded to ``hiv_incidence_import.__init__``.
+            **kwargs: forwarded to ``hiv_incidence.__init__``.
         """
         from . import data as _data
         inc = _data.load_hiv(location)['incidence']
@@ -173,7 +165,7 @@ class hiv_incidence_import(ss.Intervention):
         super().init_pre(sim)
         if 'hiv' not in sim.diseases:
             raise ValueError(
-                'hiv_incidence_import requires an HIV disease in the sim '
+                'hiv_incidence requires an HIV disease in the sim '
                 "(sim.diseases.hiv); none found."
             )
         # Precompute a fast lookup cube indexed by [sex, year, age].
@@ -328,32 +320,36 @@ class hpv_hiv_connector(ss.Connector):
     """Apply CD4-stratified HIV→HPV effects to every HPV module.
 
     Each step: bin HIV+ agents' CD4 into discrete strata, compute per-agent
-    factor arrays (hiv_rel_sus / hiv_rel_sev / hiv_rel_imm; 1.0 for HIV-),
-    and multiply each HPV module's rel_sus by hiv_rel_sus. The rel_sev and
-    rel_imm factors are *read* by HPV.set_prognoses, HPV.step_state, and the
-    vaccine products (see those sites) — applied where they compose correctly
-    with CrossImmunity, which overwrites rel_sus each step before this runs.
-    Must be registered AFTER CrossImmunity in the connectors list.
+    factor arrays (hiv_rel_sus / hiv_rel_sev / hiv_rel_imm / hiv_rel_reactivation;
+    1.0 for HIV-), and multiply each HPV module's rel_sus by hiv_rel_sus. The
+    rel_sev / rel_imm / rel_reactivation factors are *read* by
+    HPV.set_prognoses, HPV.step_state, and the vaccine products (see those
+    sites) — applied where they compose correctly with CrossImmunity, which
+    overwrites rel_sus each step before this runs. Must be registered AFTER
+    CrossImmunity in the connectors list.
+
+    Effect pars are ``{effect}_lo`` / ``{effect}_hi`` for
+    ``effect in ('rel_sus', 'rel_sev', 'rel_imm', 'rel_reactivation')``: 'lo'
+    applies to CD4 in ``[0, cd4_threshold)``, 'hi' to
+    ``[cd4_threshold, cd4_upper)``. CD4 >= ``cd4_upper`` gets no effect
+    (factor 1.0) -- see the module comment above. Being real pars (not a
+    nested ``effects=`` dict), each can be overridden independently -- e.g. a
+    location calibration passes only ``rel_sev_lo=..., rel_sev_gt200=...``
+    without needing to restate every other effect's defaults -- and all are
+    reachable via ``route_pars``.
     """
 
-    def __init__(self, effects=None, **kwargs):
-        super().__init__(**kwargs)
-        # CD4-stratified effect multipliers; defaults to the generic
-        # values (_HIV_EFFECTS). A location calibration passes its own dict
-        # (same {effect: {'lt200':.., 'gt200':..}} shape) — e.g. a location's
-        # rel_sus/rel_sev overrides. Validated for the required keys here so a
-        # malformed override fails at construction, not mid-run.
-        if effects is None:
-            effects = _HIV_EFFECTS
-        else:
-            for eff in ('rel_sus', 'rel_sev', 'rel_imm', 'rel_reactivation'):
-                if eff not in effects or not {'lt200', 'gt200'} <= set(effects[eff]):
-                    raise ValueError(
-                        "hpv_hiv_connector effects must provide 'rel_sus', "
-                        "'rel_sev', 'rel_imm', 'rel_reactivation', each with "
-                        f"'lt200' and 'gt200' keys; got {effects!r}"
-                    )
-        self.effects = effects
+    def __init__(self, pars=None, **kwargs):
+        super().__init__()
+        self.define_pars(
+            rel_sus_lo=2.2,   rel_sus_hi=2.2,    # increased HPV acquisition
+            rel_sev_lo=1.5,   rel_sev_hi=1.2,    # faster/worse CIN->cancer progression
+            rel_imm_lo=0.36,  rel_imm_hi=0.76,   # reduced post-infection/vaccine immunity
+            rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier (neutral default; no prior calibrated value exists for this new effect)
+            cd4_threshold=200.0,  # lo/hi stratum boundary
+            cd4_upper=500.0,      # CD4 >= this -> no effect at all (see module comment)
+        )
+        self.update_pars(pars, **kwargs)
         self.hpv_modules = None
         self.hiv_module = None
         self.define_states(
@@ -385,20 +381,20 @@ class hpv_hiv_connector(ss.Connector):
                       'CrossImmunity.')
 
     def _cd4_stratum(self, cd4):
-        """Return 0 for lt200 (CD4<200), 1 for gt200 (CD4>=200).
+        """True for the hi stratum (CD4 >= cd4_threshold), False for lo.
 
-        This is the lt200/gt200 split only; the CD4>=500 'no effect' band is
+        This is the lo/hi split only; the CD4 >= cd4_upper 'no effect' band is
         applied separately in ``step`` (such agents are excluded from the
-        effect mask), matching the strata [0,200) and [200,500).
+        effect mask), matching the strata [0,cd4_threshold) and [cd4_threshold,cd4_upper).
         """
-        return (np.asarray(cd4) >= _CD4_THRESHOLD).astype(int)
+        return cd4 >= self.pars.cd4_threshold
 
-    def _factor_array(self, effect, hiv_pos, strata, n):
+    def _factor_array(self, effect, hiv_pos, is_hi, n):
         """Build a per-agent factor array (1.0 for HIV-, stratum value for HIV+)."""
         out = np.ones(n, dtype=float)
-        lt200 = self.effects[effect]['lt200']
-        gt200 = self.effects[effect]['gt200']
-        vals = np.where(strata == 0, lt200, gt200)
+        lo = self.pars[f'{effect}_lo']
+        hi = self.pars[f'{effect}_hi']
+        vals = np.where(is_hi, hi, lo)
         out[hiv_pos] = vals[hiv_pos]
         return out
 
@@ -411,17 +407,17 @@ class hpv_hiv_connector(ss.Connector):
         # HIV- agents have NaN cd4 (never initialized); an HIV+ agent whose cd4
         # is still NaN (pre-init edge case) is treated as neutral (factor 1.0)
         # rather than silently binned into a stratum.
-        # Effects apply only to HIV+ agents with an initialized CD4 in [0, 500).
-        # CD4 >= 500 (newly infected at ~594, or ART-reconstituted) falls outside
-        # the gt200=[200,500) band and gets NO effect (factor 1.0).
-        infected = np.asarray(self.hiv_module.infected[auids], dtype=bool)
-        hiv_pos = infected & ~np.isnan(cd4) & (cd4 < _CD4_UPPER)
-        strata = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
+        # Effects apply only to HIV+ agents with an initialized CD4 in
+        # [0, cd4_upper). CD4 >= cd4_upper (newly infected at ~594, or
+        # ART-reconstituted) falls outside the hi band and gets NO effect (factor 1.0).
+        infected = self.hiv_module.infected[auids]
+        hiv_pos = infected & ~np.isnan(cd4) & (cd4 < self.pars.cd4_upper)
+        is_hi = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
         n = len(auids)
-        rel_sus = self._factor_array('rel_sus', hiv_pos, strata, n)
-        rel_sev = self._factor_array('rel_sev', hiv_pos, strata, n)
-        rel_imm = self._factor_array('rel_imm', hiv_pos, strata, n)
-        rel_reactivation = self._factor_array('rel_reactivation', hiv_pos, strata, n)
+        rel_sus = self._factor_array('rel_sus', hiv_pos, is_hi, n)
+        rel_sev = self._factor_array('rel_sev', hiv_pos, is_hi, n)
+        rel_imm = self._factor_array('rel_imm', hiv_pos, is_hi, n)
+        rel_reactivation = self._factor_array('rel_reactivation', hiv_pos, is_hi, n)
         self.hiv_rel_sus[auids] = rel_sus
         self.hiv_rel_sev[auids] = rel_sev
         self.hiv_rel_imm[auids] = rel_imm
