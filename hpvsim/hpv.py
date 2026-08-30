@@ -984,3 +984,5 @@ class HPV(ss.Infection):
         self.cancerous[uids] = False
         self.infected[uids] = False
         self.susceptible[uids] = False
+        self.latent[uids] = False
+        self.to_latent[uids] = False
