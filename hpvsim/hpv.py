@@ -166,6 +166,12 @@ class HPV(ss.Infection):
             # 1 = single scale (bit-identical no-op). >1 grows real fine cancer
             # agents at scale 1/ms_agent_ratio.
             ms_agent_ratio=1,
+            # Latency: probability a clearing female enters dormancy instead of
+            # clearing (default 0.0 = off unless calibrated on, matching v2.2.6).
+            hpv_control_prob=0.0,
+            # Per-timestep reactivation hazard for latent agents (default matches
+            # v2.2.6's placeholder value; only takes effect when hpv_control_prob>0).
+            hpv_reactivation=ss.probperyear(0.025),
         )
         self.update_pars(pars=pars, **kwargs)
         self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
@@ -202,10 +208,15 @@ class HPV(ss.Infection):
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
-            # No-op state hook to support products_dx.csv's `latent` rows. Real
-            # reactivation natural history (set_prognoses branch + step_state
-            # reactivation) is a post-M06 follow-on; for now nothing populates this.
+            # Populated by set_prognoses (entry roll) and step_state (per-timestep
+            # reactivation hazard) -- see hpv_control_prob/hpv_reactivation above.
             ss.BoolState('latent', label='Latent infection'),
+            # True from the moment a female's clearance is redirected into latency
+            # (in set_prognoses) until step_state processes the transition and
+            # stamps ti_latent, at which point it is cleared back to False.
+            ss.BoolState('to_latent', label='Pending transition into latency'),
+            ss.FloatArr('ti_latent', label='Time latency began'),
+            ss.FloatArr('ti_reactivation', label='Time of reactivation from latency'),
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
@@ -252,6 +263,11 @@ class HPV(ss.Infection):
         self._round_clear_cin_bern = ss.bernoulli(p=0.5)
         self._round_cancer_bern = ss.bernoulli(p=0.5)
         self._round_dead_bern = ss.bernoulli(p=0.5)
+        # Latency: entry roll (set_prognoses) and per-timestep reactivation
+        # hazard (step_state) each get their own persistent stream, matching
+        # every other probability decision in this module.
+        self._latent_bern = ss.bernoulli(p=0.5)
+        self._reactivation_bern = ss.bernoulli(p=0.5)
         # Multiscale grow: dedicated dists for the extra fine-agent trajectories
         # (_grow_fine_agents). These are SEPARATE RNG streams from the live
         # natural-history dists (dur_precin/dur_cin above), so growing fine
@@ -390,6 +406,8 @@ class HPV(ss.Infection):
                       label='Sum of ages at cancer onset'),
             ss.Result('sum_age_at_cancer_death', dtype=float, scale=True,
                       label='Sum of ages at cancer death'),
+            ss.Result('new_reactivations', dtype=float, scale=True,
+                      label='New reactivations from latency'),
         )
         return
 
