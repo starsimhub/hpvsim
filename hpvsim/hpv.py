@@ -488,6 +488,24 @@ class HPV(ss.Infection):
         bumps = dist.rvs(uids)
         return (floor + bumps).astype(int)
 
+    def _roll_latency(self, female_uids):
+        """Roll hpv_control_prob for female agents about to clear.
+
+        Called from both clearance-scheduling branches in set_prognoses (precin-
+        only clearance, and post-CIN clearance) so the roll applies to any
+        clearance event, matching v2.2.6 semantics. Agents who hit are flagged
+        to_latent=True; step_state redirects their scheduled clearance into
+        latency instead of susceptibility. No-op when hpv_control_prob==0 (the
+        default), keeping the feature a true no-op unless calibrated on.
+        """
+        if len(female_uids) == 0 or self.pars.hpv_control_prob == 0:
+            return
+        p = np.full(len(female_uids), self.pars.hpv_control_prob)
+        self._latent_bern.set(p=p)
+        latent_uids = self._latent_bern.filter(female_uids)
+        if len(latent_uids):
+            self.to_latent[latent_uids] = True
+
     def set_prognoses(self, uids, sources=None):
         """Sample full natural-history trajectory for newly-infected agents.
 
@@ -522,6 +540,7 @@ class HPV(ss.Infection):
         self.ti_cin[uids] = np.nan
         self.ti_cancerous[uids] = np.nan
         self.ti_dead_cancer[uids] = np.nan
+        self.to_latent[uids] = False
 
         female_all = self.sim.people.female[uids]
         # rel_sev is shared across HPV modules via the CrossImmunity connector;
@@ -583,6 +602,7 @@ class HPV(ss.Infection):
                 nocin_dur[~nocin_female]
             ).astype(int)
         self.ti_clearance[nocin_uids] = ti + rounded_dur
+        self._roll_latency(nocin_uids[nocin_female])
 
         if len(cin_uids) == 0:
             return
@@ -616,6 +636,7 @@ class HPV(ss.Infection):
                 dur_cin[~cancer_draw], nocancer_uids, self._round_clear_cin_bern,
             )
         )
+        self._roll_latency(nocancer_uids)  # already all-female (CIN branch is female-only)
 
         # 5b. Progression to cancer. Guard is local to the base scheduling only;
         # the grow in step 6 must still run over all cin_uids even when no base
@@ -798,9 +819,22 @@ class HPV(ss.Infection):
         cleared = (self.infected & (self.ti_clearance <= ti)).uids
         if len(cleared):
             self.infected[cleared] = False
-            self.susceptible[cleared] = True
             self.precin[cleared] = False
             self.cin[cleared] = False
+
+            # Split off agents redirected into latency by _roll_latency: they
+            # leave precin/cin/infected like any clearance, but do NOT become
+            # susceptible and do NOT get clearance-conferred immunity below
+            # (biologically, the virus hasn't actually been cleared).
+            to_latent_uids = cleared[self.to_latent[cleared]]
+            to_susceptible_uids = cleared[~self.to_latent[cleared]]
+
+            self.susceptible[to_susceptible_uids] = True
+
+            if len(to_latent_uids):
+                self.latent[to_latent_uids] = True
+                self.ti_latent[to_latent_uids] = ti
+                self.to_latent[to_latent_uids] = False
 
             # Only update post-clearance immunity for females; males clear
             # without seroconverting. First-clearance immunity is gated on
@@ -808,7 +842,7 @@ class HPV(ss.Infection):
             # fully reinfectible on next exposure. Repeat clearances always
             # update via running max (sero_prob only gates the first event).
             female = self.sim.people.female
-            f_cleared = cleared[female[cleared]]
+            f_cleared = to_susceptible_uids[female[to_susceptible_uids]]
             if len(f_cleared):
                 has_prior_imm = self.nab_imm[f_cleared] > 0
                 first_mask  = ~has_prior_imm
