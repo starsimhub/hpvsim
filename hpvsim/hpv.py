@@ -888,6 +888,52 @@ class HPV(ss.Infection):
                     self.cell_imm[repeat_uids] = np.maximum(
                         self.cell_imm[repeat_uids], cell_all[has_prior_imm])
 
+        # --- 1b. Reactivation from latent (per-timestep hazard) ---
+        # Excludes agents that entered latency THIS step (ti_latent < ti, not
+        # <=) so a same-step clear-into-latent-then-immediately-reactivate
+        # never happens -- matches the "clearance fires first" ordering
+        # discipline already documented above.
+        latent_uids = (self.latent & (self.ti_latent < ti)).uids
+        if len(latent_uids):
+            sev_imm_uids = self.sev_imm[latent_uids]
+            hivc = self._hiv_connector()
+            if hivc is not None:
+                rel_reactivation_uids = hivc.hiv_rel_reactivation[latent_uids]
+            else:
+                rel_reactivation_uids = np.ones(len(latent_uids))
+            # Multiply all relative factors onto the RATE, then convert to a
+            # probability exactly once (starsim TimePar rule -- see CLAUDE.md /
+            # starsim-dev-time skill). Never multiply a probability by a scalar.
+            # hpv_reactivation is an ss.prob subtype, which raises on `prob *
+            # array` (array_mul_error -- see starsim time.py) since scaling a
+            # probability's raw value by an array is not well-defined; per-agent
+            # scaling of a prob's underlying RATE is done via the `scale=`
+            # kwarg on the single .to_prob() call instead (same idiom as
+            # starsim's own hiv.py death_prob_func). This is algebraically
+            # identical to (rate * combined_rel).to_prob(dt): both compute
+            # 1 - exp(-rate * combined_rel * (dt/unit)).
+            combined_rel = (1.0 - sev_imm_uids) * rel_reactivation_uids
+            p_react = self.pars.hpv_reactivation.to_prob(self.t.dt, scale=combined_rel)
+            self._reactivation_bern.set(p=p_react)
+            reactivated = self._reactivation_bern.filter(latent_uids)
+            if len(reactivated):
+                self.latent[reactivated] = False
+                self.ti_reactivation[reactivated] = ti
+                # set_prognoses draws a fresh trajectory, matching v2.2.6's
+                # people.infect(..., layer='reactivation'), which reused the
+                # standard infect() path. Immunity (sev_imm/nab_imm/cell_imm) is
+                # NOT reset -- it carries into the new prognosis draw, exactly as
+                # v2.2.6 behaved (confirmed: v2's infect() only cleared
+                # date_clearance, never touched immunity states).
+                # ss.Infection.set_prognoses unconditionally increments
+                # new_infections; cancel that and count reactivations under
+                # their own result instead, matching v2's separate flow.
+                ppl = self.sim.people
+                n_react = ppl.scale_flows(reactivated)
+                self.set_prognoses(reactivated)
+                self.results.new_infections[ti] -= n_react
+                self.results.new_reactivations[ti] = n_react
+
         # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
         if len(to_cin):
