@@ -37,11 +37,13 @@ def test_rel_sus_scaled_for_hiv_positive():
     assert np.isclose(conn.hiv_rel_sus[uid], _HIV_EFFECTS['rel_sus']['lt200'])
     assert np.isclose(conn.hiv_rel_sev[uid], _HIV_EFFECTS['rel_sev']['lt200'])
     assert np.isclose(conn.hiv_rel_imm[uid], _HIV_EFFECTS['rel_imm']['lt200'])
+    assert np.isclose(conn.hiv_rel_reactivation[uid], _HIV_EFFECTS['rel_reactivation']['lt200'])
     # Absolute-value anchor (documents the expected lt200 acquisition factor).
     assert np.isclose(hpvmod.rel_sus[uid], 2.2)
     # HIV- agent's stored factors stay neutral.
     assert np.isclose(conn.hiv_rel_sev[other], 1.0)
     assert np.isclose(conn.hiv_rel_imm[other], 1.0)
+    assert np.isclose(conn.hiv_rel_reactivation[other], 1.0)
 
 
 def test_rel_sus_gt200_stratum():
@@ -90,6 +92,7 @@ _RWANDA_EFFECTS = {
     'rel_sus': {'lt200': 4.75, 'gt200': 2.75},
     'rel_sev': {'lt200': 2.5, 'gt200': 3.5},
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76},
+    'rel_reactivation': {'lt200': 1.0, 'gt200': 1.0},
 }
 
 

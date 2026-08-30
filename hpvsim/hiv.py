@@ -36,6 +36,7 @@ _HIV_EFFECTS = {
     'rel_sus': {'lt200': 2.2, 'gt200': 2.2},   # increased HPV acquisition
     'rel_sev': {'lt200': 1.5, 'gt200': 1.2},   # faster/worse CIN->cancer progression
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76}, # reduced post-infection/vaccine immunity
+    'rel_reactivation': {'lt200': 1.0, 'gt200': 1.0}, # latent reactivation hazard multiplier (neutral default; no prior calibrated value exists for this new effect)
 }
 _CD4_THRESHOLD = 200.0   # lt200 / gt200 boundary
 _CD4_UPPER = 500.0       # CD4 >= this -> no HIV→HPV effect (gt200 ceiling)
@@ -345,12 +346,12 @@ class hpv_hiv_connector(ss.Connector):
         if effects is None:
             effects = _HIV_EFFECTS
         else:
-            for eff in ('rel_sus', 'rel_sev', 'rel_imm'):
+            for eff in ('rel_sus', 'rel_sev', 'rel_imm', 'rel_reactivation'):
                 if eff not in effects or not {'lt200', 'gt200'} <= set(effects[eff]):
                     raise ValueError(
                         "hpv_hiv_connector effects must provide 'rel_sus', "
-                        "'rel_sev', 'rel_imm', each with 'lt200' and 'gt200' keys; "
-                        f'got {effects!r}'
+                        "'rel_sev', 'rel_imm', 'rel_reactivation', each with "
+                        f"'lt200' and 'gt200' keys; got {effects!r}"
                     )
         self.effects = effects
         self.hpv_modules = None
@@ -359,6 +360,7 @@ class hpv_hiv_connector(ss.Connector):
             ss.FloatArr('hiv_rel_sus', default=1.0),
             ss.FloatArr('hiv_rel_sev', default=1.0),
             ss.FloatArr('hiv_rel_imm', default=1.0),
+            ss.FloatArr('hiv_rel_reactivation', default=1.0),
         )
 
     def init_pre(self, sim):
@@ -419,9 +421,11 @@ class hpv_hiv_connector(ss.Connector):
         rel_sus = self._factor_array('rel_sus', hiv_pos, strata, n)
         rel_sev = self._factor_array('rel_sev', hiv_pos, strata, n)
         rel_imm = self._factor_array('rel_imm', hiv_pos, strata, n)
+        rel_reactivation = self._factor_array('rel_reactivation', hiv_pos, strata, n)
         self.hiv_rel_sus[auids] = rel_sus
         self.hiv_rel_sev[auids] = rel_sev
         self.hiv_rel_imm[auids] = rel_imm
+        self.hiv_rel_reactivation[auids] = rel_reactivation
         # Acquisition effect: multiply each module's rel_sus (set by CrossImmunity
         # earlier this step) by the HIV factor. rel_sus is written for all agents,
         # but Starsim only samples it for susceptibles during step_infect.
