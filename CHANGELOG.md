@@ -1,5 +1,9 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
+## Version 3.2.0 (in progress)
+
+- Restores HPV latency modeling (dropped in the v2->v3 rewrite): a female-only `hpv_control_prob` roll at clearance redirects into a `latent` state, with a per-timestep `hpv_reactivation` hazard (an `ss.probperyear`, scaled by the agent's `sev_imm` and a new CD4-stratified `rel_reactivation` HIV connector effect) governing return to an active (freshly-drawn) trajectory. Opt-in and a true no-op when `hpv_control_prob=0` (the default).
+
 ## Version 3.1.0 (2026-08-20)
 Adds flat parameter routing, a redesigned calibration workflow, and real-population scaling by default; requires `starsim>=3.6`.
 

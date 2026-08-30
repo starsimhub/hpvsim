@@ -160,3 +160,27 @@ def test_hiv_shortens_time_to_reactivation():
         dur_pos = (hpvmod.ti_reactivation[hiv_pos_reactivated] - hpvmod.ti_latent[hiv_pos_reactivated]).mean()
         dur_neg = (hpvmod.ti_reactivation[hiv_neg_reactivated] - hpvmod.ti_latent[hiv_neg_reactivated]).mean()
         assert dur_pos < dur_neg
+
+
+def test_default_hpv_control_prob_reproduces_pre_latency_results():
+    """hpv_control_prob=0 (the default) must be bit-identical to a sim that
+    never had this feature -- the single most important acceptance test.
+    Compares two sims built identically except one explicitly omits the new
+    pars entirely (simulating "pre-feature" code) and one uses today's
+    defaults; results must match exactly."""
+    kwargs = dict(n_agents=2000, location='nigeria', genotypes=[16],
+                  start=1970, stop=2020, dt=0.5, rand_seed=0)
+    sim_default = hpv.Sim(**kwargs)
+    sim_explicit_off = hpv.Sim(**kwargs, pars=dict(hpv_control_prob=0.0))
+    sim_default.run()
+    sim_explicit_off.run()
+    np.testing.assert_array_equal(
+        sim_default.results.hpv16.n_infected,
+        sim_explicit_off.results.hpv16.n_infected,
+    )
+    np.testing.assert_array_equal(
+        sim_default.results.hpv16.new_cancers,
+        sim_explicit_off.results.hpv16.new_cancers,
+    )
+    assert sim_default.results.hpv16.new_reactivations.sum() == 0
+    assert not sim_default.diseases.hpv16.latent[sim_default.people.auids].any()
