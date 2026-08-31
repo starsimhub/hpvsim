@@ -10,8 +10,9 @@ def test_cd4_stratum_boundaries():
     c = hpv_hiv_connector()
     cd4 = np.array([50.0, 199.0, 200.0, 400.0, 594.0, 700.0, 800.0])
     strata = c._cd4_stratum(cd4)
-    # 0 = lt200, 1 = gt200 (>=200, including >=500)
-    assert list(strata) == [0, 0, 1, 1, 1, 1, 1]
+    assert strata.dtype == bool
+    # False = lo, True = hi (>=200, including >=500)
+    assert list(strata) == [False, False, True, True, True, True, True]
 
 
 def test_rel_sus_scaled_for_hiv_positive():

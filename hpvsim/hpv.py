@@ -541,6 +541,7 @@ class HPV(ss.Infection):
         self.ti_cancerous[uids] = np.nan
         self.ti_dead_cancer[uids] = np.nan
         self.to_latent[uids] = False
+        self.latent[uids] = False
 
         female_all = self.sim.people.female[uids]
         # rel_sev is shared across HPV modules via the CrossImmunity connector;
@@ -973,10 +974,8 @@ class HPV(ss.Infection):
             self.sim.people.request_death(to_dead)
 
     def step_die(self, uids):
-        """Reset transient compartment flags for dying agents.
-
-        Without this, dead agents would keep their compartment flags and
-        corrupt n_precin / n_cin / n_cancerous counts.
+        """ Set states to False for the newly-dead. 
+        IMPORTANT: if you add any new states, remember to add them here!
         """
         super().step_die(uids)
         self.precin[uids] = False

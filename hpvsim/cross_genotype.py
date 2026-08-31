@@ -245,6 +245,7 @@ class HPVTotal(ss.Analyzer):
         'n_precin':    'precin',
         'n_cin':       'cin',
         'n_cancerous': 'cancerous',
+        'n_latent':    'latent',
     }
 
     # WHO 2000 World Standard Population weights per 5-year age band (0-4

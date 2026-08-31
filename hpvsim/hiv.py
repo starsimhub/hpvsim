@@ -46,7 +46,9 @@ class HIV(sti.HIV):
     named ``'structuredsexual'``, which hpvsim does not use, so they are
     otherwise inert there -- ``init_pre`` below reads them directly to build
     the per-network beta dict on ``hpv.SexualNetwork``. Being real pars (not
-    private constructor attributes) makes them reachable via ``route_pars``.
+    private constructor attributes) is a prerequisite for a future
+    ``route_pars`` HIV scope (not yet implemented -- ``route_pars`` does not
+    currently route to ``hpv.HIV`` or ``hpv_hiv_connector`` at all).
     """
 
     def __init__(self, init_prev_data=None, pars=None, **kwargs):
@@ -334,9 +336,11 @@ class hpv_hiv_connector(ss.Connector):
     ``[cd4_threshold, cd4_upper)``. CD4 >= ``cd4_upper`` gets no effect
     (factor 1.0) -- see the module comment above. Being real pars (not a
     nested ``effects=`` dict), each can be overridden independently -- e.g. a
-    location calibration passes only ``rel_sev_lo=..., rel_sev_gt200=...``
-    without needing to restate every other effect's defaults -- and all are
-    reachable via ``route_pars``.
+    location calibration passes only ``rel_sev_lo=..., rel_sev_hi=...``
+    without needing to restate every other effect's defaults. Not yet
+    reachable via ``route_pars`` -- ``route_pars`` does not currently route
+    to ``hpv_hiv_connector`` at all (a future HIV scope, see the sub-project 2
+    design work).
     """
 
     def __init__(self, pars=None, **kwargs):

@@ -110,3 +110,38 @@ def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
         assert neg_count == 0, (
             f'{mod.genotype}.new_cancers has {neg_count} negative timestep(s).'
         )
+
+
+def test_hpvtotal_n_latent_is_a_union_not_a_sum():
+    """all_hpv.n_latent must count each agent once even if latent for
+    multiple genotypes simultaneously -- it is a _UNION_STATES entry (boolean
+    OR across modules), not an element-wise sum of per-module n_latent.
+
+    hpv_control_prob=1.0 forces latency on every clearance, so with 2
+    genotypes co-infection is common and a naive sum would double-count.
+    """
+    sim = hpv.Sim(
+        location='nigeria',
+        start=1970, stop=2000, dt=0.5,
+        n_agents=1000,
+        genotypes=['hpv16', 'hpv18'],
+        pars=dict(hpv_control_prob=1.0),
+        rand_seed=0,
+    )
+    sim.run()
+
+    genotypes = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
+    naive_sum = sum(mod.results.n_latent[:] for mod in genotypes)
+    union = sim.results.all_hpv.n_latent[:]
+
+    assert union.max() > 0, 'no agent ever latent — the union logic is untested here'
+    assert naive_sum.max() > union.max(), (
+        'expected co-latency (naive sum > union) at hpv_control_prob=1.0 with '
+        '2 genotypes -- if this no longer holds, either latency stopped '
+        'firing or co-infection became too rare for this test to discriminate '
+        'union-vs-sum; investigate before weakening the assertion below.'
+    )
+    assert (union <= naive_sum + 1e-6).all(), (
+        'all_hpv.n_latent exceeds the naive per-module sum at some timestep -- '
+        'a union count can never exceed a sum of its parts.'
+    )

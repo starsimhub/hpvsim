@@ -3,6 +3,10 @@ All notable changes to the codebase are documented in this file. Changes that ma
 ## Version 3.2.0 (in progress)
 
 - Restores HPV latency modeling (dropped in the v2->v3 rewrite): a female-only `hpv_control_prob` roll at clearance redirects into a `latent` state, with a per-timestep `hpv_reactivation` hazard (an `ss.probperyear`, scaled by the agent's `sev_imm` and a new CD4-stratified `rel_reactivation` HIV connector effect) governing return to an active (freshly-drawn) trajectory. Opt-in and a true no-op when `hpv_control_prob=0` (the default).
+- `hpv_hiv_connector`'s CD4-stratified effects (`rel_sus`/`rel_sev`/`rel_imm`/`rel_reactivation`) are now `define_pars`-based, each independently overridable without restating the others. `HIV.beta_m2f`/`rel_beta_f2m` are likewise real pars now.
+- *Regression information*: `hpv_hiv_connector(effects={...})` is removed. Replace with flat `{effect}_lo`/`{effect}_hi` kwargs, e.g. `effects={'rel_sus': {'lt200': 4.75, 'gt200': 2.75}}` becomes `rel_sus_lo=4.75, rel_sus_hi=2.75`.
+- *Regression information*: `hpv.hiv_incidence_import` is renamed to `hpv.hiv_incidence`.
+- *Regression information*: `hpv.HIV(beta_m2f=..., rel_beta_f2m=..., ...)` no longer accepts these as positional arguments (they are now `pars`, consistent with every other hpvsim module); pass them as keywords.
 
 ## Version 3.1.0 (2026-08-20)
 Adds flat parameter routing, a redesigned calibration workflow, and real-population scaling by default; requires `starsim>=3.6`.
