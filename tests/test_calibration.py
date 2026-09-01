@@ -26,12 +26,10 @@ def test_build_sim_routes_top_level_pars():
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
                   genotypes=[16, 18])
     sim.init()
-    out = hpv.calibration.build_sim(sim, calib_pars={'rand_seed': 7, 'beta': 0.25})
+    out = hpv.calibration.build_sim(sim, calib_pars={'rand_seed': 7, 'ms_agent_ratio': 3})
     assert out.pars.rand_seed == 7
-    # beta is per-network directional; 'beta' scalar rescales preserving F/M
     for d in (out.diseases.hpv16, out.diseases.hpv18):
-        f2m = d.pars.beta['sexualnetwork'][0]
-        assert f2m == pytest.approx(0.25)
+        assert d.pars.ms_agent_ratio == 3
 
 
 def test_build_sim_routes_per_genotype_pars():
@@ -41,19 +39,6 @@ def test_build_sim_routes_per_genotype_pars():
     sim.init()
     out = hpv.calibration.build_sim(sim, calib_pars={'hpv16.cin_fn.k': 0.77})
     assert out.diseases.hpv16.pars.cin_fn['k'] == 0.77
-
-
-def test_build_sim_routes_cross_immunity():
-    """A 'cross_immunity.<matrix>.<tgt>.<src>' key writes into the connector matrix."""
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
-                  genotypes=[16, 18, 'hi5', 'ohr'])
-    sim.init()
-    out = hpv.calibration.build_sim(
-        sim, calib_pars={'cross_immunity.cross_imm_sus.hpv16.hpv18': 0.42})
-    conn = [c for c in out.connectors.values()
-            if isinstance(c, hpv.CrossImmunity)][0]
-    idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
-    assert conn.cross_imm_sus[idx['hpv16'], idx['hpv18']] == 0.42
 
 
 def test_build_sim_raises_on_unknown_key():

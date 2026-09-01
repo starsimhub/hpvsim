@@ -221,8 +221,9 @@ def get_genotype_pars(genotype='hpv16'):
 
 # Sim-level keys route_pars will pass through to sim.pars. Explicit allowlist
 # so a typo raises rather than silently creating a new sim par.
+# ms_agent_ratio is a Sim()-constructor-only kwarg, not a sim.pars key.
 _SIM_KEYS = frozenset({'n_agents', 'dt', 'start', 'stop', 'rand_seed',
-                       'ms_agent_ratio', 'total_pop', 'verbose'})
+                       'total_pop', 'verbose'})
 
 
 # --------------------------------------------------------------------------- #
@@ -374,165 +375,74 @@ def expanddict(flat):
 def par_registry():
     """Category -> par-name-set (built lazily; lightweight)."""
     from .hpv import HPV
+    from .hiv import HIV
     from .cross_genotype import CrossImmunity
     from .network import SexualNetwork
     hpv_keys = set()
     for g in GENOTYPE_KEYS:
         hpv_keys.update(HPV(g).pars.keys())
     return {'sim': set(_SIM_KEYS), 'hpv': hpv_keys,
+            'hiv': set(HIV().pars.keys()),
             'connector': set(CrossImmunity().pars.keys()),
             'network': set(SexualNetwork().pars.keys())}
 
 
 def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
-    """Route a flat ``{key: value}`` dict to the correct modules on ``sim``.
+    """Route a nested ``{key: value}`` dict of overrides onto sim's modules.
 
-    Rules:
-      - ``<genotype>.<par>[.<sub>]``: scoped to one HPV disease.
-      - ``cross_immunity.<par>[.<sub>]``: scoped to ``CrossImmunity``.
-        Legacy form ``cross_immunity.<matrix>.<tgt>.<src>`` (4 parts)
-        writes a single matrix cell.
-      - ``network.<par>[.<sub>]`` / ``sexualnetwork.<par>[.<sub>]``:
-        scoped to ``SexualNetwork``. Also accepts a nested dict value.
-      - Bare key: registry lookup (see ``par_registry``); broadcast to
-        every matching category. ``beta`` scalar broadcasts to every HPV
-        module, preserving each genotype's F/M ratio.
-      - Optuna spec dicts ``{'low','high','guess','value'}`` are unwrapped
-        to their ``value``.
+    A top-level key is either:
+      - Scoped: matches a live HPV genotype's name, the HIV disease's name
+        (``'hiv'``), or ``cross_immunity``/``network`` (aliases
+        ``crossimmunity``/``sexualnetwork``). Routed to that instance's pars
+        via ONE ``instance.pars.update(value)`` call -- starsim's own
+        ``Pars.update()`` handles arbitrarily nested overrides natively
+        (merging into ``ss.Pars``-typed sub-pars, calling ``.set()`` on
+        ``Dist`` leaves, preserving ``TimePar`` units). Applied AFTER
+        broadcast keys, so a scoped override always wins regardless of
+        input dict ordering.
+      - A bare registry key: broadcast to every matching category (sim,
+        hpv, hiv, connector, network) via ``instance.pars.update({key: value})``.
+        Applied FIRST.
+      - ``calib_pars`` (flat dotted) is converted to nested via
+        ``expanddict`` before anything else runs.
     """
     from .hpv import HPV
+    from .hiv import HIV
     from .cross_genotype import CrossImmunity
     from .network import SexualNetwork
 
-    pars = pars if pars is not None else calib_pars
-    if not pars:
+    raw = calib_pars if calib_pars is not None else (pars or {})
+    if not raw:
         return sim
-    pars = {k: (v['value'] if isinstance(v, dict) and 'value' in v else v)
-            for k, v in pars.items()}
+    # Unwrap Optuna spec dicts ({'low','high','guess','value',...}) to their
+    # sampled value; calib_pars trial dicts arrive in this shape.
+    raw = {k: (v['value'] if isinstance(v, dict) and 'value' in v else v)
+           for k, v in raw.items()}
+    nested = expanddict(raw) if calib_pars is not None else raw
 
     if hasattr(sim, 'diseases') and sim.diseases is not None:
-        diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, HPV)}
+        diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, (HPV, HIV))}
         connectors = [c for c in sim.connectors.values() if isinstance(c, CrossImmunity)]
         networks = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
     else:
         diseases = {d.name: d for d in sc.tolist(sim.pars.get('diseases'))
-                    if isinstance(d, HPV)}
+                    if isinstance(d, (HPV, HIV))}
         connectors = [c for c in sc.tolist(sim.pars.get('connectors'))
                       if isinstance(c, CrossImmunity)]
         networks = [n for n in sc.tolist(sim.pars.get('networks'))
                     if isinstance(n, SexualNetwork)]
 
     registry = par_registry()
-
-    def apply_nested(container, parts, value):
-        """Walk into nested pars/Dist to set at the leaf.
-
-        Terminal cases:
-        - ``target`` is an ``ss.Dist``: ``target.set(**{leaf: value})`` —
-          used e.g. for ``cross_immunity.rel_sev.scale`` (leaf is a Dist par).
-        - ``target`` is an ``ss.Pars``: delegate to ``Pars.update``, which
-          handles dict-to-Dist merges (e.g. ``dur_cin={'mean': 5}`` calls
-          ``lognorm_ex.set(mean=5)`` without clobbering ``std``) and
-          preserves ``ss.TimePar`` units on scalar overrides (e.g.
-          ``dur_cin=6`` on an existing ``mean=years(5)`` gives ``years(6)``,
-          not a bare unitless ``6``) natively as of starsim 3.6
-          (starsimhub/starsim#1420).
-        - Otherwise (plain dict): direct assignment.
-        """
-        target = container
-        for p in parts[:-1]:
-            if isinstance(target, ss.Dist):
-                target = target.pars
-            target = target[p]
-        leaf = parts[-1]
-
-        if isinstance(target, ss.Dist):
-            target.set(**{leaf: value})
-        elif isinstance(target, ss.Pars):
-            target.update({leaf: value})
+    scoped, broadcast = {}, {}
+    for key, value in nested.items():
+        if key in diseases or key in ('cross_immunity', 'crossimmunity', 'network', 'sexualnetwork'):
+            scoped[key] = value
         else:
-            target[leaf] = value
-
-    def apply_beta_scalar(disease, value):
-        """Broadcast a scalar beta onto pars.beta ({'sexualnetwork': [f2m, m2f]}),
-        preserving the F/M ratio. Per-act probabilities are clipped to
-        [0, 1] via ``HPV._clip_beta`` (matches the construction-time clip)
-        to protect against unusual parameter combinations pushing a per-act
-        probability above 1 (would silently NaN transmission)."""
-        from .hpv import _clip_beta
-        old = disease.pars.beta
-        if not (sc.isnumber(value) and isinstance(old, dict)):
-            disease.pars.beta = value
-            return
-        first = next(iter(old.values()))
-        ref = first[0] if isinstance(first, list) else first
-        scale = 1.0 if ref == 0 else value / ref
-        new_beta = {}
-        for net_name, v in old.items():
-            if isinstance(v, list):
-                new_beta[net_name] = _clip_beta(
-                    v[0] * scale, v[1] * scale,
-                    getattr(disease, 'genotype', getattr(disease, 'name', '?')),
-                )
-            else:
-                new_beta[net_name] = min(1.0, v * scale)
-        disease.pars.beta = new_beta
+            broadcast[key] = value
 
     unmatched = {}
-
-    def apply_scope(container_pars, key, value):
-        """Apply a scoped key (either 'a.b.c' dotted or 'a' with dict value)
-        onto ``container_pars``. Dict values are unpacked one level so each
-        sub-key gets its own apply_nested; the caller has already stripped
-        the module-scope prefix."""
-        if isinstance(value, dict):
-            for sub_k, sub_v in value.items():
-                apply_nested(container_pars, [key, *sub_k.split('.')], sub_v)
-        else:
-            apply_nested(container_pars, key.split('.'), value)
-
-    for key, value in pars.items():
-        parts = key.split('.')
-        head = parts[0]
-
-        # Scoped: <module>.<par>[.<sub>] OR bare <module> with a dict of pars.
-        if head in diseases and (len(parts) > 1 or isinstance(value, dict)):
-            if len(parts) > 1:
-                apply_nested(diseases[head].pars, parts[1:], value)
-            else:
-                for sub_k, sub_v in value.items():
-                    apply_scope(diseases[head].pars, sub_k, sub_v)
-            continue
-        if head in ('cross_immunity', 'crossimmunity') and (len(parts) > 1 or isinstance(value, dict)):
-            if not connectors:
-                raise ValueError(f'route_pars: {key!r} needs a CrossImmunity connector.')
-            # Legacy: cross_immunity.<matrix>.<tgt>.<src> -> matrix cell.
-            if len(parts) == 4 and parts[1] in ('cross_imm_sus', 'cross_imm_sev'):
-                conn = connectors[0]
-                idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
-                getattr(conn, parts[1])[idx[parts[2]], idx[parts[3]]] = value
-            elif len(parts) > 1:
-                for c in connectors:
-                    apply_nested(c.pars, parts[1:], value)
-            else:
-                for c in connectors:
-                    for sub_k, sub_v in value.items():
-                        apply_scope(c.pars, sub_k, sub_v)
-            continue
-        if head in ('network', 'sexualnetwork') and (len(parts) > 1 or isinstance(value, dict)):
-            if not networks:
-                raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
-            if len(parts) > 1:
-                for n in networks:
-                    apply_nested(n.pars, parts[1:], value)
-            else:
-                for n in networks:
-                    for sub_k, sub_v in value.items():
-                        apply_scope(n.pars, sub_k, sub_v)
-            continue
-
-        # Flat: registry lookup. Broadcast if a key lives in more than one category.
-        cats = [c for c, kk in registry.items() if head in kk]
+    for key, value in broadcast.items():
+        cats = [c for c, kk in registry.items() if key in kk]
         if not cats:
             unmatched[key] = value
             continue
@@ -540,23 +450,39 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
             print(f'route_pars: {key!r} broadcast to {cats}')
         for cat in cats:
             if cat == 'sim':
-                apply_nested(sim.pars, parts, value)
+                sim.pars.update({key: value})
             elif cat == 'hpv':
                 for d in diseases.values():
-                    if parts == ['beta']:
-                        apply_beta_scalar(d, value)
-                    else:
-                        apply_nested(d.pars, parts, value)
+                    if isinstance(d, HPV):
+                        d.pars.update({key: value})
+            elif cat == 'hiv':
+                for d in diseases.values():
+                    if isinstance(d, HIV):
+                        d.pars.update({key: value})
             elif cat == 'connector':
                 if not connectors:
                     raise ValueError(f'route_pars: {key!r} needs a CrossImmunity connector.')
                 for c in connectors:
-                    apply_nested(c.pars, parts, value)
+                    c.pars.update({key: value})
             elif cat == 'network':
                 if not networks:
                     raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
                 for n in networks:
-                    apply_nested(n.pars, parts, value)
+                    n.pars.update({key: value})
+
+    for key, value in scoped.items():
+        if key in diseases:
+            diseases[key].pars.update(value)
+        elif key in ('cross_immunity', 'crossimmunity'):
+            if not connectors:
+                raise ValueError(f'route_pars: {key!r} needs a CrossImmunity connector.')
+            for c in connectors:
+                c.pars.update(value)
+        elif key in ('network', 'sexualnetwork'):
+            if not networks:
+                raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
+            for n in networks:
+                n.pars.update(value)
 
     if unmatched and strict:
         raise ValueError(f'route_pars: unrecognized par(s): {sorted(unmatched)}')
