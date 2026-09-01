@@ -200,11 +200,11 @@ class GenotypePars(ss.Pars):
         self.dur_cin = _lognorm_yr(d['dur_cin_yr'])
         self.dur_cancer = _lognorm_yr(d['dur_cancer_yr'])
         self.dur_inf_male = _lognorm_yr(d['dur_inf_male_yr'])
-        self.cin_fn = dict(d['cin_fn'])
-        self.cancer_fn = dict(d['cancer_fn'])
+        self.cin_fn = ss.Pars(d['cin_fn'])
+        self.cancer_fn = ss.Pars(d['cancer_fn'])
         self.imm_init = _imm_init_dist()
         self.cell_imm_init = _cell_imm_dist()
-        self.age_risk = dict(d['age_risk'])
+        self.age_risk = ss.Pars(d['age_risk'])
         self.rel_beta = d['rel_beta']
         self.sero_prob = d['sero_prob']
         self.transf2m = d['transf2m']
@@ -348,8 +348,8 @@ class NetworkPars(sc.objdict):
         # Age-based act modulation per layer. Ramp linearly from
         # debut_ratio at debut age to 1.0 at peak, then to retirement_ratio
         # at retirement, then 0 beyond.
-        self.age_act_pars_marital = dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
-        self.age_act_pars_casual  = dict(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
+        self.age_act_pars_marital = ss.Pars(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
+        self.age_act_pars_casual  = ss.Pars(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
 
         self.mixing_marital = _MIXING_M
         self.mixing_casual  = _MIXING_C
