@@ -14,7 +14,7 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['SimPars', 'GenotypePars', 'get_genotype_pars',
+__all__ = ['SimPars', 'GenotypePars', 'NetworkPars', 'get_genotype_pars',
            'genotype_aliases', 'GENOTYPE_KEYS', 'route_pars',
            'expanddict', 'par_registry']
 
@@ -219,13 +219,6 @@ def get_genotype_pars(genotype='hpv16'):
     return GenotypePars(genotype=genotype)
 
 
-# Sim-level keys route_pars will pass through to sim.pars. Explicit allowlist
-# so a typo raises rather than silently creating a new sim par.
-# ms_agent_ratio is a Sim()-constructor-only kwarg, not a sim.pars key.
-_SIM_KEYS = frozenset({'n_agents', 'dt', 'start', 'stop', 'rand_seed',
-                       'total_pop', 'verbose'})
-
-
 # --------------------------------------------------------------------------- #
 # Network mixing & participation matrices (data — used by NetworkPars)        #
 # --------------------------------------------------------------------------- #
@@ -373,16 +366,25 @@ def expanddict(flat):
 
 
 def par_registry():
-    """Category -> par-name-set (built lazily; lightweight)."""
+    """Category -> par-name-set (built lazily; lightweight).
+
+    No 'hiv' category: HIV's pars overlap HPV's on 'beta'/'init_prev' (both
+    inherited from stisim's BaseSTIPars), so a bare-key broadcast would
+    silently also flip on HIV transmission (e.g. bare beta= turning on
+    hiv.pars.beta from its 0 default). The scoped hiv=dict(...) form in
+    route_pars does NOT consult this registry -- it dispatches directly by
+    instance name -- so scoped/hiv_pars= routing is unaffected.
+    """
     from .hpv import HPV
-    from .hiv import HIV
     from .cross_genotype import CrossImmunity
     from .network import SexualNetwork
     hpv_keys = set()
     for g in GENOTYPE_KEYS:
         hpv_keys.update(HPV(g).pars.keys())
-    return {'sim': set(_SIM_KEYS), 'hpv': hpv_keys,
-            'hiv': set(HIV().pars.keys()),
+    # 'location' excluded: it's the one hpv.SimPars key vanilla ss.SimPars
+    # (sim.pars) lacks, so broadcasting it would raise KeyNotFoundError
+    # instead of route_pars' own clear "unrecognized" ValueError.
+    return {'sim': set(SimPars().keys()) - {'location'}, 'hpv': hpv_keys,
             'connector': set(CrossImmunity().pars.keys()),
             'network': set(SexualNetwork().pars.keys())}
 
@@ -418,7 +420,7 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
     # sampled value; calib_pars trial dicts arrive in this shape.
     raw = {k: (v['value'] if isinstance(v, dict) and 'value' in v else v)
            for k, v in raw.items()}
-    nested = expanddict(raw) if calib_pars is not None else raw
+    nested = expanddict(raw)
 
     if hasattr(sim, 'diseases') and sim.diseases is not None:
         diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, (HPV, HIV))}

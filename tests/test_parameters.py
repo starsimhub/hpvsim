@@ -1,9 +1,6 @@
 """Tests for hpv.Sim's parameter-routing surface: the user-facing
 equivalence between bare kwargs, pars=, and calib_pars."""
-import numpy as np
-import pandas as pd
 import pytest
-import sciris as sc
 import starsim as ss
 
 import hpvsim as hpv
@@ -52,8 +49,8 @@ def test_par_routing():
     conn = [c for c in sim.connectors.values() if isinstance(c, hpv.CrossImmunity)][0]
     assert conn.pars.own_imm_hr == 0.5
 
-    hpv.route_pars(sim, pars={'network': {'m_cross_layer': 8}})
-    assert sim.networks.sexualnetwork.pars.m_cross_layer == 8
+    hpv.route_pars(sim, pars={'network': {'m_cross_layer': 0.5}})
+    assert sim.networks.sexualnetwork.pars.m_cross_layer == 0.5
 
 
 def test_par_routing_calib_pars_flat_dotted():
@@ -137,3 +134,71 @@ def test_hiv_par_routing():
     sim.init()
     assert sim.diseases.hiv.pars.rel_sus_lo == 0.4
     assert sim.diseases.hiv.pars.rel_sus_hi == 0.5
+
+
+def test_bare_beta_does_not_broadcast_to_hiv():
+    """A bare beta= override must not leak into the auto-constructed HIV
+    disease. beta/init_prev are inherited stisim BaseSTIPars keys shared
+    with HPV, but 'hiv' is intentionally excluded from route_pars' bare-key
+    broadcast registry (par_registry) -- only the scoped hiv=/hiv_pars=
+    forms may touch HIV's pars."""
+    from hpvsim.hiv import HIV
+    default_hiv_beta = HIV().pars.beta
+    sim = make_sim(genotypes=[16], model_hiv='transmission', pars=dict(beta=0.2))
+    sim.init()
+    assert sim.diseases.hiv.pars.beta == default_hiv_beta
+    assert sim.diseases.hpv16.pars.beta == 0.2
+
+
+def test_pars_accepts_flat_dotted_keys():
+    """pars= (not just calib_pars=) accepts a flat dotted key -- a bare
+    dotted key via pars= must route the same as the equivalent nested form."""
+    sim = make_sim(genotypes=[16], pars={'hpv16.cin_fn.k': 0.5})
+    sim.init()
+    assert sim.diseases.hpv16.pars.cin_fn['k'] == 0.5
+
+
+def test_pars_location_raises_value_error():
+    """pars=dict(location=...) cannot be forwarded to super().__init__
+    (vanilla ss.SimPars lacks 'location'), so it must fail with route_pars'
+    clear ValueError, not sciris' KeyNotFoundError from deep inside
+    ss.Sim.__init__. Bare location= (not via pars=) is unaffected -- see
+    test_sim_construction / test_hiv_par_routing for that path."""
+    with pytest.raises(ValueError, match='location'):
+        make_sim(genotypes=[16], pars=dict(location='nigeria'))
+
+
+def test_copy_inputs_kwarg_accepted():
+    """copy_inputs=/data= are genuine ss.Sim.__init__ kwargs (defaults
+    True/None) that must still construct without error now that
+    unrecognized bare kwargs route through mod_pars/route_pars instead of
+    flowing straight through to super().__init__."""
+    make_sim(genotypes=[16], copy_inputs=False)
+
+
+def test_validate_beta_zeroes_non_sexual_networks():
+    """A scalar beta must not leak a nonzero symmetric value onto a
+    non-sexual network sharing the sim -- ss.Infection.validate_beta's
+    scalar branch expands to every network by default; HPV.validate_beta
+    must zero out anything that isn't the sexual network."""
+    sim = make_sim(genotypes=[16], networks=[hpv.SexualNetwork(), ss.MaternalNet()],
+                   beta=0.2)
+    sim.init()
+    betamap = sim.diseases.hpv16.validate_beta()
+    assert betamap['maternal'] == [0.0, 0.0]
+    assert betamap['sexualnetwork'] != [0.0, 0.0]
+
+
+def test_sim_key_source_of_truth_consistent():
+    """route_pars' bare-key 'sim' category and hpv.Sim.__init__'s own
+    sim/mod split must agree on what counts as a sim-level key -- calling
+    route_pars directly (as calibration does) and constructing via
+    pars= must both accept the same sim-level keys."""
+    sim = make_sim(genotypes=[16])
+    sim.init()
+    hpv.route_pars(sim, pars={'pop_scale': 2})
+    assert sim.pars.pop_scale == 2
+
+    sim2 = make_sim(genotypes=[16], pars=dict(pop_scale=2))
+    sim2.init()
+    assert sim2.pars.pop_scale == 2
