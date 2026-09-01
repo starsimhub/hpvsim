@@ -14,8 +14,9 @@ import sciris as sc
 import starsim as ss
 
 
-__all__ = ['SimPars', 'GenotypePars', 'NetworkPars', 'get_genotype_pars',
-           'genotype_aliases', 'GENOTYPE_KEYS', 'route_pars']
+__all__ = ['SimPars', 'GenotypePars', 'get_genotype_pars',
+           'genotype_aliases', 'GENOTYPE_KEYS', 'route_pars',
+           'expanddict', 'par_registry']
 
 # Sexual-network layer keys (marital, casual).
 NETWORK_LAYERS = ('m', 'c')
@@ -360,7 +361,17 @@ class NetworkPars(sc.objdict):
         self.update(overrides)
 
 
-def _par_registry():
+def expanddict(flat):
+    """Convert a flat {'a.b.c': value} dict to nested {'a': {'b': {'c': value}}}.
+    The inverse of sc.flattendict. A key with no '.' becomes a plain
+    top-level entry."""
+    nested = {}
+    for key, value in flat.items():
+        sc.setnested(nested, key.split('.'), value)
+    return nested
+
+
+def par_registry():
     """Category -> par-name-set (built lazily; lightweight)."""
     from .hpv import HPV
     from .cross_genotype import CrossImmunity
@@ -383,7 +394,7 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
         writes a single matrix cell.
       - ``network.<par>[.<sub>]`` / ``sexualnetwork.<par>[.<sub>]``:
         scoped to ``SexualNetwork``. Also accepts a nested dict value.
-      - Bare key: registry lookup (see ``_par_registry``); broadcast to
+      - Bare key: registry lookup (see ``par_registry``); broadcast to
         every matching category. ``beta`` scalar broadcasts to every HPV
         module, preserving each genotype's F/M ratio.
       - Optuna spec dicts ``{'low','high','guess','value'}`` are unwrapped
@@ -411,7 +422,7 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
         networks = [n for n in sc.tolist(sim.pars.get('networks'))
                     if isinstance(n, SexualNetwork)]
 
-    registry = _par_registry()
+    registry = par_registry()
 
     def apply_nested(container, parts, value):
         """Walk into nested pars/Dist to set at the leaf.

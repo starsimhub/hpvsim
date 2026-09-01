@@ -10,7 +10,7 @@ from .version import __version__, __versiondate__, __license__
 from .settings import options
 from .defaults import datadir
 from . import data
-from .parameters import SimPars, GenotypePars, get_genotype_pars, GENOTYPE_KEYS, route_pars
+from .parameters import SimPars, GenotypePars, get_genotype_pars, GENOTYPE_KEYS, route_pars, expanddict, par_registry
 from . import misc
 from . import utils
 
@@ -47,7 +47,7 @@ __all__ = [
     'Calibration', 'make_calib_sims', 'calibration',
     'plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim', 'plot_intervention_impact', 'plot_calibration',
     'data', 'options', 'datadir', '__version__',
-    'SimPars', 'GenotypePars', 'get_genotype_pars', 'route_pars',
+    'SimPars', 'GenotypePars', 'get_genotype_pars', 'route_pars', 'expanddict', 'par_registry',
     'GENOTYPE_KEYS',
     'vx', 'dx', 'tx', 'txvx', 'radiation',
     'BaseVaccination', 'routine_vx', 'campaign_vx',
