@@ -235,7 +235,7 @@ class Sim(ss.Sim):
         # connector pars) routed after super().__init__ via hpv.route_pars.
         sim_pars, mod_pars = None, None
         if pars:
-            sim_par_keys = set(ss.SimPars().keys())
+            sim_par_keys = set(hpv.SimPars().keys())
             sim_pars = {k: v for k, v in pars.items() if k in sim_par_keys}
             mod_pars = {k: v for k, v in pars.items() if k not in sim_par_keys}
 

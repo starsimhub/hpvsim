@@ -45,7 +45,7 @@ class SimPars(ss.SimPars):
 
         self.start     = ss.years(1990)
         self.stop      = ss.years(2060)
-        self.dt        = ss.years(0.5)
+        self.dt        = ss.years(0.25)
         self.rand_seed = 0
 
         self.location = 'nigeria'
