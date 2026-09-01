@@ -807,8 +807,9 @@ class HPV(ss.Infection):
           3. CIN -> cancerous (stops transmitting)
           4. Cancer death (via people.request_death)
         """
-        # rel_sev for new agents is sampled lazily by CrossImmunity/set_prognoses.
-        self.rel_sus[:] = 1.0  # reset so CrossImmunity/HIV multiply, not overwrite
+        # rel_sev for births/immigrants is sampled lazily by the
+        # CrossImmunity connector's step() before any HPV step_infect runs,
+        # and again on first-touch in set_prognoses; no per-module work needed.
         ti = self.ti
 
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
