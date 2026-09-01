@@ -246,11 +246,13 @@ class Sim(ss.Sim):
         # super() so pre-init state (People/timeline) picks them up, and
         # (b) hpv module-level keys (per-genotype pars, network flat pars,
         # connector pars) routed after super().__init__ via hpv.route_pars.
-        sim_pars, mod_pars = None, None
-        if pars:
-            sim_par_keys = set(hpv.SimPars().keys())
-            sim_pars = {k: v for k, v in pars.items() if k in sim_par_keys}
-            mod_pars = {k: v for k, v in pars.items() if k not in sim_par_keys}
+        # Merge pars= and leftover bare kwargs before splitting, so bare
+        # hpvsim-specific kwargs and pars= are equivalent (mirrors sti.Sim).
+        merged = sc.mergedicts(pars, kwargs)
+        kwargs = {}
+        sim_par_keys = set(hpv.SimPars().keys())
+        sim_pars = {k: v for k, v in merged.items() if k in sim_par_keys}
+        mod_pars = {k: v for k, v in merged.items() if k not in sim_par_keys}
 
         super().__init__(
             start=ss.years(start),

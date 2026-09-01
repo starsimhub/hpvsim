@@ -10,7 +10,9 @@ import hpvsim as hpv
 
 
 def make_sim(**kw):
-    return hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0, **kw)
+    if 'rand_seed' not in kw and 'rand_seed' not in (kw.get('pars') or {}):
+        kw['rand_seed'] = 0
+    return hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, **kw)
 
 
 def test_expanddict():
@@ -102,3 +104,36 @@ def test_construction():
         make_sim(genotypes=[16], networks=[hpv.SexualNetwork()], nw_pars=dict(m_cross_layer=0.3))
     with pytest.raises(ValueError, match='imm_pars'):
         make_sim(genotypes=[16], connectors=[hpv.CrossImmunity()], imm_pars=dict(own_imm_hr=0.5))
+
+
+def test_sim_construction():
+    """Bare kwargs and pars= are equivalent for sim-level, HPV-scalar, and
+    nested genotype-scoped overrides; an unrecognized bare key raises."""
+    a = make_sim(rand_seed=7)
+    b = make_sim(pars=dict(rand_seed=7))
+    assert a.pars.rand_seed == b.pars.rand_seed == 7
+
+    sim = make_sim(genotypes=[16], beta=0.15)
+    sim.init()
+    assert sim.diseases.hpv16.pars.beta == 0.15
+
+    a = make_sim(genotypes=[16, 18], hpv16=dict(cin_fn=dict(k=0.55)))
+    b = make_sim(genotypes=[16, 18], pars=dict(hpv16=dict(cin_fn=dict(k=0.55))))
+    a.init(); b.init()
+    assert a.diseases.hpv16.pars.cin_fn['k'] == b.diseases.hpv16.pars.cin_fn['k'] == 0.55
+    assert a.diseases.hpv18.pars.cin_fn['k'] != 0.55
+
+    with pytest.raises(ValueError):
+        make_sim(genotypes=[16], not_a_real_par=1)
+
+
+def test_hiv_par_routing():
+    """pars=dict(hiv=dict(...)) routes into an already-constructed HIV
+    disease; hiv_pars= (construction-time) and pars=dict(hiv=...)
+    (post-construction) compose."""
+    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
+                  genotypes=[16], model_hiv='transmission',
+                  hiv_pars=dict(rel_sus_lo=0.4), pars=dict(hiv=dict(rel_sus_hi=0.5)))
+    sim.init()
+    assert sim.diseases.hiv.pars.rel_sus_lo == 0.4
+    assert sim.diseases.hiv.pars.rel_sus_hi == 0.5
