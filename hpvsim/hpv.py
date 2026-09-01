@@ -346,20 +346,24 @@ class HPV(ss.Infection):
         through unchanged. A bare (unattached) module has no self.sim to
         validate networks against, so skip super() and expand/pass-through
         directly."""
-        β = self.pars.beta
+        beta = self.pars.beta
         if self.sim is None:
-            if sc.isnumber(β):
-                base = β * self.pars.rel_beta
+            if sc.isnumber(beta):
+                base = beta * self.pars.rel_beta
                 return {'sexualnetwork': _clip_beta(
                     base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
                 )}
-            return dict(β)
+            return dict(beta)
         betamap = super().validate_beta()
-        if 'sexualnetwork' in betamap and sc.isnumber(β):
-            base = β * self.pars.rel_beta
-            betamap['sexualnetwork'] = _clip_beta(
-                base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
-            )
+        if sc.isnumber(beta):
+            base = beta * self.pars.rel_beta
+            for net in betamap:
+                if net == 'sexualnetwork':
+                    betamap[net] = _clip_beta(
+                        base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
+                    )
+                else:
+                    betamap[net] = [0.0, 0.0]
         return betamap
 
     def _hiv_module(self):

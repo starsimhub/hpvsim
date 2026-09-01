@@ -107,6 +107,8 @@ class Sim(ss.Sim):
             if total_pop is None:
                 total_pop = country['age_data']['value'].sum()
         people = kwargs.pop('people', None)
+        copy_inputs = kwargs.pop('copy_inputs', True)
+        sim_data = kwargs.pop('data', None)
         if people is None:
             age_data = country['age_data'] if country is not None else None
             people = ss.People(n_agents, age_data=age_data,
@@ -250,7 +252,7 @@ class Sim(ss.Sim):
         # hpvsim-specific kwargs and pars= are equivalent (mirrors sti.Sim).
         merged = sc.mergedicts(pars, kwargs)
         kwargs = {}
-        sim_par_keys = set(hpv.SimPars().keys())
+        sim_par_keys = set(hpv.SimPars().keys()) - {'location'}
         sim_pars = {k: v for k, v in merged.items() if k in sim_par_keys}
         mod_pars = {k: v for k, v in merged.items() if k not in sim_par_keys}
 
@@ -266,6 +268,8 @@ class Sim(ss.Sim):
             analyzers=analyzers,
             pars=sim_pars,
             total_pop=total_pop,
+            copy_inputs=copy_inputs,
+            data=sim_data,
             **kwargs,
         )
         if mod_pars:
