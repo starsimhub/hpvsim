@@ -87,3 +87,18 @@ def test_beta_scalar_expansion():
 
     explicit = hpv.HPV(genotype='hpv16', beta={'sexualnetwork': [0.11, 0.22]})
     assert explicit.pars.beta == {'sexualnetwork': [0.11, 0.22]}
+
+
+def test_construction():
+    """nw_pars=/imm_pars= apply to the auto-constructed network/connector;
+    each raises when the caller also supplies their own instance."""
+    sim = make_sim(genotypes=[16], nw_pars=dict(m_cross_layer=0.3), imm_pars=dict(own_imm_hr=0.5))
+    sim.init()
+    assert sim.networks.sexualnetwork.pars.m_cross_layer == 0.3
+    conn = [c for c in sim.connectors.values() if isinstance(c, hpv.CrossImmunity)][0]
+    assert conn.pars.own_imm_hr == 0.5
+
+    with pytest.raises(ValueError, match='nw_pars'):
+        make_sim(genotypes=[16], networks=[hpv.SexualNetwork()], nw_pars=dict(m_cross_layer=0.3))
+    with pytest.raises(ValueError, match='imm_pars'):
+        make_sim(genotypes=[16], connectors=[hpv.CrossImmunity()], imm_pars=dict(own_imm_hr=0.5))

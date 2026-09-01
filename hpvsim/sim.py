@@ -60,6 +60,7 @@ Kwargs:
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 import hpvsim as hpv
 
@@ -82,7 +83,7 @@ class Sim(ss.Sim):
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, ms_agent_ratio=1, pars=None, v2_compat_demographics=False,
-                 end=None, datafolder=None, **kwargs):
+                 end=None, datafolder=None, nw_pars=None, imm_pars=None, **kwargs):
         # Legacy alias: HPVsim v2 used ``end`` for the final sim year; Starsim
         # renamed it ``stop``. Accept ``end`` so v2 scripts keep running, but
         # nudge toward ``stop``. If given, ``end`` wins over ``stop``.
@@ -139,7 +140,12 @@ class Sim(ss.Sim):
         user_cross = [c for c in user_connectors if isinstance(c, CrossImmunity)]
         user_connectors = [c for c in user_connectors
                            if not isinstance(c, CrossImmunity)]
-        auto_connectors = [user_cross[0] if user_cross else CrossImmunity()]
+        if user_cross and imm_pars:
+            raise ValueError(
+                'imm_pars= is mutually exclusive with supplying your own '
+                'CrossImmunity in connectors= -- pass pars= to your instance directly.'
+            )
+        auto_connectors = [user_cross[0] if user_cross else CrossImmunity(pars=imm_pars)]
 
         if hpv_instances:
             hpv_diseases = hpv_instances  # override path; seeder skipped (user-supplied HPV manage their own init_prev)
@@ -199,7 +205,14 @@ class Sim(ss.Sim):
             # Network calibration is location-agnostic (see hpv.NetworkPars);
             # country['network_pars'] is just NetworkPars() defaults.
             network_pars = country['network_pars'] if country is not None else {}
+            if nw_pars:
+                network_pars = sc.mergedicts(network_pars, nw_pars)
             networks = [hpv.SexualNetwork(**network_pars)]
+        elif nw_pars:
+            raise ValueError(
+                'nw_pars= is mutually exclusive with supplying your own '
+                'networks= -- pass pars= to your instance directly.'
+            )
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
             if country is None:
