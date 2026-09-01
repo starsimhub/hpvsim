@@ -29,7 +29,7 @@ The `AgeResults` analyzer (see the [analyzers tutorial](tut_analyzers.qmd)) reco
 In v3 the `Calibration` object is built on Starsim's calibration machinery, which is in turn built on [Optuna](https://optuna.org), an open-source hyperparameter-optimization framework. A calibration needs:
 
 - an `hpv.Sim()` instance carrying an `AgeResults` analyzer that records the quantities you have data on;
-- `calib_pars`: a flat dictionary of the parameters to vary. A bare key (e.g. `'beta'`) targets a sim-level parameter; a dotted key (e.g. `'hpv16.cin_fn.k'`) targets a per-genotype parameter, and a `'cross_immunity....'` key targets the cross-immunity matrix. Each entry is `dict(low=..., high=..., guess=...)`.
+- `calib_pars`: a flat dictionary of the parameters to vary. A bare key (e.g. `'beta'`) targets a sim-level parameter; a dotted key (e.g. `'hpv16.cin_fn.k'`) targets a per-genotype parameter, and a `'cross_immunity.<par>'` key (e.g. `'cross_immunity.own_imm_hr'`) targets one of the `CrossImmunity` connector's own scalar pars (`own_imm_hr`, `cross_imm_sus_med`, `cross_imm_sus_high`, `cross_imm_sev_med`, `cross_imm_sev_high`) -- not a cross-immunity matrix cell, which is not independently calibratable. Each entry is `dict(low=..., high=..., guess=...)`.
 - `data`: a dictionary mapping each `AgeResults` result key to a dataframe of observed values (indexed by snapshot year, index name `'t'`, one column per age bin).
 
 The example below illustrates the general idea. To keep it self-contained we synthesize a target dataset from a run with a known CIN-progression parameter, then ask the calibration to recover it; in practice you would load your observed data into the `data` dataframes instead.
