@@ -67,3 +67,23 @@ def test_par_routing_raises_on_unknown_key():
     sim.init()
     with pytest.raises(ValueError):
         hpv.route_pars(sim, pars={'not_a_real_par': 1})
+
+
+def test_beta_scalar_expansion():
+    """A scalar beta expands via rel_beta/transf2m/transm2f identically whether
+    set via genotype_pars= (bare HPV kwargs) or a nested pars= override; an
+    explicit beta dict bypasses the expansion."""
+    from hpvsim.parameters import get_genotype_pars
+    g = get_genotype_pars('hpv16')
+
+    a = make_sim(genotypes=[16], genotype_pars={'hpv16': dict(beta=0.2, rel_beta=1.5)})
+    b = make_sim(genotypes=[16], pars=dict(hpv16=dict(beta=0.2, rel_beta=1.5)))
+    a.init(); b.init()
+    betamap_a = a.diseases.hpv16.validate_beta()
+    betamap_b = b.diseases.hpv16.validate_beta()
+    assert betamap_a == betamap_b
+    assert betamap_a['sexualnetwork'][0] == pytest.approx(0.2 * 1.5 * g.transf2m)
+    assert betamap_a['sexualnetwork'][1] == pytest.approx(0.2 * 1.5 * g.transm2f)
+
+    explicit = hpv.HPV(genotype='hpv16', beta={'sexualnetwork': [0.11, 0.22]})
+    assert explicit.pars.beta == {'sexualnetwork': [0.11, 0.22]}

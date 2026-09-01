@@ -14,14 +14,15 @@ from hpvsim.parameters import get_genotype_pars
 
 
 def _beta(mod):
-    return mod.pars.beta['sexualnetwork']
+    return mod.validate_beta()['sexualnetwork']
 
 
 def test_default_beta_matches_formula():
     """Regression guard: default beta = base * rel_beta * transf2m/transm2f."""
     g = get_genotype_pars('hpv16')
-    mod = hpv.HPV(genotype='hpv16')
-    b = _beta(mod)
+    sim = hpv.Sim(genotypes=[16], n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
+    sim.init()
+    b = _beta(sim.diseases.hpv16)
     assert b[0] == pytest.approx(g.beta * g.rel_beta * g.transf2m)
     assert b[1] == pytest.approx(g.beta * g.rel_beta * g.transm2f)
 
@@ -29,9 +30,11 @@ def test_default_beta_matches_formula():
 def test_rel_beta_override_scales_beta():
     """A rel_beta override must scale the transmission beta dict (bug 1)."""
     g = get_genotype_pars('hpv16')
-    base = hpv.HPV(genotype='hpv16')
-    hi = hpv.HPV(genotype='hpv16', rel_beta=2.0)
-    # 2x rel_beta -> 2x both directional betas vs the default rel_beta=1.0.
+    base_sim = hpv.Sim(genotypes=[16], n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
+    hi_sim = hpv.Sim(genotypes=[16], n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
+                     genotype_pars={'hpv16': {'rel_beta': 2.0}})
+    base_sim.init(); hi_sim.init()
+    base, hi = base_sim.diseases.hpv16, hi_sim.diseases.hpv16
     for i in (0, 1):
         assert _beta(hi)[i] == pytest.approx(2.0 * _beta(base)[i])
     assert _beta(hi)[0] == pytest.approx(g.beta * 2.0 * g.transf2m)
@@ -48,7 +51,7 @@ def test_rel_beta_override_via_sim_genotype_pars():
                   n_agents=200, start=2000, stop=2001, dt=1.0)
     sim.init()  # sim.diseases is populated at init
     g = get_genotype_pars('hpv16')
-    b = sim.diseases.hpv16.pars.beta['sexualnetwork']
+    b = _beta(sim.diseases.hpv16)
     assert b[0] == pytest.approx(g.beta * 0.5 * g.transf2m)
     assert b[1] == pytest.approx(g.beta * 0.5 * g.transm2f)
 

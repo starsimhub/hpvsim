@@ -24,6 +24,7 @@ identity matrix on the Connector.
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 
 from .parameters import genotype_aliases, get_genotype_pars
@@ -139,17 +140,9 @@ class HPV(ss.Infection):
         gpars = get_genotype_pars(genotype)
         self.define_pars(
             init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
-            # Sex-directional beta: p1→p2 = female→male (transf2m); p2→p1 =
-            # male→female (transm2f). SexualNetwork places females in p1 and
-            # males in p2 (see hpvsim/network.py:185). validate_beta accepts
-            # this dict shape natively (ss.Infection.validate_beta).
-            beta={
-                'sexualnetwork': _clip_beta(
-                    gpars.beta * gpars.rel_beta * gpars.transf2m,
-                    gpars.beta * gpars.rel_beta * gpars.transm2f,
-                    genotype,
-                ),
-            },
+            # Scalar beta; validate_beta() expands via rel_beta/transf2m/transm2f.
+            # Pass an explicit dict instead to bypass expansion.
+            beta=gpars.beta,
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
             dur_cancer=gpars.dur_cancer,
@@ -159,8 +152,11 @@ class HPV(ss.Infection):
             imm_init=gpars.imm_init,
             cell_imm_init=gpars.cell_imm_init,
             age_risk=gpars.age_risk,
-            # Per-genotype beta scaler and serology probability (multi-genotype).
+            # Per-genotype beta scaler, transmission-asymmetry scalars, and
+            # serology probability (multi-genotype).
             rel_beta=gpars.rel_beta,
+            transf2m=gpars.transf2m,
+            transm2f=gpars.transm2f,
             sero_prob=gpars.sero_prob,
             # Multiscale: number of agents each cancer-capable agent represents.
             # 1 = single scale (bit-identical no-op). >1 grows real fine cancer
@@ -175,23 +171,6 @@ class HPV(ss.Infection):
         )
         self.update_pars(pars=pars, **kwargs)
         self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
-
-        # The directional transmission `beta` dict above was built from the
-        # genotype DEFAULTS. Recompute it from the resolved pars so a `rel_beta`
-        # override (via genotype_pars= / pars=) actually changes transmission;
-        # without this it is silently ignored (the dict keeps the default
-        # rel_beta). Skip if the caller supplied an explicit `beta` — then they
-        # own the dict. With no override the recompute is byte-identical to the
-        # value set in define_pars.
-        _beta_overridden = ('beta' in kwargs) or (pars is not None and 'beta' in pars)
-        if not _beta_overridden:
-            self.pars.beta = {
-                'sexualnetwork': _clip_beta(
-                    gpars.beta * self.pars.rel_beta * gpars.transf2m,
-                    gpars.beta * self.pars.rel_beta * gpars.transm2f,
-                    genotype,
-                ),
-            }
 
         # Guard against unit-less duration distributions: a duration given
         # without ss.years(...) is read in timesteps, not years, so at dt<1 the
@@ -361,13 +340,35 @@ class HPV(ss.Infection):
     _STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin',
                      'cancerous', 'latent')
 
-    def _hiv_connector(self):
-        """Locate the hpv_hiv_connector on the sim, if any (None when no HIV)."""
+    def validate_beta(self):
+        """Expand a scalar pars.beta via rel_beta/transf2m/transm2f (mirrors
+        stisim's BaseSTI.validate_beta). An explicit dict pars.beta is passed
+        through unchanged. A bare (unattached) module has no self.sim to
+        validate networks against, so skip super() and expand/pass-through
+        directly."""
+        β = self.pars.beta
+        if self.sim is None:
+            if sc.isnumber(β):
+                base = β * self.pars.rel_beta
+                return {'sexualnetwork': _clip_beta(
+                    base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
+                )}
+            return dict(β)
+        betamap = super().validate_beta()
+        if 'sexualnetwork' in betamap and sc.isnumber(β):
+            base = β * self.pars.rel_beta
+            betamap['sexualnetwork'] = _clip_beta(
+                base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
+            )
+        return betamap
+
+    def _hiv_module(self):
+        """Locate the hpv.HIV disease on the sim, if any (None when no HIV)."""
         # Avoid circular import at module load (hiv.py imports HPV from this module).
-        from .hiv import hpv_hiv_connector
-        for c in self.sim.connectors.values():
-            if isinstance(c, hpv_hiv_connector):
-                return c
+        from .hiv import HIV
+        for d in self.sim.diseases.values():
+            if isinstance(d, HIV):
+                return d
         return None
 
     def init_results(self):
@@ -553,7 +554,7 @@ class HPV(ss.Infection):
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
         # HIV co-infection scales progression severity (gated no-op when no HIV).
-        hivc = self._hiv_connector()
+        hivc = self._hiv_module()
         if hivc is not None:
             rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
         sev_imm_uids = self.sev_imm[uids]
@@ -806,9 +807,8 @@ class HPV(ss.Infection):
           3. CIN -> cancerous (stops transmitting)
           4. Cancer death (via people.request_death)
         """
-        # rel_sev for births/immigrants is sampled lazily by the
-        # CrossImmunity connector's step() before any HPV step_infect runs,
-        # and again on first-touch in set_prognoses; no per-module work needed.
+        # rel_sev for new agents is sampled lazily by CrossImmunity/set_prognoses.
+        self.rel_sus[:] = 1.0  # reset so CrossImmunity/HIV multiply, not overwrite
         ti = self.ti
 
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
@@ -860,7 +860,7 @@ class HPV(ss.Infection):
                 # immaterial since CD4 moves slowly). Contrast set_prognoses,
                 # which reads hiv_rel_sev fresh because step_infect runs after
                 # the connector.
-                hivc = self._hiv_connector()
+                hivc = self._hiv_module()
                 if hivc is not None:
                     imm_factor = hivc.hiv_rel_imm[f_cleared]
                     nab_all = nab_all * imm_factor
@@ -897,7 +897,7 @@ class HPV(ss.Infection):
         latent_uids = (self.latent & (self.ti_latent < ti)).uids
         if len(latent_uids):
             sev_imm_uids = self.sev_imm[latent_uids]
-            hivc = self._hiv_connector()
+            hivc = self._hiv_module()
             if hivc is not None:
                 rel_reactivation_uids = hivc.hiv_rel_reactivation[latent_uids]
             else:
