@@ -23,13 +23,12 @@ if str(_ROOT) not in sys.path:
 
 from tests.regression.rwanda_calib import build_rwanda_sim  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
 
 
 class _Probe(ss.Analyzer):
     def init_pre(self, sim):
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv_module = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        self.hiv_module = sim.diseases.hiv
         super().init_pre(sim)
         n = len(sim.t.timevec)
         self.n_f_pos = np.zeros(n); self.n_f_neg = np.zeros(n)

@@ -31,7 +31,6 @@ if str(_ROOT) not in sys.path:
 
 import starsim as ss  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
 from tests.regression import rwanda_calib as rc  # noqa: E402
 from tests.regression.calibrate_rwanda import build_sim  # noqa: E402
 
@@ -45,7 +44,7 @@ _DT = rc._DT
 class _Probe(ss.Analyzer):
     def init_pre(self, sim):
         self.hpv = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        self.hiv = sim.diseases.hiv
         super().init_pre(sim)
         n = len(sim.t.timevec)
         nb = len(_AGE_LABELS)

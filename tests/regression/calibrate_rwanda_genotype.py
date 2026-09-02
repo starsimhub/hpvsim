@@ -42,12 +42,12 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+import stisim as sti  # noqa: E402
 import hpvsim as hpv  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
+from hpvsim.hiv import HIV, HIV_incidence  # noqa: E402
 from hpvsim.parameters import get_genotype_pars  # noqa: E402
 from hpvsim.cross_genotype import CrossImmunity  # noqa: E402
-from hpvsim.hiv import hpv_hiv_connector  # noqa: E402
 from hpvsim.calibration import compute_gof  # noqa: E402
 from tests.regression import rwanda_calib as rc  # noqa: E402
 
@@ -100,11 +100,10 @@ def build_sim(seed, n_agents, start, stop, p):
         p['cin_k_scale'], p['tp_scale'],
         {'hpv18': p['tp_rel_18'], 'hi5': p['tp_rel_hi5'], 'ohr': p['tp_rel_ohr']},
         {'hpv18': p['rb_18'], 'hi5': p['rb_hi5'], 'ohr': p['rb_ohr']})
-    connectors = [CrossImmunity(rel_sev_loc=rc.REL_SEV_LOC),
-                  hpv_hiv_connector(pars=rc.effects_to_connector_pars(effects))]
-    hiv = hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)
-    interventions = [hpv.hiv_incidence.from_location('rwanda'),
-                     hpv.hiv_art.from_location('rwanda')]
+    connectors = [CrossImmunity(rel_sev_loc=rc.REL_SEV_LOC)]
+    hiv = HIV_incidence(incidence=rc.RWANDA_HIV_DATA['incidence'], init_prev_data=0.0,
+                        pars=rc.effects_to_hiv_pars(effects))
+    interventions = [sti.ART(coverage=hpv.data.reshape_art_coverage(rc.RWANDA_HIV_DATA['art_coverage']))]
     return hpv.Sim(location='rwanda', rand_seed=seed, n_agents=n_agents,
                    start=start, stop=stop, dt=_DT, genotypes=rc.GENOTYPES,
                    genotype_pars=gp, init_hpv_dist=rc.RWANDA_INIT_HPV_DIST,

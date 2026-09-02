@@ -33,7 +33,6 @@ if str(_ROOT) not in sys.path:
 
 import hpvsim as hpv  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
 from tests.regression.rwanda_calib import build_rwanda_sim  # noqa: E402
 
 _DATA = Path(__file__).resolve().parent / 'data'
@@ -64,7 +63,7 @@ def _published_target():
 class CalibProbe(ss.Analyzer):
     def init_pre(self, sim):
         self.hpv = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        self.hiv = sim.diseases.hiv
         super().init_pre(sim)
         n = len(sim.t.timevec)
         nb = len(_AGE_LABELS)
