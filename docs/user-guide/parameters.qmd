@@ -1,0 +1,77 @@
+---
+title: "Parameters"
+---
+
+A country model has parameters of very different kinds: how many agents to run, how transmissible HPV16 is, how many casual partners women report, how much protection clearing HPV18 gives against HPV16. In HPVsim these live on different modules, because each module owns the state it acts on. That is good for the code and inconvenient for you, since a parameter set arrives as one flat table from a spreadsheet or a calibration.
+
+`hpv.route_pars` closes that gap. It takes one dictionary and delivers each entry to the module that owns it, so you can keep a country's parameters in one place.
+
+## Where parameters live
+
+| Home | Examples | Reach it with |
+|---|---|---|
+| Sim | `n_agents`, `start`, `stop`, `dt`, `rand_seed`, `total_pop`, `verbose` | a bare key |
+| Construction only | `location`, `genotypes`, `datafolder`, `model_hiv`, `init_seeding`, `v2_compat_demographics` | a keyword argument to `hpv.Sim`, never inside `pars=` |
+| Each HPV genotype | `beta`, `rel_beta`, `transm2f`, `dur_precin`, `dur_cin`, `cin_fn`, `cancer_fn`, `age_risk`, `sero_prob`, `imm_init`, `hpv_control_prob`, `hpv_reactivation`, `ms_agent_ratio` | a bare key (all genotypes) or `hpv16=dict(...)` (one genotype) |
+| Sexual network | everything in `hpv.NetworkPars` | a bare key, `network=dict(...)`, or `nw_pars=` |
+| Cross-immunity | `own_imm_hr`, `cross_imm_sus_med`, `cross_imm_sus_high`, `cross_imm_sev_med`, `cross_imm_sev_high`, `rel_sev` | a bare key, `cross_immunity=dict(...)`, or `imm_pars=` |
+| HIV | `beta_m2f`, `rel_sus_lo`, `rel_sev_lo`, `cd4_threshold`, … | `hiv=dict(...)` or `hiv_pars=` |
+
+Three rules govern the routing:
+
+**A bare key goes everywhere it fits.** `beta=0.2` sets `beta` on every genotype. `n_agents=2000` sets it on the sim. A name that exists in two places is written to both, which is intended — `ms_agent_ratio` belongs on every genotype at once.
+
+**HIV is never reached by a bare key.** HIV shares parameter names with HPV (`beta`, `init_prev`), so a bare `beta=` would silently switch on HIV transmission. HIV parameters must be scoped: `hiv=dict(beta_m2f=0.008)` or `hiv_pars=dict(...)`.
+
+**Scoped beats bare.** Scoped entries are applied after bare ones, whatever order your dictionary is in, so `dict(beta=0.2, hpv16=dict(beta=0.3))` gives HPV16 0.3 and every other genotype 0.2. Dotted keys are accepted too — `'hpv16.cin_fn.k'` is the same as `hpv16=dict(cin_fn=dict(k=...))` — which is what calibration output looks like.
+
+Nested parameter groups merge rather than replace. `cin_fn`, `cancer_fn`, `age_risk` and the network's `age_act_pars_*` are parameter objects, so `hpv16=dict(cin_fn=dict(k=0.4))` changes `k` and leaves `form`, `x_infl` and `ttc` alone. Before v3.2 this replaced the whole group, silently dropping the siblings.
+
+An unrecognised name raises a `ValueError` listing it. That is deliberate: a typo in a country parameter file should stop the run, not run the defaults.
+
+Durations need units. Write `ss.years(3)`, or a distribution whose parameters carry them: `ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))`. A unit-less duration is read as a number of timesteps, so at `dt=0.25` it is four times too short; HPVsim raises rather than running it.
+
+The sim-level defaults are in `hpv.SimPars`: 10,000 agents, 1990 to 2060, `dt=0.25` (three months), seed 0. `hpv.Sim` itself does not assume a country — pass `location=` or you get the location-free playground described in [Demographics](demographics.qmd).
+
+## How to organise a country parameter set
+
+Keep one dictionary per country, grouped by scope, and splat it into `hpv.Sim`. For module parameters, bare keyword arguments and `pars=` are equivalent — that equivalence is new in v3.2.
+
+```{python}
+import hpvsim as hpv
+
+nigeria = dict(
+    location = 'nigeria',
+    n_agents = 2000,
+    start = 2000,
+    stop = 2020,
+    beta = 0.2,                                # every genotype
+    hpv16 = dict(cin_fn=dict(k=0.4)),          # one genotype
+    network = dict(f_cross_layer=0.25),        # sexual network
+    cross_immunity = dict(own_imm_hr=0.8),     # cross-protection
+    verbose = 0,
+)
+
+sim = hpv.Sim(genotypes=[16, 18], **nigeria)
+sim.init()
+
+print('HPV16 beta:      ', sim.diseases.hpv16.pars.beta)
+print('HPV18 beta:      ', sim.diseases.hpv18.pars.beta)
+print('HPV16 cin_fn:    ', dict(sim.diseases.hpv16.pars.cin_fn))
+print('HPV18 cin_fn:    ', dict(sim.diseases.hpv18.pars.cin_fn))
+print('f_cross_layer:   ', sim.networks.sexualnetwork.pars.f_cross_layer)
+print('own_imm_hr:      ', sim.connectors.crossimmunity.pars.own_imm_hr)
+print('people per agent:', f'{sim.pars.pop_scale:,.0f}')
+```
+
+`beta` reached both genotypes but their per-act transmission probabilities still differ, because each genotype scales `beta` by its own `rel_beta`. Check what the model actually uses with `sim.diseases.hpv16.validate_beta()`.
+
+Splatting the dictionary matters here. `location` is a constructor argument, not a routed parameter, so `hpv.Sim(**nigeria)` works while `hpv.Sim(pars=nigeria)` stops with `unrecognized par(s): ['location']`. Keep the country name in the dictionary and splat it, or pass it separately.
+
+Always initialise and print the values back, as above, when you first wire up a parameter file. It takes a second and catches the whole class of errors where a value goes somewhere you did not intend. To apply a parameter set to a sim you have already built, call `hpv.route_pars(sim, pars)` directly — it accepts the same flat, dotted or nested forms, and prints a note when a bare key lands in more than one place.
+
+## See also
+
+- [Calibration](calibration.qmd), which uses the same nested form for `calib_pars`
+- [Migrating from v2](../migration.qmd) for the v2 parameter names
+- [`hpv.SimPars`, `hpv.GenotypePars`, `hpv.NetworkPars`, `hpv.route_pars`](../api/parameters.qmd)

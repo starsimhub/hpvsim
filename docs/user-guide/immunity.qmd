@@ -1,0 +1,64 @@
+---
+title: "Immunity"
+---
+
+A woman who clears an HPV infection is not returned to the state she was in before it. She keeps two things, and they do different jobs.
+
+`nab_imm` is antibody-mediated immunity: it reduces the chance of acquiring an infection at all. `cell_imm` is cell-mediated immunity: it does not stop acquisition, but it shortens the next infection and so lowers the chance that it becomes precancer. Both are drawn on clearance from beta distributions — `imm_init` has a mean of 0.35, `cell_imm_init` a mean of 0.25 — and both accumulate as a running maximum, so repeated clearance can only raise a woman's protection, never lower it.
+
+Only women update immunity on clearance; men clear without seroconverting. At a woman's **first** clearance the antibody component is gated on `sero_prob` (0.75 for HPV16, 0.56 for HPV18, 0.60 for the pools): women who do not seroconvert keep `nab_imm = 0` and are fully reinfectible. Cell-mediated immunity is not gated — every woman who clears gets some severity protection. That asymmetry matters for the low-seroconversion genotypes, where treating all clearance as fully protective would understate ongoing transmission.
+
+## Cross-protection is a matrix, vaccine protection is not
+
+Immunity earned against one genotype partly protects against the others. The `CrossImmunity` module holds two 4×4 matrices — rows are the genotype being protected, columns the genotype that was cleared — and every timestep it computes, for each genotype `g`:
+
+```
+susceptibility reduction = Σ over sources k of cross_imm_sus[g, k] × nab_imm[k]
+rel_sus[g]               = (1 − that) × (1 − vax_imm[g]) × (1 − txvx_imm[g])
+sev_imm[g]               = Σ over sources k of cross_imm_sev[g, k] × cell_imm[k]
+```
+
+The matrices are built from five scalars, not calibrated cell by cell. `own_imm_hr` (0.9) is the diagonal for the pooled genotypes; HPV16 and HPV18 have a diagonal of 1.0. Off the diagonal, HPV16 and HPV18 protect each other at the "high" level (`cross_imm_sus_high` 0.5, `cross_imm_sev_high` 0.7) because they share a clade; every other pair uses the "medium" level (`cross_imm_sus_med` 0.3, `cross_imm_sev_med` 0.5). Per-cell calibration was removed in v3.2: calibrate the five scalars, or pass whole matrices as `cross_imm_sus=` and `cross_imm_sev=` if you have external estimates.
+
+Vaccine immunity works differently on purpose. It is stored per **target** genotype in `vax_imm` and applied directly, bypassing the matrix, because the per-genotype `rel_imm` values in `hpvsim/data/products_vx.csv` already are the vaccine's complete cross-protection profile — bivalent gives 1.0 against HPV16 and HPV18, 0.5 against `hi5`, 0.1 against `ohr`; nonavalent gives 1.0 against `hi5` too. Putting those through the clearance matrix would double-count protection they already describe.
+
+Vaccine protection is all-or-nothing per woman: one draw at `sterilizing_p` (0.95) settles her fate for every genotype at once. Women who draw sterilizing immunity get `vax_imm[g] = rel_imm[g]`; the rest get `rel_imm[g] × 0.95` as leaky protection. Existing immunity is never downgraded.
+
+The same module owns `rel_sev`, each woman's intrinsic progression speed. It is not immunity, but it lives here for the same reason the matrices do: it must be one draw per woman, shared across every genotype she carries. It is sampled from a folded normal — `ss.normal(loc=1.0, scale=0.2)` with the sign discarded — and multiplies the time axis of both progression curves in [Natural history](natural-history.qmd). Calibrations often lower its centre.
+
+Two limits to state plainly. Immunity does not wane in v3: protection earned is kept for life. And because immunity is applied before interventions within a timestep, a woman vaccinated in one timestep is protected from the next onwards — three months at the default `dt`.
+
+## How to test whether cross-protection matters for your setting
+
+Cross-protection is one of the least well-measured parts of the model, and it changes prevalence substantially. Before calibrating it, find out how much your outputs depend on it: run with the defaults and with cross-protection switched off, leaving own-genotype immunity intact.
+
+```{python}
+import pandas as pd
+import hpvsim as hpv
+
+pars = dict(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'],
+            n_agents=2000, start=2000, stop=2020, verbose=0)
+
+default = hpv.Sim(**pars, label='default cross-protection')
+no_cross = hpv.Sim(**pars, label='no cross-protection',
+                   imm_pars=dict(cross_imm_sus_med=0.0, cross_imm_sus_high=0.0,
+                                 cross_imm_sev_med=0.0, cross_imm_sev_high=0.0))
+
+for sim in (default, no_cross):
+    sim.run()
+    print(f'{sim.label:>25}: HPV prevalence in 2020 = '
+          f'{float(sim.results.all_hpv.prevalence[-1]):.3f}')
+
+# The matrix the defaults produce: rows protected, columns cleared
+genotypes = ['hpv16', 'hpv18', 'hi5', 'ohr']
+print(pd.DataFrame(default.connectors.crossimmunity.cross_imm_sus,
+                   index=genotypes, columns=genotypes))
+```
+
+Setting the four off-diagonal scalars to zero leaves the diagonal — a woman is still protected against the genotype she cleared. If the gap between the two runs is wide, cross-protection belongs in your calibrated parameter set; if it is narrow, fix it at the defaults and spend your trials elsewhere.
+
+## See also
+
+- [Natural history](natural-history.qmd) for how `sev_imm` shortens the next infection
+- [Interventions](interventions.qmd) for delivering vaccines to a population
+- [`hpv.CrossImmunity` API reference](../api/cross_genotype.qmd) and [`hpv.vx`](../api/products.qmd)
