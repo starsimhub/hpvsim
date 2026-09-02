@@ -22,8 +22,7 @@ def _attach_dx_and_init(sim, dx_instance):
     on the intervention after init may differ from the one passed in. Callers
     must use the returned product for all administer/result_dist calls.
     """
-    # ss.treat_num supports being constructed with prob=0 (no firing) — this is the
-    # cheapest way to get the dx attached to a sim that will run sim.init()
+    # prob=0 attaches the dx to a sim that will init without ever firing it.
     stub = ss.treat_num(product=dx_instance, prob=0.0)
     sim.pars['interventions'] = [stub]
     sim.init()
@@ -99,3 +98,20 @@ def test_dx_empty_uids_returns_empty_dict():
     d_init = _attach_dx_and_init(sim, hpv_dx(name='via'))
     out = d_init.administer(ss.uids())
     assert all(len(v) == 0 for v in out.values())
+
+
+def test_dx_from_df_initializes_in_sim():
+    """A df-built product has no product name, so it must keep the class default.
+
+    A None module name breaks people.add_module() at sim.init().
+    """
+    import pandas as pd
+    df = pd.DataFrame(dict(
+        state=['susceptible', 'precin'],
+        genotype=['all', 'all'],
+        result=['negative', 'positive'],
+        probability=[1.0, 1.0],
+    ))
+    d = hpv_dx(df=df, hierarchy=['positive', 'negative'])
+    assert d.name == 'dx'
+    _attach_dx_and_init(_four_genotype_sim(), d)

@@ -73,9 +73,9 @@ def _make_small_sim_with_product(product, genotypes=('hpv16', 'hpv18', 'hi5', 'o
     the intervention is purely so that sim.init() runs the full dist-init
     chain that initializes the product's bare-attribute distributions.
 
-    Returns (sim, initialized_product) — Starsim deep-copies modules during
-    init_module_attrs, so the product reference retrieved from the sim after
-    init is distinct from (and replaces) the one passed in.
+    Returns (sim, initialized_product): Starsim deep-copies modules during
+    init_module_attrs, so the product retrieved from the sim after init is a
+    different object from the one passed in.
     """
     import starsim as ss
     intv = ss.routine_vx(product=product, prob=0.0, start_year=2010)
@@ -88,8 +88,7 @@ def _make_small_sim_with_product(product, genotypes=('hpv16', 'hpv18', 'hi5', 'o
         interventions=[intv],
     )
     sim.init()
-    # Retrieve the initialized copy from the sim — Starsim deep-copies modules
-    # during init_module_attrs, so the original `product` variable is stale.
+    # Starsim deep-copies modules at init, so the passed-in product is stale.
     initialized_product = sim.interventions['routine_vx'].product
     return sim, initialized_product
 
@@ -98,7 +97,6 @@ def test_vx_administer_bumps_vax_imm_for_active_genotypes():
     """administer() writes per-genotype vax_imm; max-of-existing semantics."""
     from hpvsim.products import vx
     sim, product = _make_small_sim_with_product(vx(rel_imm={'hpv16': 1.0, 'hpv18': 0.5}))
-    # Pick 20 agents and vaccinate them
     uids = sim.people.alive.uids[:20]
     pre_hpv16 = sim.diseases['hpv16'].vax_imm[uids].copy()
     pre_hpv18 = sim.diseases['hpv18'].vax_imm[uids].copy()
@@ -111,10 +109,9 @@ def test_vx_administer_bumps_vax_imm_for_active_genotypes():
     # hpv18 has rel_imm=0.5: sterilizing -> vax_imm=0.5, leaky -> 0.5*0.95=0.475
     assert np.all(post_hpv18 >= 0.475)
     assert np.all(post_hpv18 <= 0.5)
-    # No regressions in initial state
+    # max-of-existing: vax_imm never decreases.
     assert np.all(post_hpv16 >= pre_hpv16)
     assert np.all(post_hpv18 >= pre_hpv18)
-    # nab_imm must be untouched — vaccine writes only to vax_imm
     assert np.all(sim.diseases['hpv16'].nab_imm[uids] == 0.0), \
         'administer() must not touch nab_imm (clearance-only array)'
     assert np.all(sim.diseases['hpv18'].nab_imm[uids] == 0.0), \
@@ -134,25 +131,19 @@ def test_vx_administer_skips_inactive_genotypes_silently():
 def test_vx_administer_does_not_downgrade_natural_immunity():
     """Vaccine writes vax_imm; leaves clearance-conferred nab_imm untouched.
 
-    Natural immunity is in nab_imm. Vaccine immunity is in vax_imm.  Since
-    they are separate arrays, the vaccine can never downgrade natural immunity.
-    This test also verifies that vax_imm respects the max-of-existing rule when
-    the agent already has prior vaccine immunity.
+    Natural and vaccine immunity live in separate arrays, so the vaccine cannot
+    downgrade natural immunity. vax_imm also respects max-of-existing when the
+    agent already carries prior vaccine immunity.
     """
     from hpvsim.products import vx
     sim, product = _make_small_sim_with_product(vx(rel_imm={'hpv16': 0.5}))
     uids = sim.people.alive.uids[:10]
-    # Simulate natural clearance immunity (nab_imm=0.95) and prior vaccine
-    # immunity (vax_imm=0.8, higher than the new vaccine's leaky floor of 0.5).
+    # Prior vax_imm=0.8 sits above the new vaccine's leaky floor of 0.5.
     sim.diseases['hpv16'].nab_imm[uids] = 0.95
     sim.diseases['hpv16'].vax_imm[uids] = 0.8
     product.administer(sim.people, uids)
-    # nab_imm must be completely untouched — vaccine writes only to vax_imm
     assert np.all(sim.diseases['hpv16'].nab_imm[uids] == 0.95), \
         'administer() must not touch nab_imm (clearance-only array)'
-    # vax_imm must respect max-of-existing: prior 0.8 > leaky floor 0.5, so
-    # vax_imm must still be >= 0.8 (sterilizing draw may push it to 1.0, but
-    # it must never fall below the pre-administer value).
     assert np.all(sim.diseases['hpv16'].vax_imm[uids] >= 0.8), \
         'administer() must not downgrade existing vax_imm'
 
@@ -190,6 +181,12 @@ def test_cast_sex_list_both():
     from hpvsim.interventions import _cast_sex
     assert _cast_sex(['f', 'm']) == {0, 1}
     assert _cast_sex([0, 1]) == {0, 1}
+
+
+def test_cast_sex_both_sexes_string():
+    from hpvsim.interventions import _cast_sex
+    assert _cast_sex('fm') == {0, 1}
+    assert _cast_sex('mf') == {0, 1}
 
 
 def test_cast_sex_invalid_raises():
@@ -342,4 +339,23 @@ def test_campaign_vx_passes_years_through():
     from hpvsim.interventions import campaign_vx
     intv = campaign_vx(product='bivalent', prob=[0.7, 0.5], years=[2020, 2021])
     assert list(intv.years) == [2020, 2021]
+
+
+def test_intervention_name_colliding_with_product_raises():
+    """A name matching the product's module name raises at construction."""
+    with pytest.raises(ValueError, match='reserved'):
+        hpv.routine_vx(product='bivalent', prob=0.5, name='vx', start_year=2020)
+    with pytest.raises(ValueError, match='reserved'):
+        hpv.campaign_vx(product='bivalent', prob=0.5, name='vx', years=[2020])
+    with pytest.raises(ValueError, match='reserved'):
+        hpv.routine_screening(product='via', prob=0.5, name='via', start_year=2020)
+    with pytest.raises(ValueError, match='reserved'):
+        hpv.treat_num(product=hpv.radiation(), prob=1.0, name='radiation')
+    with pytest.raises(ValueError, match='reserved'):
+        hpv.routine_txvx(product='txvx1', prob=0.5, name='txvx1', start_year=2020)
+    # A non-colliding name still constructs and initializes.
+    intv = hpv.routine_vx(product='bivalent', prob=0.5, name='vx_program',
+                          start_year=2020)
+    hpv.Sim(n_agents=100, start=2020, stop=2021, location='nigeria',
+            interventions=intv).init()
 

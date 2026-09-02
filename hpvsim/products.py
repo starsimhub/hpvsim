@@ -246,10 +246,8 @@ class vx(ss.Vx):
         if len(uids) == 0:
             return
         # HIV co-infection reduces vaccine take (gated no-op without HIV).
-        # When an HIV connector is present, scale each agent's conferred peak by
-        # its per-agent hiv_rel_imm factor (1.0 for HIV- agents).
         rel_imm_hiv = _hiv_rel_imm_factor(self.sim)
-        # Single sterilizing draw per agent (NOT per genotype).
+        # Single sterilizing draw per agent, not per genotype.
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         sterilizing_uids, leaky_uids = self._sterilizing_dist.filter(uids, both=True)
         for genotype, rel_imm_g in self.rel_imm.items():
@@ -311,22 +309,19 @@ class dx(ss.Dx):
 
     def __init__(self, name=None, df=None, hierarchy=None, **kwargs):
         resolved_df, resolved_hierarchy = _resolve_dx_pars(name, df, hierarchy)
-        # ss.Dx.__init__ accesses df.disease.unique() which HPV CSVs don't have.
-        # Add a temporary stub column so the base init succeeds, then overwrite
-        # self.diseases with our HPV-specific genotype attribute.
+        # ss.Dx.__init__ needs df.disease, which HPV CSVs lack; stub it out.
         df_for_base = resolved_df.copy()
         if 'disease' not in df_for_base.columns:
             df_for_base['disease'] = '_hpv_stub'
         super().__init__(df=df_for_base, hierarchy=resolved_hierarchy, **kwargs)
-        # ss.Dx populates self.diseases from the stub; we don't use that attribute
-        # — hpv.dx routes through iter_hpv_modules instead. Clear it to avoid
-        # confusing downstream introspection.
+        # Unused: hpv.dx routes through iter_hpv_modules, not self.diseases.
         self.diseases = None
         # Store the original (no-stub) df for our own administer logic
         self.df = resolved_df
-        self.name = name
-        # The base sets self.diseases from df['disease'] but HPV CSV uses
-        # 'genotype' instead. Replace with our own attrs.
+        # Module name = product name; a df-built product keeps the class default
+        # ('dx'), since a None name breaks people.add_module() at sim.init().
+        if name is not None:
+            self.name = name
         self._genotypes_in_df = list(resolved_df['genotype'].unique())
         self._all_genotype = (len(self._genotypes_in_df) == 1
                               and self._genotypes_in_df[0] == 'all')
@@ -337,12 +332,9 @@ class dx(ss.Dx):
                 return {k: ss.uids() for k in self.hierarchy}
             return np.array([], dtype=int)
 
-        # Normalize input to ss.uids so downstream .intersect / .union ops work
-        # regardless of whether the caller passed an ss.uids or a plain ndarray.
+        # Normalize so .intersect / .union work on a plain-ndarray input.
         uids = ss.uids(uids)
-        # uid-keyed Series so we can update with .loc[these_uids] directly,
-        # mirroring ss.Dx.administer. Hierarchy-min semantics: most-severe
-        # result (lowest hierarchy index) wins on multi-genotype-positive agents.
+        # uid-keyed for .loc updates; hierarchy-min means lowest index wins.
         results = pd.Series(self.default_value, index=uids)
 
         for state in self.health_states:
@@ -392,23 +384,24 @@ class tx(ss.Tx):
         module.ti_cin[uids]      = NaN
         module.ti_cancerous[uids] = NaN
         module.ti_clearance[uids] = module.ti + 1   # cleared next module step
+        module.to_latent[uids]    = False           # clears to susceptible
     """
 
     def __init__(self, name=None, df=None, **kwargs):
         df = _resolve_tx_pars(name, df)
-        # ss.Tx.__init__ accesses df.disease.unique() — HPV CSVs use 'genotype'
-        # instead. Add a temporary stub column so the base init succeeds, then
-        # restore the original df and clear the base-set self.diseases attribute.
+        # ss.Tx.__init__ needs df.disease, which HPV CSVs lack; stub it out.
         df_for_base = df.copy()
         if 'disease' not in df_for_base.columns:
             df_for_base['disease'] = '_hpv_stub'
         super().__init__(df=df_for_base, **kwargs)
-        # ss.Tx populates self.diseases from the stub; hpv.tx routes through
-        # iter_hpv_modules instead — clear it to avoid confusing introspection.
+        # Unused: hpv.tx routes through iter_hpv_modules, not self.diseases.
         self.diseases = None
         # Restore the original (no-stub) df for our own administer logic.
         self.df = df
-        self.name = name
+        # Module name = product name; a df-built product keeps the class default
+        # ('tx'), since a None name breaks people.add_module() at sim.init().
+        if name is not None:
+            self.name = name
 
     def administer(self, uids, return_format='dict'):
         if len(uids) == 0:
@@ -439,9 +432,12 @@ class tx(ss.Tx):
                 module.cancerous[eff] = False
                 module.ti_cin[eff] = np.nan
                 module.ti_cancerous[eff] = np.nan
-                # ti_clearance is owned and read by the HPV module against its
-                # own module.ti (hpv.py step), so schedule in the module's ti.
+                # ti_clearance is read against the HPV module's own ti, not ours.
                 module.ti_clearance[eff] = module.ti + 1
+                # Cancel any pending latency roll: treatment-induced clearance
+                # sends the agent to susceptible, not into latency. No-op at the
+                # default hpv_control_prob=0, where to_latent is never set.
+                module.to_latent[eff] = False
 
         if successful_uids_list:
             successful = ss.uids(np.unique(np.concatenate(successful_uids_list)))
@@ -472,9 +468,7 @@ class txvx(ss.Vx):
             sterilizing_p=sterilizing_p,
             imm_boost=imm_boost,
         )
-        # Set the module-level name to the product name (instead of class
-        # name 'txvx') so sim.people.add_module() doesn't collide with an
-        # intervention also called 'txvx'.
+        # Avoids an add_module() collision with an intervention also named 'txvx'.
         if name is not None:
             self.name = name
         if imm_boost is None:
@@ -492,19 +486,15 @@ class txvx(ss.Vx):
         if len(uids) == 0:
             return
         if self.pars.imm_boost is not None:
-            # HIV scaling is NOT applied to the booster: the base immunity set at
-            # first dose was already scaled by hiv_rel_imm; multiplying the booster
-            # by it again would double-count the reduction.
-            # Booster: multiplicative in place on all HPV modules.
+            # Booster: multiplicative in place. No HIV scaling — the first dose
+            # was already scaled, so applying it again would double-count.
             for module in iter_hpv_modules(self.sim):
                 module.txvx_imm[uids] *= float(self.pars.imm_boost)
             return
-        # First dose: per-agent sterilizing draw, then per-genotype scaling.
-        # bernoulli.rvs returns the boolean array directly, in uids-order.
+        # First dose: per-agent sterilizing draw (rvs returns bools in uids-order).
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         is_sterilizing = self._sterilizing_dist.rvs(uids)
-        # HIV co-infection reduces vaccine take (gated no-op without HIV). The
-        # factor is read in uids-order to match `peak` / `is_sterilizing`.
+        # HIV reduces vaccine take (gated no-op); uids-order matches peak below.
         rel_imm_hiv = _hiv_rel_imm_factor(self.sim)
         hiv_scale = 1.0 if rel_imm_hiv is None else rel_imm_hiv[uids]
         for genotype, rel_imm_g in self.rel_imm.items():
@@ -531,29 +521,22 @@ class radiation(ss.Product):
         self.define_pars(
             dur=dur or dict(dist='normal', par1=18 / 12, par2=2 / 12),
         )
-        # Placeholder; params re-pointed each administer call so post-init
-        # mutations of self.pars.dur (e.g. via dynamic_pars) take effect.
+        # Placeholder; loc/scale are re-pointed on each administer call so
+        # post-init mutation of self.pars.dur is honored.
         self._dur_dist = ss.normal(loc=0.0, scale=1.0)
 
     def administer(self, uids):
         if len(uids) == 0:
             return ss.uids()
-        # Re-point loc/scale from current pars on each call so any later
-        # mutation of self.pars.dur is honored.
         self._dur_dist.set(loc=float(self.pars.dur['par1']),
                            scale=float(self.pars.dur['par2']))
-        # Convert sampled-duration years -> integer-ti steps via dt_year. Using
-        # self.sim.t.dt is a freq object (e.g. years(0.25)); arithmetic with it
-        # drops the time-unit denominator and undercounts by 1/dt steps.
+        # dt_year, not t.dt: arithmetic on the freq object drops the time unit.
         dt_year = self.sim.t.dt_year
         for module in iter_hpv_modules(self.sim):
             cancer_uids = module.cancerous.uids.intersect(uids)
             if len(cancer_uids) == 0:
                 continue
-            # Draw per-module on the cancer subset. Avoids the alignment trap
-            # of pre-drawing on `uids` and then trying to index by mask (which
-            # gives uids-order durations) while writing by cancer_uids
-            # (which is sorted order — `intersect` does not preserve uids-order).
+            # Draw on cancer_uids: intersect returns sorted order, not uids-order.
             new_dur = self._dur_dist.rvs(cancer_uids)
             module.ti_dead_cancer[cancer_uids] += np.ceil(new_dur / dt_year)
         return uids

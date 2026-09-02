@@ -103,6 +103,37 @@ def test_tx_clears_ti_cin_and_ti_cancerous_on_success():
         assert np.all(np.isnan(sim.diseases['hpv16'].ti_cancerous[succ]))
 
 
+def test_tx_treated_woman_clears_to_susceptible_not_latency():
+    """Treatment-induced clearance must not strand a to_latent woman in latency.
+
+    Invisible at the default hpv_control_prob=0, so latency is forced on and
+    beta=0 rules out same-step reinfection.
+    """
+    sim = hpv.Sim(
+        n_agents=200, start=2020, stop=2022, location='nigeria',
+        diseases=[hpv.HPV('hpv16', hpv_control_prob=1.0, beta=0)],
+    )
+    t = _attach_tx_and_init(sim, hpv_tx(name='ablation'))
+    hpv16 = sim.diseases['hpv16']
+    uids = sim.people.female.uids[:10]
+    hpv16.susceptible[uids] = False
+    hpv16.infected[uids] = True
+    hpv16.precin[uids] = False
+    hpv16.cin[uids] = True
+    hpv16.cancerous[uids] = False
+    hpv16.to_latent[uids] = True
+    succ = t.administer(uids)['successful']
+    assert len(succ), 'ablation has efficacy 0.936 on cin; expected successes'
+    # Two steps: ti increments at the end of a step, and treatment schedules
+    # clearance for module.ti + 1.
+    sim.run_one_step()
+    sim.run_one_step()
+    still_alive = succ[sim.people.alive[succ]]
+    assert len(still_alive)
+    assert not hpv16.latent[still_alive].any()
+    assert hpv16.susceptible[still_alive].all()
+
+
 def test_tx_empty_uids_returns_empty_outcomes():
     sim = _four_genotype_sim()
     t = _attach_tx_and_init(sim, hpv_tx(name='ablation'))
