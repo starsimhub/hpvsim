@@ -1,6 +1,7 @@
 """Tests for HPV latency: entry (hpv_control_prob), reactivation
 (hpv_reactivation), and the HIV rel_reactivation connector effect."""
 import numpy as np
+import pytest
 import starsim as ss
 import hpvsim as hpv
 
@@ -18,7 +19,7 @@ def test_hpv_has_latency_pars_and_states():
 
 
 def test_latency_states_default_correctly():
-    """to_latent defaults False; ti_latent/ti_reactivation default nan; latent (existing) defaults False."""
+    """to_latent and latent default False; ti_latent/ti_reactivation default nan."""
     sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)
     sim.init()
     mod = sim.diseases.hpv16
@@ -49,7 +50,6 @@ def test_forced_control_prob_produces_latent_agents():
     assert latent_mask.any(), 'expected at least one latent agent with hpv_control_prob=1.0'
     latent_uids = uids[latent_mask]
     assert np.all(~np.isnan(mod.ti_latent[latent_uids]))
-    # Latent agents are neither susceptible nor (normally) infected.
     assert not mod.susceptible[latent_uids].any()
     assert not mod.to_latent[latent_uids].any(), 'to_latent should clear once latent is stamped'
 
@@ -85,17 +85,7 @@ def test_latent_agents_reactivate_and_regain_a_trajectory():
     uids = sim.people.auids
     reactivated_uids = uids[~np.isnan(mod.ti_reactivation[uids])]
     assert len(reactivated_uids) > 0, 'expected at least one reactivation with hpv_reactivation=5.0/year'
-    # A reactivated agent is no longer latent and has a fresh clearance/CIN
-    # schedule (i.e. looks like a freshly-infected agent again) -- checked on
-    # agents reactivated in the FINAL step specifically. Checking *all* uids
-    # that ever reactivated over the full 25-year run would be unsound here:
-    # hpv_control_prob=1.0 means every subsequent clearance -- including one
-    # from a post-reactivation trajectory -- is also routed back into latency
-    # (correct, permanent-cycling behavior), so some earlier reactivators
-    # legitimately relapse into latency again before the sim ends. Agents
-    # reactivated on the very last step can't have completed another full
-    # clearance cycle within the same step, so this is a clean check of the
-    # immediate post-reactivation state.
+    # Only final-step reactivators: earlier ones may have relapsed into latency again.
     just_reactivated = reactivated_uids[mod.ti_reactivation[reactivated_uids] == sim.ti]
     assert len(just_reactivated) > 0
     assert not mod.latent[just_reactivated].any()
@@ -105,28 +95,14 @@ def test_latent_agents_reactivate_and_regain_a_trajectory():
 
 
 def test_reactivations_are_not_double_counted_as_new_infections():
-    """Reactivation must not inflate new_infections (matches v2.2.6's separate
-    'reactivations' flow, kept apart from 'infections')."""
+    """Reactivations are their own flow and must not inflate new_infections."""
     sim_react = hpv.Sim(n_agents=500, location='nigeria', genotypes=[16],
                         start=1975, stop=2000, dt=1.0, rand_seed=0,
                         pars=dict(hpv_control_prob=1.0, hpv_reactivation=ss.probperyear(rate=5.0)))
     sim_react.run()
     n_react = sim_react.results.hpv16.new_reactivations.sum()
     assert n_react > 0
-    # new_infections should not have been inflated by reactivation. We can't
-    # easily get a "what if reactivation didn't exist" baseline bit-for-bit
-    # (different rand draws), and bounding cumulative new_infections by a
-    # unique-ever-infected agent count doesn't work either: in an endemic STI
-    # sim, agents (particularly males, who always clear back to susceptible)
-    # are reinfected by the network many times over 25 years, so cumulative
-    # infection *events* routinely and correctly exceed the unique
-    # ever-infected count by a large margin, independent of reactivation.
-    # Instead, check the invariant that the implementation actually
-    # guarantees: step_state increments new_infections by exactly n_react
-    # (via set_prognoses) and then subtracts that same n_react in the same
-    # step, so the reactivation bookkeeping can never push new_infections
-    # negative. If a future change breaks that pairing (e.g. double-counts or
-    # double-subtracts), this goes negative.
+    # step_state adds then subtracts the same n_react, so new_infections can't go negative.
     assert (sim_react.results.hpv16.new_infections.values >= 0).all()
 
 
@@ -146,21 +122,29 @@ def test_hiv_shortens_time_to_reactivation():
     hiv_infected = np.asarray(hivmod.infected[reactivated], dtype=bool)
     hiv_pos_reactivated = reactivated[hiv_infected]
     hiv_neg_reactivated = reactivated[~hiv_infected]
-    # Not a strict guarantee for every individual, but with a 20x hazard
-    # multiplier the HIV+ group's average time latent->reactivation should be
-    # clearly shorter, if both groups are non-empty.
+    # Group means only: a 20x hazard isn't a per-agent guarantee.
     if len(hiv_pos_reactivated) > 3 and len(hiv_neg_reactivated) > 3:
         dur_pos = (hpvmod.ti_reactivation[hiv_pos_reactivated] - hpvmod.ti_latent[hiv_pos_reactivated]).mean()
         dur_neg = (hpvmod.ti_reactivation[hiv_neg_reactivated] - hpvmod.ti_latent[hiv_neg_reactivated]).mean()
         assert dur_pos < dur_neg
 
 
+def test_to_latent_is_not_a_public_result():
+    """to_latent is an internal scheduling flag, so it must not auto-generate
+    a result on a genotype or on all_hpv; n_latent stays the real scaled stock."""
+    sim = _sim_with_forced_latency()
+    mod = sim.diseases.hpv16
+    pop_scale = sim.pars.pop_scale
+    for res in (sim.results.hpv16, sim.results.all_hpv):
+        assert 'n_to_latent' not in res
+        assert res.n_latent.scale is True
+        assert res.n_latent.sum() > 0
+        assert res.n_latent[-1] == pytest.approx(mod.latent.sum() * pop_scale)
+
+
 def test_default_hpv_control_prob_reproduces_pre_latency_results():
-    """hpv_control_prob=0 (the default) must be bit-identical to a sim that
-    never had this feature -- the single most important acceptance test.
-    Compares two sims built identically except one explicitly omits the new
-    pars entirely (simulating "pre-feature" code) and one uses today's
-    defaults; results must match exactly."""
+    """The default hpv_control_prob=0 gives results identical to setting it
+    explicitly, and produces no latency or reactivations at all."""
     kwargs = dict(n_agents=2000, location='nigeria', genotypes=[16],
                   start=1970, stop=2020, dt=0.5, rand_seed=0)
     sim_default = hpv.Sim(**kwargs)

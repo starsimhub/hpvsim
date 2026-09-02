@@ -4,10 +4,8 @@ import pytest
 
 import hpvsim as hpv
 
-# Pattern note: hpv.Sim deep-copies its inputs (sc.mergedicts(_copy=True)),
-# so the user-side by_age reference passed to analyzers=[...] becomes stale
-# after sim construction. Tests construct the analyzer inline and retrieve
-# the live instance post-run via sim.analyzers['by_age'].
+# hpv.Sim deep-copies its inputs, so the live analyzer must be retrieved
+# post-run via sim.analyzers['by_age'] rather than the passed-in reference.
 
 
 def test_by_age_string_key():
@@ -122,6 +120,25 @@ def test_by_age_cancers_matches_all_hpv_new_cancers():
         actual = float(df.loc[year].sum())
         assert np.isclose(actual, expected, rtol=1e-6, atol=1e-6), (
             f'year {year}: by_age sum={actual}, all_hpv.new_cancers sum={expected}')
+
+
+def test_by_age_demographic_denominators():
+    """n_alive/n_females/n_males register scale=True, are internally
+    consistent per bin, and sum across bins to the sim population."""
+    edges = [0., 30., 60., 150.]
+    sim = hpv.Sim(location='nigeria', total_pop=200_000, n_agents=2000,
+                  start=2000, stop=2003, dt=1.0, rand_seed=0,
+                  analyzers=[hpv.by_age(['n_alive', 'n_females', 'n_males'],
+                                        edges=edges)])
+    sim.run()
+    ar = sim.analyzers['by_age']
+    assert sim.results.by_age.n_alive_0_30.scale is True
+    assert (ar.n_alive > 0).all()
+    np.testing.assert_allclose(ar.n_females + ar.n_males, ar.n_alive)
+    np.testing.assert_allclose(ar.n_alive.sum(axis=1),
+                               np.asarray(sim.results.n_alive, dtype=float))
+    female_frac = ar.n_females.sum() / ar.n_alive.sum()
+    assert 0.4 < female_frac < 0.6
 
 
 def test_by_age_hpv_prevalence_in_zero_one_range():
