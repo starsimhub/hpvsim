@@ -1,25 +1,46 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
-## Version 3.2.0 (in progress)
+## Version 3.2.0 (2026-09-02)
 
-- Restores HPV latency modeling (dropped in the v2->v3 rewrite): a female-only `hpv_control_prob` roll at clearance redirects into a `latent` state, with a per-timestep `hpv_reactivation` hazard (an `ss.probperyear`, scaled by the agent's `sev_imm` and a new CD4-stratified `rel_reactivation` HIV connector effect) governing return to an active (freshly-drawn) trajectory. Opt-in and a true no-op when `hpv_control_prob=0` (the default).
-- `cin_fn`/`cancer_fn`/`age_risk`/`NetworkPars.age_act_pars_*` are now `ss.Pars` instead of plain `dict`, so a partial nested override merges instead of wholesale-replacing sibling keys.
-- New: `hpv.Sim` now accepts bare hpvsim-specific kwargs equivalently to `pars=` (e.g. `hpv.Sim(beta=0.15)` now works, matching `hpv.Sim(pars=dict(beta=0.15))`); adds `nw_pars=`/`imm_pars=` construction-time sugar mirroring the existing `hiv_pars=`.
-- Fixes `hpv.SimPars().dt` drift bug: corrected from `0.5` to `0.25`, matching `hpv.Sim.__init__`'s own longstanding default.
-- Unifies HIV co-infection under one `hpv.HIV` base class (CD4-stratified effects, HIV-stratified results) with two leaves, `hpv.HIV_transmit` (network transmission) and `hpv.HIV_incidence` (imposed incidence curve) -- both self-contained, no separate connector or stratified-results analyzer needed. New `hpv.Sim(model_hiv=True|'incidence'|'transmission', hiv_data=, hiv_pars=)` sugar auto-constructs the right disease (+ `sti.ART` for incidence mode, where ART data is mandatory).
-- *Regression information*: `hpv.hiv_incidence` (the intervention), `hpv.hiv_art`, `hpv_hiv_connector`, and `HIVStratifiedResults` are all removed. Use `hpv.HIV_incidence`/`hpv.HIV_transmit` (diseases) directly, or `hpv.Sim(model_hiv=...)` sugar.
-- *Regression information*: `HPV.pars.beta` is now a plain scalar at rest (was a dict `{'sexualnetwork': [f2m, m2f]}`); read the validated per-network dict via `HPV.validate_beta()` instead of `.pars.beta` directly.
-- *Regression information*: the legacy `cross_immunity.<matrix>.<tgt>.<src>` calibration key form is removed; per-cell cross-immunity calibration is no longer supported -- use the 5 scalar `CrossImmunity` pars instead (e.g. `own_imm_hr`, `cross_imm_sus_med`).
-- *Regression information*: `stisim` is now an optional dependency, not a hard one -- `pip install hpvsim` no longer installs it, and pure-HPV modeling works without it. HIV users need `pip install hpvsim[hiv]`; `hpv.HIV`/`hpv.HIV_transmit`/`hpv.HIV_incidence` and `hpv.Sim(model_hiv=...)` raise a clear `ImportError` pointing at that extra when it's missing.
+- Restores female HPV latency, dropped in the v2→v3 rewrite. Opt-in via `hpv_control_prob`; a no-op at its default of 0. Once enabled it has a large effect — latency withholds women from their genotype's cancer pathway, roughly halving cancer counts at the default reactivation hazard — and `hpv_reactivation` carries v2's never-fitted placeholder value of 0.025/year, so fit it for your setting rather than relying on the default.
+- Unifies HIV co-infection under `hpv.HIV`, with `hpv.HIV_transmit` and `hpv.HIV_incidence` leaves and new `hpv.Sim(model_hiv=...)` sugar. CD4 stratum now also scales latency reactivation.
+- `hpv.Sim` accepts bare hpvsim kwargs as well as `pars=`, so `hpv.Sim(beta=0.15)` works. Adds `nw_pars=` and `imm_pars=`.
+- Nested parameter overrides now merge rather than replace sibling keys (`cin_fn`, `cancer_fn`, `age_risk`, `age_act_pars_*`).
+- Fixes `hpv.SimPars().dt`, which was 0.5 while `hpv.Sim` used 0.25.
+- `hpv.HIV_incidence` and `hpv.data.reshape_art_coverage` now accept age-banded HIV and ART inputs, such as the 5-year bands UNAIDS and Spectrum emit. Banded incidence previously raised `IndexError`, and banded ART coverage silently left most ages untreated. Year lookup is now nearest-year rather than exact-match.
+- `hpv.by_age` now accepts the population denominators `n_alive`, `n_females` and `n_males`, so crude age-specific rates no longer need a second analyzer. These keys were declared but unimplemented, and previously raised `ValueError`.
+- Vaccination interventions now define `new_vaccinated`, `new_doses`, `cum_vaccinated` and `cum_doses`, so counting doses no longer needs a manual `vaccinated.sum() * pop_scale`.
+- Naming an intervention after its own product (`hpv.routine_vx(product='bivalent', name='vx')`) now raises a clear error at construction instead of an opaque `AttributeError: Module vx already added` at init.
+- Fixes `hpv.dx(df=...)` and `hpv.tx(df=...)` crashing at `sim.init()` with `TypeError: attribute name must be string, not 'NoneType'`.
+- Adds a user guide, refreshes the tutorials, and fixes the docs build, broken since v3.1.0.
+- *Regression information*: treatment and therapeutic-vaccine interventions honour `sex=` correctly. `sex=['f','m']` previously restricted silently to women, and `hpv.BaseTxVx` ignored `sex=` altogether. `sex='f'` and `sex=None` are unchanged.
+- *Regression information*: the `age_range` upper bound is now exclusive for treatment and txvx, matching vaccination, screening and triage. Agents alive at sim start are unaffected (float ages never land exactly on the bound), but agents born during the run lose one timestep of eligibility at the top of the band — up to `dt/(hi-lo)` of eligible person-time.
+- *Regression information*: treating a woman who had entered the latency branch now returns her to susceptible rather than leaving her latent. Only affects runs with `hpv_control_prob > 0`.
+- *Regression information*: `reshape_art_coverage` leaves the top age band open-ended, so ART now reaches agents above the last data row (over-80s in a band ending at 80) who previously received none.
+- *Regression information*: the internal `n_to_latent` result is no longer published on genotypes or on `all_hpv`. It was scheduling bookkeeping, unscaled, and meaningless once summed across genotypes. `n_latent` is unchanged. Anything indexing `all_hpv` results positionally will shift by one.
+- *Regression information*: `stisim` is now optional; HIV users need `pip install hpvsim[hiv]`.
+- *Regression information*: `hpv.hiv_incidence`, `hpv.hiv_art`, `hpv_hiv_connector`, and `HIVStratifiedResults` are removed. Use `hpv.HIV_incidence`/`hpv.HIV_transmit` or `model_hiv=`.
+- *Regression information*: `HPV.pars.beta` is now a scalar; use `HPV.validate_beta()` for the per-network dict.
+- *Regression information*: per-cell `cross_immunity.<matrix>.<tgt>.<src>` calibration keys are removed; use the scalar `CrossImmunity` pars.
+
+### Known issues
+
+These predate v3.2 and are not introduced by it, but they are documented here because they affect how results should be interpreted.
+
+- **Results depend on `dt`.** The same parameters give substantially different epidemiology at different timesteps: HPV prevalence is 0.001, 0.044 and 0.200 at `dt` of 1.0, 0.5 and 0.25, and cervical cancer counts scale similarly. The values do not converge as `dt` falls. Treat `dt=0.25` (the default) as the reference, keep `dt` fixed across any comparison, and recalibrate if you change it — a calibration is specific to the `dt` it was fitted at. The likely cause is that `layer_probs` specifies the fraction of an age band that is partnered, a stock, but is consumed as a per-year partnership formation rate.
+- **Multiscale over-reports agent counts.** With `ms_agent_ratio > 1`, agents grown to follow extra cancer trajectories carry a reduced per-agent weight, but `n_alive` and the intervention flow results (`n_screened`, `new_cin_treated`, `new_doses`) count them at full weight. The error grows with both the ratio and the length of the run, because it compounds: exact at ratio 1, about 1.01x at ratio 5, and at ratio 100 roughly 1.3x after one year rising to 3.4x over a sixty-year run. This is a reporting bug only — the underlying dynamics are correct. `sum(people.scale)` is conserved and grows at the right rate, so `sum(people.scale) * pop_scale` recovers the true population, and results whose denominators are already scale-weighted, including `asr_cancer_incidence` and the per-genotype disease results, are unaffected.
+- **Two interventions cannot share one product.** Products are registered as modules keyed by name, so `hpv.routine_vx(product='bivalent')` alongside `hpv.campaign_vx(product='bivalent')` raises `AttributeError: Module vx already added`. This blocks the routine-plus-catch-up pattern; use a single intervention with a time-varying `prob`, or distinct product types, until this is fixed.
+- **`hpv.tx` on a latent infection is a silent no-op.** A therapeutic-vaccine product with `latent` rows will report a woman as treated and set her clearance time, but she is not `infected`, so clearance never fires and she stays latent. Does not affect `ablation` or `excision`.
 
 ## Version 3.1.0 (2026-08-20)
 Adds flat parameter routing, a redesigned calibration workflow, and real-population scaling by default; requires `starsim>=3.6`.
 
 - `hpv.route_pars(sim, pars)` and `hpv.Sim(pars={...})` route flat, dotted, or nested keys to the right module. `SexualNetwork` pars are now flat (defaults in `hpv.NetworkPars`), and `CrossImmunity` pars use `define_pars`.
-- `hpv.Calibration` takes a single `data=` argument (CSVs, DataFrames, or dicts) and nested `calib_pars` with `[best, low, high, step]` leaves. Adds `shrink()`, `hpv.make_calib_sims()`, a rewritten `hpv.plot_calibration()`, per-scheme `by_age` analyzers, and Optuna `JournalStorage`.
+- `hpv.Calibration` takes a single `data=` argument (CSVs, DataFrames, or dicts) and nested `calib_pars` with `[best, low, high, step]` leaves. Adds `shrink()`, `hpv.make_calib_sims()`, and a rewritten `hpv.plot_calibration()`.
 - `hpv.AgeResults` is now `hpv.by_age`, with a positional-keys API and one `ss.Result` per (key, age bin). The genotype-distribution and per-100k-rate keys are removed; use `hpv.results_by_genotype()`.
 - New WHO2000-standardized `all_hpv.asr_cancer_incidence` / `asr_cancer_mortality` results (no analyzer needed).
-- Demographics: `total_pop` is auto-populated from UN WPP when `location` is given, `datafolder=` loads custom CSVs, `hpv.demo()` returns an example sim, and bare `hpv.Sim()` is a natural-history playground. Prevalence results are now `scale=False`, while `age_pyramid`, `dalys`, and `age_causal_infection` outputs are scaled by `pop_scale`.
+- Demographics: `total_pop` is auto-populated from UN WPP when `location` is given, and `datafolder=` loads custom CSVs. `hpv.demo()` returns an example sim; bare `hpv.Sim()` is a natural-history playground.
+- Prevalence results are now `scale=False`; `age_pyramid`, `dalys`, and `age_causal_infection` outputs are scaled by `pop_scale`.
 - *Regression information*: `hpv.Sim(location=...)` without `total_pop` now gives `pop_scale > 1`, so results are at real-population scale; pass `total_pop=n_agents` for the old behavior.
 - *Regression information*: default `transm2f` drops from 3.69 to 2.0, per-act beta is clipped to [0, 1] (higher values previously gave silent NaNs), and `ablation`/`excision` now clear precin, so screen-and-treat scenarios avert more cancers; recalibrate existing parameter sets.
 - *Regression information*: all vaccination, screening, and treatment interventions now default to `sex='f'`; pass `sex=None` for both sexes.
@@ -29,10 +50,10 @@ Adds flat parameter routing, a redesigned calibration workflow, and real-populat
 HPVsim v3 is a ground-up migration onto [Starsim](https://docs.starsim.org). The disease model, sexual network, demographics, interventions, and analyzers are now Starsim modules, and `hpv.Sim` wraps `starsim.Sim`. The natural-history model, genotypes, and interventions are preserved; the API changed substantially. See the [migration guide](docs/migration.qmd) for a full v2→v3 walkthrough.
 
 - Rebuilt on Starsim (`starsim>=3.5`); requires Python ≥ 3.10.
-- Multi-genotype HPV with cross-immunity, natural-history progression (precin/CIN/cancer), sexual network, births/deaths/age-specific migration, vaccination, screening, and test-and-treat cascades all reimplemented as Starsim modules.
+- Multi-genotype HPV with cross-immunity, natural history (precin/CIN/cancer), sexual network, demographics, vaccination, screening, and test-and-treat cascades all reimplemented as Starsim modules.
 - Multiscale modeling (`ms_agent_ratio`) grows real fine agents rather than scheduling extras, giving an intervention-correct, unbiased cancer level.
 - Analyzers (`snapshot`, `age_pyramid`, `age_causal_infection`, `dalys`, `AgeResults`, per-genotype results) and built-in plotting ported.
-- HIV–HPV co-infection via a transmission-based HIV module (built on STIsim). Adding an `hpv.HIV` disease auto-wires the `hpv_hiv_connector` (raising HPV susceptibility/severity by CD4 stratum) and an `HIVStratifiedResults` analyzer. See the migration guide for the API.
+- HIV–HPV co-infection via a transmission-based HIV module built on STIsim, raising HPV susceptibility and severity by CD4 stratum. (Redesigned in v3.2.)
 - *Regression information*: v3 uses Starsim's RNG framework and does not share a stream with v2; results are not bit-identical to v2 even with the same seed. Validate on overlapping uncertainty intervals, not exact values.
 - *Regression information*: the `hpv.Sim` constructor no longer takes a positional parameter dict (the first positional argument is `location`); pass parameters as keyword arguments or `hpv.Sim(**pars)`. `end` is now `stop`; the pooled `'hr'` genotype shorthand is replaced by `hi5`/`ohr`.
 - *Regression information*: results are organized by module (`sim.results.hpv16.cum_infections`, aggregate `sim.results.all_hpv.*`) rather than one flat dict; `sim.short_summary` and the top-level `hpv.save`/`hpv.load`/`hpv.MultiSim` helpers are removed (use `sim.save()` / `ss.load()` / `ss.MultiSim`).
