@@ -21,6 +21,7 @@ import starsim as ss
 
 from . import misc
 from .hpv import HPV
+from .hiv import HIV
 from .parameters import GENOTYPE_KEYS
 
 
@@ -298,10 +299,12 @@ class HPVTotal(ss.Analyzer):
     def init_pre(self, sim):
         """Discover HPV modules once at init; mirrors CrossImmunity's pattern.
 
-        Set ``hpv_modules`` before the ``super().init_pre`` call, since starsim's
-        ``Module.init_pre`` invokes ``self.init_results`` which reads this.
+        Set ``hpv_modules``/``hiv_module`` before the ``super().init_pre``
+        call, since starsim's ``Module.init_pre`` invokes ``self.init_results``
+        which reads them.
         """
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        self.hiv_module = next((d for d in sim.diseases.values() if isinstance(d, HIV)), None)
         super().init_pre(sim)
         # Allocate per-ti WHO2000-binned histograms (rows = ti, cols = 5-year
         # bins). Populated in step() and consumed by finalize_results() to
@@ -358,6 +361,15 @@ class HPVTotal(ss.Analyzer):
         defs.append(ss.Result('asr_cancer_mortality', dtype=float, scale=False,
                               label='Age-standardized cervical cancer mortality '
                                     '(WHO 2000, per 100,000 person-years)'))
+        if self.hiv_module is not None:
+            defs.append(ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'))
+            defs.append(ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'))
+            defs.append(ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False,
+                                  label='Cancer incidence per 100k (HIV+)'))
+            defs.append(ss.Result('cancer_incidence_no_hiv', dtype=float, scale=False,
+                                  label='Cancer incidence per 100k (HIV-)'))
+            defs.append(ss.Result('cancer_rate_ratio', dtype=float, scale=False,
+                                  label='Cancer incidence rate ratio (HIV+/HIV-)'))
         self.define_results(*defs)
 
     def step(self):
@@ -371,7 +383,7 @@ class HPVTotal(ss.Analyzer):
         fine agents (scale=1/ratio) count as 1/ratio, not 1. Derived results
         (n_susceptible, prevalence) are computed from scale-weighted totals.
         """
-        ti = self.sim.ti
+        ti = self.ti
         hpvs = self.hpv_modules
         if not hpvs:
             return
@@ -441,6 +453,8 @@ class HPVTotal(ss.Analyzer):
         wts_nc = w.values[new_cancer] if w is not None else None
         self._cancers_by_who_bin[ti, :] = np.histogram(
             ages[new_cancer], bins=edges, weights=wts_nc)[0]
+        if self.hiv_module is not None:
+            self._update_hiv_cancer_results(ti, people, new_cancer)
         # Numerator: cancer deaths realized this step, across genotypes.
         # ``ti_dead_cancer`` is set at scheduled cancer-death time; the agent
         # is still marked alive at ti (remove_dead runs after analyzers).
@@ -451,6 +465,27 @@ class HPVTotal(ss.Analyzer):
         wts_cd = w.values[new_cd] if w is not None else None
         self._cancer_deaths_by_who_bin[ti, :] = np.histogram(
             ages[new_cd], bins=edges, weights=wts_cd)[0]
+
+    def _update_hiv_cancer_results(self, ti, people, new_cancer):
+        """HIV-stratified new-cancer counts/incidence/rate ratio, from the
+        same ``new_cancer`` mask used for the ASR histogram. Runs at this
+        module's own (sim-cadence) ti, so no risk of a faster HIV clock
+        double-counting the same event across multiple HIV sub-ticks."""
+        alive = people.alive.values
+        scale = people.scale.values
+        hiv_pos = self.hiv_module.infected.values & alive
+        hiv_neg = (~self.hiv_module.infected.values) & alive
+        n_pos = float((hiv_pos * scale).sum())
+        n_neg = float((hiv_neg * scale).sum())
+        cancers_with_hiv = float(((new_cancer & hiv_pos) * scale).sum())
+        cancers_no_hiv = float(((new_cancer & hiv_neg) * scale).sum())
+        self.results['cancers_with_hiv'][ti] = cancers_with_hiv
+        self.results['cancers_no_hiv'][ti] = cancers_no_hiv
+        inc_with_hiv = cancers_with_hiv / n_pos * 1e5 if n_pos else 0.0
+        inc_no_hiv = cancers_no_hiv / n_neg * 1e5 if n_neg else 0.0
+        self.results['cancer_incidence_with_hiv'][ti] = inc_with_hiv
+        self.results['cancer_incidence_no_hiv'][ti] = inc_no_hiv
+        self.results['cancer_rate_ratio'][ti] = inc_with_hiv / inc_no_hiv if inc_no_hiv else 0.0
 
     def finalize_results(self):
         """Sum across modules for all results not handled by step()."""

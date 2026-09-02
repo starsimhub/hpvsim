@@ -152,25 +152,27 @@ def test_hiv_effect():
     sim.run()
 
     res = sim.results.hiv
-    for key in ('cancers_with_hiv', 'cancers_no_hiv', 'cancer_incidence_with_hiv',
-                'cancer_incidence_no_hiv', 'hpv_prevalence_with_hiv',
-                'hpv_prevalence_no_hiv', 'cancer_rate_ratio'):
+    all_hpv = sim.results.all_hpv
+    for key in ('hpv_prevalence_with_hiv', 'hpv_prevalence_no_hiv'):
         assert key in res
+    for key in ('cancers_with_hiv', 'cancers_no_hiv', 'cancer_incidence_with_hiv',
+                'cancer_incidence_no_hiv', 'cancer_rate_ratio'):
+        assert key in all_hpv
     assert np.all((res['hpv_prevalence_with_hiv'] >= 0) & (res['hpv_prevalence_with_hiv'] <= 1))
     # Per-capita incidence, not raw counts: at ms_agent_ratio=5 the HIV- group
     # accumulates far more (lower-weight, fine) agents via demographic growth
     # than the fixed HIV+ cohort, so raw cancers_no_hiv can exceed
     # cancers_with_hiv even though per-capita risk is ~20x higher with HIV.
-    assert res['cancer_incidence_with_hiv'].sum() > res['cancer_incidence_no_hiv'].sum()
+    assert all_hpv['cancer_incidence_with_hiv'].sum() > all_hpv['cancer_incidence_no_hiv'].sum()
 
     # HIV-stratified cancers are a lower bound on the (scale-weighted) total --
     # HIVStratifiedResults' successor runs after step_die, so an agent who
     # turns cancerous and dies from background demographics the same step is
     # counted by all_hpv.new_cancers but missed here.
-    assert np.issubdtype(res['cancers_with_hiv'].dtype, np.floating)
-    strat_total = res['cancers_with_hiv'].sum() + res['cancers_no_hiv'].sum()
+    assert np.issubdtype(all_hpv['cancers_with_hiv'].dtype, np.floating)
+    strat_total = all_hpv['cancers_with_hiv'].sum() + all_hpv['cancers_no_hiv'].sum()
     assert strat_total > 0
-    assert strat_total <= sim.results.all_hpv.new_cancers.sum() * 1.001  # float tolerance
+    assert strat_total <= all_hpv.new_cancers.sum() * 1.001  # float tolerance
 
 
 def test_hiv_rel_imm_effect():

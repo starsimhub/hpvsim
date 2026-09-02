@@ -55,5 +55,6 @@ if __name__ == '__main__':
           float(np.nanmean(res['hpv_prevalence_with_hiv'][-40:])))
     print('HPV prev (HIV-), last-10y mean:',
           float(np.nanmean(res['hpv_prevalence_no_hiv'][-40:])))
-    print('HIV+ cancers (total):', int(res['cancers_with_hiv'].sum()))
-    print('HIV- cancers (total):', int(res['cancers_no_hiv'].sum()))
+    all_hpv = sim.results.all_hpv
+    print('HIV+ cancers (total):', int(all_hpv['cancers_with_hiv'].sum()))
+    print('HIV- cancers (total):', int(all_hpv['cancers_no_hiv'].sum()))

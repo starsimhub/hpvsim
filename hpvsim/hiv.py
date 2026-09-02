@@ -24,10 +24,11 @@ class HIV(sti.HIV):
 
     Owns the CD4-stratified HIV->HPV effect pars (rel_sus/rel_sev/rel_imm/
     rel_reactivation, each {effect}_lo/{effect}_hi, plus cd4_threshold/
-    cd4_upper) and the HIV-stratified results (cancers, cancer incidence,
-    HPV prevalence by HIV status, and a cancer rate ratio) -- the single
-    place to look for HIV's effect on HPV, regardless of which subclass
-    drives infection.
+    cd4_upper) and HPV prevalence by HIV status -- the place to look for HIV's
+    effect on HPV, regardless of which subclass drives infection. Cancer
+    counts/incidence/rate-ratio by HIV status live on HPVTotal
+    (sim.results.all_hpv) instead, since that module always ticks at the
+    sim's own cadence.
 
     rel_sus is written directly onto every HPV module in step_state(), with
     no separate connector: HPV.step_state() resets rel_sus=1.0 before any
@@ -56,6 +57,7 @@ class HIV(sti.HIV):
             rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier (neutral default; no prior calibrated value)
             cd4_threshold=200.0,  # lo/hi stratum boundary
             cd4_upper=500.0,      # CD4 >= this -> no effect at all (see class docstring)
+            dt=ss.years(0.25),  
         )
         self.define_states(
             ss.FloatArr('hiv_rel_sus', default=1.0),
@@ -64,9 +66,6 @@ class HIV(sti.HIV):
             ss.FloatArr('hiv_rel_reactivation', default=1.0),
         )
         self.hpv_modules = None
-        # No update_pars() call here -- deferred to whichever leaf class
-        # (HIV_transmit/HIV_incidence) is actually instantiated, after it
-        # layers its own define_pars, matching HPV.__init__'s pattern.
 
     def init_pre(self, sim):
         super().init_pre(sim)
@@ -115,36 +114,29 @@ class HIV(sti.HIV):
         if len(uids):
             self.diagnosed[uids] = True
             self.ti_diagnosed[uids] = self.ti
-            self.ti_art[uids] = self.ti + 1
+            # self.sim.ti, not self.ti: sti.ART's schedule gate checks
+            # ti_art against ITS OWN ti, which runs in lockstep with the
+            # sim's ti regardless of HIV's own dt (see HIV_incidence.infect
+            # for the full loop-order argument).
+            self.ti_art[uids] = self.sim.ti + 1
         return
 
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'),
-            ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'),
-            ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False, label='Cancer incidence per 100k (HIV+)'),
-            ss.Result('cancer_incidence_no_hiv', dtype=float, scale=False, label='Cancer incidence per 100k (HIV-)'),
             ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
             ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
-            ss.Result('cancer_rate_ratio', dtype=float, scale=False, label='Cancer incidence rate ratio (HIV+/HIV-)'),
         )
 
     def update_results(self):
-        """HIV-stratified HPV/cancer outcomes (absorbed from the former
-        HIVStratifiedResults analyzer).
-
-        Cancer detection: each HPV module fires its cin->cancerous transition
-        in step_state for agents with ti_cancerous <= ti. Since ti_cancerous
-        is scheduled as ti_cin + _randround(...) (an integer step >= ti_cin)
-        and the agent is already CIN by then, the transition fires at exactly
-        ti == ti_cancerous, so detecting flips this step via
-        cancerous & (ti_cancerous == ti) matches the agents that just turned
-        cancerous. NaN ti_cancerous (no scheduled cancer) compares False, so
-        it is safely excluded.
+        """HPV prevalence by HIV status (absorbed from the former
+        HIVStratifiedResults analyzer). Cancer counts/incidence by HIV status
+        live on HPVTotal (sim.results.all_hpv) instead -- that module always
+        ticks at the sim's own cadence, so a single new-cancer event can't be
+        recorded more than once even if HIV's own dt differs from the sim's.
         """
         super().update_results()
-        ti = self.sim.ti
+        ti = self.ti
         people = self.sim.people
         alive = people.alive.values
         hiv_pos = self.infected.values & alive
@@ -154,11 +146,9 @@ class HIV(sti.HIV):
         for m in self.hpv_modules:
             any_hpv |= m.infected.values
 
-        # Scale-weight all counts by people.scale so grow-multiscale fine agents
+        # Scale-weight by people.scale so grow-multiscale fine agents
         # (scale = 1/ms_agent_ratio) count fractionally, consistent with every
-        # other hpvsim result. Prevalence weights numerator AND denominator;
-        # an unweighted version over-counts fine agents at ms_agent_ratio > 1
-        # (cancers concentrate on fine agents).
+        # other hpvsim result. Prevalence weights numerator AND denominator.
         scale = people.scale.values
         n_pos = float((hiv_pos * scale).sum())
         n_neg = float((hiv_neg * scale).sum())
@@ -166,31 +156,6 @@ class HIV(sti.HIV):
             float(((any_hpv & hiv_pos) * scale).sum()) / n_pos if n_pos else 0.0)
         self.results['hpv_prevalence_no_hiv'][ti] = (
             float(((any_hpv & hiv_neg) * scale).sum()) / n_neg if n_neg else 0.0)
-
-        # New cancers this step, attributed by current HIV status. NOTE: this
-        # runs after step_die in the Starsim loop, so an agent who turns
-        # cancerous in step_state AND dies from background demographics the
-        # same step has both `cancerous` and the HIV `infected` flag cleared
-        # by the time we read them here -- that cancer is counted by
-        # HPVTotal.new_cancers (recorded in step_state) but missed here. The
-        # bias is O(P_death x P_cancer_transition) per step, negligible at
-        # typical scales.
-        new_cancer = np.zeros(alive.shape, dtype=bool)
-        for m in self.hpv_modules:
-            fired = (m.cancerous.values & (m.ti_cancerous.values == ti))
-            new_cancer |= fired
-        cancers_with_hiv = float(((new_cancer & hiv_pos) * scale).sum())
-        cancers_no_hiv = float(((new_cancer & hiv_neg) * scale).sum())
-        self.results['cancers_with_hiv'][ti] = cancers_with_hiv
-        self.results['cancers_no_hiv'][ti] = cancers_no_hiv
-
-        # Per-100k incidence rate (not age-standardized -- see all_hpv's
-        # asr_cancer_incidence for the WHO2000 age-standardized version).
-        inc_with_hiv = cancers_with_hiv / n_pos * 1e5 if n_pos else 0.0
-        inc_no_hiv = cancers_no_hiv / n_neg * 1e5 if n_neg else 0.0
-        self.results['cancer_incidence_with_hiv'][ti] = inc_with_hiv
-        self.results['cancer_incidence_no_hiv'][ti] = inc_no_hiv
-        self.results['cancer_rate_ratio'][ti] = inc_with_hiv / inc_no_hiv if inc_no_hiv else 0.0
 
 
 class HIV_transmit(HIV):
@@ -324,14 +289,15 @@ class HIV_incidence(HIV):
             self.set_prognoses(selected)
             self.diagnosed[selected] = True
             self.ti_diagnosed[selected] = self.ti
-            # +1, not self.ti: interventions.step() (loop position 8, where sti.ART
-            # runs) executes BEFORE diseases.step() (position 9, this method) in the
-            # SAME tick. ART's schedule-based gate is an exact-match `ti_art==self.ti`
-            # check with no <= fallback, so ti_art=self.ti would never be seen -- a
-            # permanent miss, not a one-tick lag. +1 mirrors how sti.HIVTest schedules
-            # a future ART start from its own step(), which correctly lines up with
-            # next tick's ART pass.
-            self.ti_art[selected] = self.ti + 1
+            # self.sim.ti + 1, not self.ti + 1: interventions.step() (loop
+            # position 8, where sti.ART runs) executes BEFORE diseases.step()
+            # (position 9, this method) in the SAME tick, and ART's
+            # schedule-based gate is an exact-match `ti_art==self.ti` check
+            # against ART's OWN ti -- which runs in lockstep with the sim's ti
+            # regardless of HIV's own dt. Using self.ti here would be wrong on
+            # both counts: it's HIV's own (possibly different) clock, and it
+            # wouldn't yet reflect the +1 lookahead ART's gate needs.
+            self.ti_art[selected] = self.sim.ti + 1
         return
 
     def step(self):
