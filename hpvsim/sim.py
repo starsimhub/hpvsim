@@ -77,11 +77,7 @@ import sciris as sc
 import starsim as ss
 import hpvsim as hpv
 
-# Explicit imports for symbols referenced by bare name in this module (the
-# disease/connector partition uses bare names; the genotype/seeding helpers
-# use the ``hpv.`` prefix — both styles coexist post-M08 merge). The HIV
-# classes and stisim itself are imported inside __init__'s model_hiv branch,
-# since stisim is an optional dependency.
+# stisim and the HIV classes are imported lazily in __init__ (optional dependency).
 from . import misc
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
@@ -101,15 +97,18 @@ class Sim(ss.Sim):
                  end=None, datafolder=None, model_hiv=None, hiv_data=None, hiv_pars=None,
                  nw_pars=None, imm_pars=None,
                  **kwargs):
-        # Legacy alias: HPVsim v2 used ``end`` for the final sim year; Starsim
-        # renamed it ``stop``. Accept ``end`` so v2 scripts keep running, but
-        # nudge toward ``stop``. If given, ``end`` wins over ``stop``.
+        # Legacy v2 alias; ``end`` wins over ``stop`` when supplied.
         if end is not None:
             ss.warn("hpv.Sim: `end` is a deprecated alias for `stop`; use `stop=` instead.")
             stop = end
-        # Dispatch on location: string -> load country data (bundled or
-        # datafolder); None -> uniform ages, no vitals, location-agnostic
-        # network (stisim pattern: no location => no auto pop scaling).
+        # location is a construction-time argument, consumed below before the
+        # sim's parameter set exists, so it can't be routed like a normal par.
+        # Accept it from pars= anyway (pars= is the documented way to pass
+        # parameters) by intercepting it here; a bare location= wins, matching
+        # the sc.mergedicts(pars, kwargs) precedence used further down.
+        pars = sc.mergedicts(pars)  # Copy, so the caller's dict isn't mutated.
+        location = sc.ifelse(location, pars.pop('location', None))
+        # location=None: uniform ages, no vitals, no auto pop scaling.
         if location is None:
             country = None
             ss.warn(
@@ -136,9 +135,7 @@ class Sim(ss.Sim):
         user_analyzers = sc.tolist(kwargs.pop('analyzers', None))
         user_interventions = sc.tolist(kwargs.pop('interventions', None))
 
-        # Partition diseases= by type: HPV genotype modules are built from
-        # genotypes= (or supplied directly as HPV instances); any non-HPV
-        # disease (e.g. hpv.HIV_transmit) is merged in alongside them.
+        # Partition diseases=: HPV instances vs everything else (e.g. HIV).
         hpv_instances = [d for d in user_diseases if isinstance(d, HPV)]
         other_diseases = [d for d in user_diseases if not isinstance(d, HPV)]
 
@@ -198,7 +195,7 @@ class Sim(ss.Sim):
         auto_connectors = [user_cross[0] if user_cross else CrossImmunity(pars=imm_pars)]
 
         if hpv_instances:
-            hpv_diseases = hpv_instances  # override path; seeder skipped (user-supplied HPV manage their own init_prev)
+            hpv_diseases = hpv_instances  # override path; these manage their own init_prev
         else:
             # Default to single-genotype HPV16 if neither supplied.
             keys = (tuple(hpv._normalize_genotype(g) for g in genotypes)
@@ -222,17 +219,13 @@ class Sim(ss.Sim):
             hpv_diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
                                 **gpars_overrides.get(k, {})) for k in keys]
             if init_seeding == 'exclusive':
-                # 'exclusive': one Bernoulli per agent for any HPV, then one
-                # genotype per infected agent via the seeder's per-genotype callback.
-                # 'independent' is the no-op path — each HPV's per-genotype init_prev
-                # curve drives its own seeding independently.
+                # One Bernoulli per agent for any HPV, then one genotype each.
                 self._seeder = hpv._ExclusiveSeeder(
                     genotype_keys=keys, init_hpv_dist=init_hpv_dist
                 )
                 for d, k in zip(hpv_diseases, keys):
                     d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
-                # Register so the seeder's Dists go through the standard
-                # define_pars -> init_pre -> init_dists lifecycle.
+                # Registered so the seeder's Dists get the standard init lifecycle.
                 auto_connectors.append(self._seeder)
 
         diseases = hpv_diseases + other_diseases
@@ -241,8 +234,7 @@ class Sim(ss.Sim):
 
         networks = kwargs.pop('networks', None)
         if networks is None:
-            # Network calibration is location-agnostic (see hpv.NetworkPars);
-            # country['network_pars'] is just NetworkPars() defaults.
+            # Network calibration is location-agnostic; these are NetworkPars() defaults.
             network_pars = country['network_pars'] if country is not None else {}
             if nw_pars:
                 network_pars = sc.mergedicts(network_pars, nw_pars)
@@ -258,11 +250,7 @@ class Sim(ss.Sim):
                 demographics = []  # bare Sim: no births/deaths/migration
             else:
                 births_cls = hpv.AnnualBirths if v2_compat_demographics else hpv.Births
-                # The raw mortality table spans ~1950-2100, but ss.Deaths only
-                # ever queries years within the sim window (and otherwise
-                # retains the whole frame). Trim to [start, stop] (+/-1yr pad
-                # for boundary interpolation) so the module carries only what
-                # it uses.
+                # Trim the ~1950-2100 table to the sim window (+/-1yr interp pad).
                 death_rate = country['death_rate']
                 death_rate = death_rate[
                     (death_rate['Time'] >= int(start) - 1)
@@ -282,12 +270,8 @@ class Sim(ss.Sim):
         # Stored for use in init() to discretize initial ages.
         self._v2_compat_demographics = v2_compat_demographics
 
-        # Split pars into (a) starsim-recognized sim-level keys forwarded to
-        # super() so pre-init state (People/timeline) picks them up, and
-        # (b) hpv module-level keys (per-genotype pars, network flat pars,
-        # connector pars) routed after super().__init__ via hpv.route_pars.
-        # Merge pars= and leftover bare kwargs before splitting, so bare
-        # hpvsim-specific kwargs and pars= are equivalent (mirrors sti.Sim).
+        # Sim-level keys go to super() so pre-init state picks them up; module-level
+        # keys are routed after via route_pars. pars= and bare kwargs are equivalent.
         merged = sc.mergedicts(pars, kwargs)
         kwargs = {}
         sim_par_keys = set(hpv.SimPars().keys()) - {'location'}

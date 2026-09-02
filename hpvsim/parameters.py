@@ -23,8 +23,7 @@ __all__ = ['SimPars', 'GenotypePars', 'NetworkPars', 'get_genotype_pars',
 # Sexual-network layer keys (marital, casual).
 NETWORK_LAYERS = ('m', 'c')
 
-# Canonical 4-genotype ordering. The Connector uses this order as the
-# default when no genotype list is supplied.
+# Canonical genotype ordering; the Connector's default when none is supplied.
 GENOTYPE_KEYS = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 # Genotype name aliases for user ergonomics.
@@ -37,7 +36,13 @@ genotype_aliases = {
 
 
 class SimPars(ss.SimPars):
-    """HPV-specific defaults on top of ss.SimPars."""
+    """HPV-specific defaults on top of ss.SimPars.
+
+    ``location`` defaults to None to match ``hpv.Sim``'s own default: a bare
+    ``hpv.Sim()`` is a natural-history playground (uniform ages 0-60, no
+    births/deaths/migration, ``pop_scale=1``). Pass a country name for a real
+    population, or call ``hpv.demo()`` for the canonical Nigeria sim.
+    """
 
     def __init__(self, **kwargs):
         super().__init__()
@@ -50,7 +55,7 @@ class SimPars(ss.SimPars):
         self.dt        = ss.years(0.25)
         self.rand_seed = 0
 
-        self.location = 'nigeria'
+        self.location = None
         self.verbose = ss.options.verbose
 
         self.update(kwargs)
@@ -96,8 +101,7 @@ def _cell_imm_dist(mean=0.25, var=0.025):
     return _beta_from_mean_var(mean, var)
 
 
-# Per-genotype natural-history defaults. Duration entries are
-# ``(mean, std)`` tuples in years.
+# Per-genotype natural-history defaults; durations are (mean, std) in years.
 _GENOTYPE_DEFAULTS = {
     'hpv16': dict(
         beta=0.25,
@@ -225,9 +229,13 @@ def get_genotype_pars(genotype='hpv16'):
 # Network mixing & participation matrices (data — used by NetworkPars)        #
 # --------------------------------------------------------------------------- #
 
-# Age-mixing (rows = female age band start, cols = male age band start; first
-# column is the female age-band label).
+# Age mixing: rows = MALE age band, columns 1..N = FEMALE age band; column 0
+# holds each row's male age-band lower bound as a label. So ``M[male_bin,
+# female_bin + 1]`` is the relative weight males in that band give females in
+# that band -- the orientation network.py indexes as ``mixing[:, ab + 1]`` with
+# ``ab`` the female bin, inherited from HPVsim v2's population.py.
 _MIXING_M = np.array([
+    # col 0 = male band label; header below = female band
     #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
     [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
     [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
@@ -247,6 +255,7 @@ _MIXING_M = np.array([
     [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],
 ], dtype=float)
 _MIXING_C = np.array([
+    # col 0 = male band label; header below = female band
     #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
     [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
     [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
@@ -316,8 +325,10 @@ class NetworkPars(sc.objdict):
         ``dur_pship_{layer}``: partnership duration Dist (years).
         ``age_act_pars_{layer}``: per-layer age-based act modulation
             (peak, retirement, debut_ratio, retirement_ratio) dict.
-        ``mixing_{layer}``: age-mixing matrix (rows = female age band start,
-            cols = male age band; first column is female age label).
+        ``mixing_{layer}``: age-mixing matrix; rows = male age band, columns
+            1..N = female age band, and column 0 holds each row's male
+            age-band label. ``M[male_bin, female_bin + 1]`` is the relative
+            weight males in that band give females in that band.
         ``layer_probs_{layer}``: (3, N) array of age-band participation:
             row 0 = age-bin lower bounds, rows 1/2 = annual f/m prob.
     """
@@ -342,9 +353,7 @@ class NetworkPars(sc.objdict):
         self.dur_pship_marital = _nbinom_mean_k(mean=80, k=3)
         self.dur_pship_casual  = ss.lognorm_ex(mean=1, std=2)
 
-        # Age-based act modulation per layer. Ramp linearly from
-        # debut_ratio at debut age to 1.0 at peak, then to retirement_ratio
-        # at retirement, then 0 beyond.
+        # Acts ramp linearly: debut_ratio -> 1.0 at peak -> retirement_ratio, then 0.
         self.age_act_pars_marital = ss.Pars(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
         self.age_act_pars_casual  = ss.Pars(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)
 
@@ -383,9 +392,9 @@ def par_registry():
     hpv_keys = set()
     for g in GENOTYPE_KEYS:
         hpv_keys.update(HPV(g).pars.keys())
-    # 'location' excluded: it's the one hpv.SimPars key vanilla ss.SimPars
-    # (sim.pars) lacks, so broadcasting it would raise KeyNotFoundError
-    # instead of route_pars' own clear "unrecognized" ValueError.
+    # 'location' excluded: it is a construction-time argument absent from
+    # sim.pars, so broadcasting it would raise. hpv.Sim.__init__ intercepts
+    # pars=dict(location=...) before routing, so users never hit this.
     return {'sim': set(SimPars().keys()) - {'location'}, 'hpv': hpv_keys,
             'connector': set(CrossImmunity().pars.keys()),
             'network': set(SexualNetwork().pars.keys())}
@@ -420,8 +429,7 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
     raw = calib_pars if calib_pars is not None else (pars or {})
     if not raw:
         return sim
-    # Unwrap Optuna spec dicts ({'low','high','guess','value',...}) to their
-    # sampled value; calib_pars trial dicts arrive in this shape.
+    # calib_pars trial dicts are Optuna specs; unwrap to the sampled value.
     raw = {k: (v['value'] if isinstance(v, dict) and 'value' in v else v)
            for k, v in raw.items()}
     nested = expanddict(raw)

@@ -33,13 +33,12 @@ def test_par_routing():
     assert sim.diseases.hpv16.pars.ms_agent_ratio == 3
     assert sim.diseases.hpv18.pars.ms_agent_ratio == 3
 
-    # Per-genotype override wins even when it appears BEFORE the broadcast
-    # key in the input dict (order must not matter).
+    # Per-genotype override wins regardless of key order in the input dict.
     hpv.route_pars(sim, pars={'hpv18': {'ms_agent_ratio': 5}, 'ms_agent_ratio': 2})
     assert sim.diseases.hpv16.pars.ms_agent_ratio == 2
     assert sim.diseases.hpv18.pars.ms_agent_ratio == 5
 
-    # Nested genotype-scoped override preserves sibling keys (Task 1's fix).
+    # Nested genotype-scoped override preserves sibling keys.
     hpv.route_pars(sim, pars={'hpv16': {'cin_fn': {'k': 0.55}}})
     assert sim.diseases.hpv16.pars.cin_fn['k'] == 0.55
     assert sim.diseases.hpv16.pars.cin_fn['form'] == 'logf2'
@@ -158,14 +157,34 @@ def test_pars_accepts_flat_dotted_keys():
     assert sim.diseases.hpv16.pars.cin_fn['k'] == 0.5
 
 
-def test_pars_location_raises_value_error():
-    """pars=dict(location=...) cannot be forwarded to super().__init__
-    (vanilla ss.SimPars lacks 'location'), so it must fail with route_pars'
-    clear ValueError, not sciris' KeyNotFoundError from deep inside
-    ss.Sim.__init__. Bare location= (not via pars=) is unaffected -- see
-    test_sim_construction / test_hiv_par_routing for that path."""
-    with pytest.raises(ValueError, match='location'):
-        make_sim(genotypes=[16], pars=dict(location='nigeria'))
+def test_location_via_pars_matches_bare_kwarg():
+    """location is consumed at construction time (before sim.pars exists), but
+    pars=dict(location=...) must still be equivalent to a bare location=,
+    including when mixed with ordinary pars= keys."""
+    bare = make_sim(genotypes=[16], location='kenya')
+    via_pars = make_sim(genotypes=[16], pars=dict(location='kenya'))
+    # location via pars=, n_agents as a bare kwarg (make_sim already sets it).
+    mixed = hpv.Sim(genotypes=[16], pars=dict(location='kenya'), n_agents=1000,
+                    start=2019, stop=2020, dt=1.0, rand_seed=0)
+    assert bare.location == via_pars.location == mixed.location == 'kenya'
+    assert bare.pars.total_pop == via_pars.pars.total_pop == mixed.pars.total_pop
+    assert [type(d) for d in bare.pars.demographics] == \
+           [type(d) for d in via_pars.pars.demographics]
+    assert len(mixed.pars.people) == 1000  # bare kwarg alongside pars= still applies
+
+
+def test_location_kwarg_wins_over_pars():
+    """A bare location= overrides pars=dict(location=...), matching
+    sc.mergedicts(pars, kwargs) precedence elsewhere in hpv.Sim."""
+    sim = make_sim(genotypes=[16], location='kenya', pars=dict(location='nigeria'))
+    assert sim.location == 'kenya'
+
+
+def test_pars_dict_not_mutated():
+    """hpv.Sim must not pop location out of the caller's own pars dict."""
+    pars = dict(location='kenya')
+    make_sim(genotypes=[16], pars=pars)
+    assert pars == dict(location='kenya')
 
 
 def test_copy_inputs_kwarg_accepted():
@@ -202,3 +221,16 @@ def test_sim_key_source_of_truth_consistent():
     sim2 = make_sim(genotypes=[16], pars=dict(pop_scale=2))
     sim2.init()
     assert sim2.pars.pop_scale == 2
+
+
+def test_simpars_defaults_match_sim_defaults():
+    """hpv.SimPars is the declared source of truth for sim-level keys, so its
+    defaults must not drift from hpv.Sim's own signature defaults."""
+    import inspect
+    sig = inspect.signature(hpv.Sim.__init__).parameters
+    p = hpv.SimPars()
+    assert p.location is sig['location'].default is None
+    assert p.n_agents == sig['n_agents'].default
+    assert p.dt == ss.years(sig['dt'].default)
+    assert p.start == ss.years(sig['start'].default)
+    assert p.stop == ss.years(sig['stop'].default)
