@@ -21,7 +21,7 @@ from .seeding import _ExclusiveSeeder
 from .sim import Sim
 from .demographics import AgeMigration, AnnualBirths, Births
 from .cross_genotype import CrossImmunity, HPVTotal
-from .hiv import HIV, hiv_incidence, hiv_art, hpv_hiv_connector, HIVStratifiedResults
+from .hiv import HIV, HIV_transmit, HIV_incidence
 from .analyzers import by_age, snapshot, age_pyramid, age_causal_infection, dalys, results_by_genotype
 from .calibration import Calibration, make_calib_sims
 from . import calibration
@@ -42,7 +42,7 @@ rootdir = sc.thispath(__file__).parent
 
 __all__ = [
     'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'AnnualBirths', 'CrossImmunity', 'HPVTotal',
-    'HIV', 'hiv_incidence', 'hiv_art', 'hpv_hiv_connector', 'HIVStratifiedResults',
+    'HIV', 'HIV_transmit', 'HIV_incidence',
     'by_age', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys', 'results_by_genotype',
     'Calibration', 'make_calib_sims', 'calibration',
     'plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim', 'plot_intervention_impact', 'plot_calibration',

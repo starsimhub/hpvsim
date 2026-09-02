@@ -22,20 +22,18 @@ _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
 
 
 def _hiv_rel_imm_factor(sim):
-    """Return the HIV connector's full ``hiv_rel_imm`` FloatArr, or None.
+    """Return the HIV module's full ``hiv_rel_imm`` FloatArr, or None.
 
-    Returns the connector's ``hiv_rel_imm`` FloatArr (caller indexes by the
-    relevant uid subset; value is 1.0 for HIV- agents) when an
-    ``hpv_hiv_connector`` is registered in the sim, else ``None`` so callers
-    cleanly no-op without an HIV connector.
-    Lazy-imports the connector to avoid a products <-> hiv circular import.
+    Returns the HIV disease's ``hiv_rel_imm`` FloatArr (caller indexes by the
+    relevant uid subset; value is 1.0 for HIV- agents) when an ``hpv.HIV``
+    disease is registered in the sim, else ``None`` so callers cleanly no-op
+    without HIV. Lazy-imports HIV to avoid a products <-> hiv circular import.
     """
-    if not getattr(sim, 'connectors', None):
+    if not getattr(sim, 'diseases', None):
         return None
-    from .hiv import hpv_hiv_connector  # lazy: avoid circular import
-    hivc = next((c for c in sim.connectors.values()
-                 if isinstance(c, hpv_hiv_connector)), None)
-    return None if hivc is None else hivc.hiv_rel_imm
+    from .hiv import HIV  # lazy: avoid circular import
+    hivm = next((d for d in sim.diseases.values() if isinstance(d, HIV)), None)
+    return None if hivm is None else hivm.hiv_rel_imm
 
 
 @functools.lru_cache(maxsize=1)

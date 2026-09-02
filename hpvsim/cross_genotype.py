@@ -199,7 +199,7 @@ class CrossImmunity(ss.Connector):
             #   - therapeutic vaccine (direct path, txvx_imm)
             # All reduce susceptibility multiplicatively. sev_imm comes only
             # from clearance (vaccines don't reduce severity beyond rel_sus).
-            m.rel_sus[auids] = (
+            m.rel_sus[auids] = m.rel_sus[auids] * (
                 (1.0 - sus_imm_nab[:, i])
                 * (1.0 - vax[:, i])
                 * (1.0 - txvx[:, i])

@@ -7,14 +7,27 @@ with location-specific age pyramid, plus a CrossImmunity connector and an
 HPVTotal analyzer — and forwards to ``ss.Sim``.
 
 ``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
-modules are added after the auto-defaults (CrossImmunity, the _ExclusiveSeeder
-when ``init_seeding='exclusive'``, HPVTotal, and — when an ``hpv.HIV`` disease
-is present in ``diseases=`` — an ``hpv_hiv_connector`` appended after
-CrossImmunity and a ``HIVStratifiedResults`` analyzer). To replace the
-auto-defaults entirely, drop down to vanilla ``ss.Sim``.
+modules are added after the auto-defaults (CrossImmunity, the
+_ExclusiveSeeder when ``init_seeding='exclusive'``, and the HPVTotal
+analyzer). To replace the auto-defaults entirely, drop down to vanilla
+``ss.Sim``.
 
 Other slots (``diseases``, ``networks``, ``demographics``, ``people``) retain
 override semantics. ``diseases=`` is mutually exclusive with ``genotypes=``.
+
+``model_hiv=True`` (or ``'incidence'``/``'transmission'``) adds HIV
+co-infection: ``'incidence'`` (the default under ``True``) imposes a
+per-(age,sex,year) incidence curve directly (``hpv.HIV_incidence``) plus a
+coverage-based ``sti.ART`` intervention (ART data is mandatory for this mode);
+``'transmission'`` drives HIV via network transmission instead
+(``hpv.HIV_transmit``), with no auto-added ART. ``hiv_data=`` supplies the
+input data (a folder path, see ``hpv.data.load_hiv_data``, or a dict with
+``{'incidence', 'art_coverage', 'init_prev'}``); ``hiv_pars=`` overrides the
+constructed HIV disease's pars (e.g. ``rel_sus_lo``, ``beta_m2f``). Mutually
+exclusive with supplying your own HIV-family disease in ``diseases=`` — build
+it yourself via ``hpv.HIV_transmit``/``hpv.HIV_incidence`` in that case, or go
+fully manual with a vanilla ``stisim`` ``sti.HIV`` (no HPV-modulation effects
+in that case — see ``hpv.HIV``'s docstring).
 
 The final sim year is ``stop`` (Starsim's name). ``end`` is accepted as a
 deprecated v2 alias — if supplied it overrides ``stop`` and emits a warning.
@@ -62,6 +75,7 @@ Kwargs:
 import numpy as np
 import sciris as sc
 import starsim as ss
+import stisim as sti  # for sti.ART: model_hiv='incidence' auto-constructs one
 import hpvsim as hpv
 
 # Explicit imports for symbols referenced by bare name in this module (the HIV
@@ -70,7 +84,7 @@ import hpvsim as hpv
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration, AnnualBirths, Births
-from .hiv import HIV, hpv_hiv_connector, HIVStratifiedResults
+from .hiv import HIV, HIV_transmit, HIV_incidence
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
 from .seeding import _ExclusiveSeeder
@@ -83,7 +97,9 @@ class Sim(ss.Sim):
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, ms_agent_ratio=1, pars=None, v2_compat_demographics=False,
-                 end=None, datafolder=None, nw_pars=None, imm_pars=None, **kwargs):
+                 end=None, datafolder=None, model_hiv=None, hiv_data=None, hiv_pars=None,
+                 nw_pars=None, imm_pars=None,
+                 **kwargs):
         # Legacy alias: HPVsim v2 used ``end`` for the final sim year; Starsim
         # renamed it ``stop``. Accept ``end`` so v2 scripts keep running, but
         # nudge toward ``stop``. If given, ``end`` wins over ``stop``.
@@ -114,13 +130,14 @@ class Sim(ss.Sim):
             people = ss.People(n_agents, age_data=age_data,
                                extra_states=[ss.BoolArr('fine', default=False)])
 
-        user_diseases = kwargs.pop('diseases', None) or []
-        user_connectors = kwargs.pop('connectors', None) or []
-        user_analyzers = kwargs.pop('analyzers', None) or []
+        user_diseases = sc.tolist(kwargs.pop('diseases', None))
+        user_connectors = sc.tolist(kwargs.pop('connectors', None))
+        user_analyzers = sc.tolist(kwargs.pop('analyzers', None))
+        user_interventions = sc.tolist(kwargs.pop('interventions', None))
 
         # Partition diseases= by type: HPV genotype modules are built from
         # genotypes= (or supplied directly as HPV instances); any non-HPV
-        # disease (e.g. hpv.HIV) is merged in alongside them.
+        # disease (e.g. hpv.HIV_transmit) is merged in alongside them.
         hpv_instances = [d for d in user_diseases if isinstance(d, HPV)]
         other_diseases = [d for d in user_diseases if not isinstance(d, HPV)]
 
@@ -129,16 +146,44 @@ class Sim(ss.Sim):
                 'Specify HPV via genotypes= or HPV instances in diseases=, not both.'
             )
 
+        # Autoconstruct HIV and ART if model_hiv=True.
+        auto_interventions = []
+        if model_hiv:
+            if any(isinstance(d, sti.HIV) for d in other_diseases):
+                raise ValueError(
+                    'model_hiv= is mutually exclusive with supplying your own HIV '
+                    'disease in diseases= -- use diseases= alone in that case.'
+                )
+            mode = 'incidence' if model_hiv is True else model_hiv
+            if mode not in ('incidence', 'transmission'):
+                raise ValueError(f"model_hiv must be True, 'incidence', or 'transmission'; got {model_hiv!r}")
+            data = hiv_data
+            if data is not None and not isinstance(data, dict):
+                from .data.hiv import load_hiv_data
+                data = load_hiv_data(data)
+            if mode == 'incidence':
+                # Require both incidence and ART.
+                missing = [k for k in ('incidence', 'art_coverage') if not data or k not in data]
+                if missing:
+                    raise ValueError(
+                        f"model_hiv='incidence' (or True) requires hiv_data with {missing}"
+                    )
+                hiv_disease = HIV_incidence(incidence=data['incidence'],
+                                             init_prev_data=data.get('init_prev'), pars=hiv_pars)
+                if not any(isinstance(iv, sti.ART) for iv in user_interventions):
+                    from .data.hiv import reshape_art_coverage
+                    auto_interventions.append(sti.ART(coverage=reshape_art_coverage(data['art_coverage'])))
+            else:
+                hiv_disease = HIV_transmit(init_prev_data=(data.get('init_prev') if data else None),
+                                            pars=hiv_pars)
+            other_diseases = other_diseases + [hiv_disease]
+
         if init_seeding not in ('exclusive', 'independent'):
             raise ValueError(
                 f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}"
             )
 
-        # CrossImmunity runs first each step (it overwrites rel_sus). A user
-        # may supply a configured CrossImmunity (e.g. a calibrated rel_sev
-        # severity scaler); honor it at the front rather than auto-adding a
-        # second default one. Any other user connectors keep their order after
-        # the auto chain (CrossImmunity -> seeder -> hpv_hiv_connector).
+        # Combine user-provided connectors with the CrossImmunity default.
         user_cross = [c for c in user_connectors if isinstance(c, CrossImmunity)]
         user_connectors = [c for c in user_connectors
                            if not isinstance(c, CrossImmunity)]
@@ -189,17 +234,6 @@ class Sim(ss.Sim):
 
         diseases = hpv_diseases + other_diseases
         auto_analyzers = [HPVTotal()]
-        # If HIV is present, auto-wire its connector (appended last, so it runs
-        # after CrossImmunity, which overwrites rel_sus each step; see
-        # hpv_hiv_connector.init_pre) and its stratified-results analyzer.
-        # A user may supply their own (e.g. an hpv_hiv_connector with calibrated
-        # pars); in that case do NOT auto-add a second one, which would
-        # double-apply the rel_sus multiply / double-count the results.
-        if any(isinstance(d, HIV) for d in other_diseases):
-            if not any(isinstance(c, hpv_hiv_connector) for c in user_connectors):
-                auto_connectors.append(hpv_hiv_connector())
-            if not any(isinstance(a, HIVStratifiedResults) for a in user_analyzers):
-                auto_analyzers.append(HIVStratifiedResults())
         connectors = auto_connectors + user_connectors
 
         networks = kwargs.pop('networks', None)
@@ -238,6 +272,7 @@ class Sim(ss.Sim):
                 ]
 
         analyzers = auto_analyzers + user_analyzers
+        interventions = auto_interventions + user_interventions
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower() if location is not None else None
@@ -266,6 +301,7 @@ class Sim(ss.Sim):
             networks=networks,
             demographics=demographics,
             analyzers=analyzers,
+            interventions=interventions,
             pars=sim_pars,
             total_pop=total_pop,
             copy_inputs=copy_inputs,

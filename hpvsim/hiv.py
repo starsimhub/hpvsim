@@ -1,12 +1,11 @@
-"""HIV–HPV co-infection: transmission-based HIV plus the CD4-stratified
-HIV→HPV effects.
+"""HIV–HPV co-infection.
 
-Three components:
-  - ``HIV`` (``sti.HIV`` subclass): continuous-CD4 transmission-based HIV,
-    re-targeted onto ``hpv.SexualNetwork`` and seeded from a per-location init-prev curve.
-  - ``hpv_hiv_connector`` (``ss.Connector``): bins CD4 into discrete strata and
-    applies CD4-stratified rel_sus / rel_sev / rel_imm effects to every HPV module.
-  - ``HIVStratifiedResults`` (``ss.Analyzer``): HPV/cancer outcomes by HIV status.
+Two ways to drive HIV, both sharing the same CD4-stratified HIV->HPV effects
+and HIV-stratified results (all owned by the shared ``HIV`` base class):
+  - ``HIV_transmit``: network-transmitted, via beta_m2f/rel_beta_f2m onto
+    hpv.SexualNetwork.
+  - ``HIV_incidence``: a per-(year, sex, age) incidence curve imposed
+    directly, no network transmission.
 """
 
 import numpy as np
@@ -17,126 +16,243 @@ from . import misc
 from .hpv import HPV
 from .network import SexualNetwork
 
-__all__ = ['HIV', 'hiv_incidence', 'hiv_art', 'hpv_hiv_connector',
-           'HIVStratifiedResults']
-
-
-# CD4 strata for the HIV->HPV effects below: 'lo' = [0, cd4_threshold),
-# 'hi' = [cd4_threshold, cd4_upper); agents with CD4 >= cd4_upper fall in
-# NEITHER stratum and so receive NO HIV->HPV effect (factor 1.0, biological).
-# This is load-bearing: HIV+ agents start at CD4~594 and ART reconstitutes
-# CD4 above 500, so most HIV+ person-time is CD4 >= cd4_upper -- applying the
-# hi-stratum value there (as an earlier draft did) over-amplifies HIV+ cancer
-# ~10x. Both boundaries are ``hpv_hiv_connector`` pars (``cd4_threshold``,
-# ``cd4_upper``), not module constants -- see its define_pars.
+__all__ = ['HIV_transmit', 'HIV_incidence']
 
 
 class HIV(sti.HIV):
-    """Transmission-based HIV for hpvsim.
+    """Shared base for hpvsim's HIV variants (HIV_transmit, HIV_incidence).
 
-    Thin subclass of ``sti.HIV``: inherits continuous CD4, ART reconstitution,
-    and CD4-based mortality unchanged. Adds (1) HPVsim-friendly directional
-    beta targeting ``hpv.SexualNetwork`` (whose p1=female, p2=male, unlike
-    STIsim's ``structuredsexual``), and (2) a per-location init-prevalence seed
-    (via ``from_location``).
+    Owns the CD4-stratified HIV->HPV effect pars (rel_sus/rel_sev/rel_imm/
+    rel_reactivation, each {effect}_lo/{effect}_hi, plus cd4_threshold/
+    cd4_upper) and the HIV-stratified results (cancers, cancer incidence,
+    HPV prevalence by HIV status, and a cancer rate ratio) -- the single
+    place to look for HIV's effect on HPV, regardless of which subclass
+    drives infection.
 
-    Note: ``beta_m2f`` / ``rel_beta_f2m`` reuse STIsim's own same-named pars
-    (``HIVPars``), just with hpvsim-appropriate defaults. STIsim's own
-    ``validate_beta``/``init_pre`` usage of them only applies to a network
-    named ``'structuredsexual'``, which hpvsim does not use, so they are
-    otherwise inert there -- ``init_pre`` below reads them directly to build
-    the per-network beta dict on ``hpv.SexualNetwork``. Being real pars (not
-    private constructor attributes) is a prerequisite for a future
-    ``route_pars`` HIV scope (not yet implemented -- ``route_pars`` does not
-    currently route to ``hpv.HIV`` or ``hpv_hiv_connector`` at all).
+    rel_sus is written directly onto every HPV module in step_state(), with
+    no separate connector: HPV.step_state() resets rel_sus=1.0 before any
+    disease's step_state() runs (inside hpv.Sim, hpv diseases are always
+    registered before other diseases, so this is guaranteed to have already
+    happened -- a fully-manual diseases=[...] construction outside hpv.Sim
+    does not get this guarantee automatically), and
+    CrossImmunity multiplies (not assigns) its own factor onto rel_sus too --
+    the two compose correctly regardless of order. rel_sev/rel_imm/
+    rel_reactivation are read lazily by HPV's own set_prognoses/step_state at
+    their point of use, unchanged from before.
+
+    A raw `sti.HIV()` instance, constructed by a user bypassing hpvsim's
+    classes entirely, does NOT get these HPV-modulation effects -- only
+    `HIV_transmit`/`HIV_incidence` do. This is an intentional tradeoff:
+    the CD4-effect pars/states/results live directly on this class, not a
+    separate connector that could discover any `sti.HIV`-shaped disease.
     """
 
-    def __init__(self, init_prev_data=None, pars=None, **kwargs):
-        super().__init__(init_prev_data=init_prev_data)
+    def __init__(self, init_prev_data=None, name='hiv'):
+        super().__init__(init_prev_data=init_prev_data, name=name)
         self.define_pars(
-            beta_m2f=0.0035,
-            rel_beta_f2m=0.5,
+            rel_sus_lo=2.2,   rel_sus_hi=2.2,    # increased HPV acquisition
+            rel_sev_lo=1.5,   rel_sev_hi=1.2,    # faster/worse CIN->cancer progression
+            rel_imm_lo=0.36,  rel_imm_hi=0.76,   # reduced post-infection/vaccine immunity
+            rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier (neutral default; no prior calibrated value)
+            cd4_threshold=200.0,  # lo/hi stratum boundary
+            cd4_upper=500.0,      # CD4 >= this -> no effect at all (see class docstring)
         )
-        self.update_pars(pars, **kwargs)
-
-    @classmethod
-    def from_location(cls, location, beta_m2f=0.0035, **kwargs):
-        """Build an ``hpv.HIV`` seeded from a country's bundled HIV inputs.
-
-        Pulls ``init_prev`` from ``hpv.data.load_hiv(location)`` and uses it as
-        ``init_prev_data``. ``beta_m2f`` is left as a TUNABLE with an
-        UNCALIBRATED placeholder default (matching the ``__init__`` default);
-        it is calibrated to the location in T12. The ART coverage data returned
-        by ``load_hiv`` is NOT applied here — that is the T10b ART-shortcut
-        intervention's job.
-
-        Args:
-            location (str): country name with bundled HIV data (see
-                ``hpv.data.load_hiv``; currently ``'rwanda'``).
-            beta_m2f (float): male->female per-act transmission rate
-                (placeholder, uncalibrated).
-            **kwargs: forwarded to ``hpv.HIV.__init__``.
-        """
-        from . import data as _data
-        inputs = _data.load_hiv(location)
-        # Allow the caller to override the seed (e.g. init_prev_data=0.0 for the
-        # incidence-driven build, where the epidemic is constructed by the
-        # importer rather than by seeding).
-        kwargs.setdefault('init_prev_data', inputs['init_prev'])
-        return cls(beta_m2f=beta_m2f, **kwargs)
+        self.define_states(
+            ss.FloatArr('hiv_rel_sus', default=1.0),
+            ss.FloatArr('hiv_rel_sev', default=1.0),
+            ss.FloatArr('hiv_rel_imm', default=1.0),
+            ss.FloatArr('hiv_rel_reactivation', default=1.0),
+        )
+        self.hpv_modules = None
+        # No update_pars() call here -- deferred to whichever leaf class
+        # (HIV_transmit/HIV_incidence) is actually instantiated, after it
+        # layers its own define_pars, matching HPV.__init__'s pattern.
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        # Target the HPV sexual network by name with directional betas.
-        # hpv.SexualNetwork puts females in p1, males in p2, so betamap entry
-        # 0 = female->male, entry 1 = male->female. Male->female is the higher-
-        # risk direction (beta_m2f); female->male = beta_m2f * rel_beta_f2m.
-        # So beta[net.name][0] = f2m (smaller), beta[net.name][1] = m2f = beta_m2f (larger).
-        nets = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
-        if not nets:
-            misc.warn('hpv.HIV: no SexualNetwork found; HIV will not transmit.')
-            return
-        beta = {}
-        for net in nets:
-            beta[net.name] = [self.pars.beta_m2f * self.pars.rel_beta_f2m, self.pars.beta_m2f]
-        self.pars.beta = beta
+        self.hpv_modules = [m for m in sim.diseases.values() if isinstance(m, HPV)]
+        if not self.hpv_modules:
+            raise ValueError('hpv.HIV requires HPV genotype module(s) in the sim.')
+
+    def _cd4_stratum(self, cd4):
+        """True for the hi stratum (CD4 >= cd4_threshold), False for lo."""
+        return cd4 >= self.pars.cd4_threshold
+
+    def _factor_array(self, effect, hiv_pos, is_hi, n):
+        """Build a per-agent factor array (1.0 for HIV-, stratum value for HIV+)."""
+        out = np.ones(n, dtype=float)
+        lo = self.pars[f'{effect}_lo']
+        hi = self.pars[f'{effect}_hi']
+        vals = np.where(is_hi, hi, lo)
+        out[hiv_pos] = vals[hiv_pos]
+        return out
+
+    def step_state(self):
+        super().step_state()
+        auids = self.sim.people.auids
+        cd4 = np.asarray(self.cd4[auids])
+        # Effects apply only to HIV+ agents with an initialized CD4 in
+        # [0, cd4_upper). CD4 >= cd4_upper (newly infected at ~594, or
+        # ART-reconstituted) falls outside the hi band and gets NO effect (factor 1.0).
+        infected = self.infected[auids]
+        hiv_pos = infected & ~np.isnan(cd4) & (cd4 < self.pars.cd4_upper)
+        is_hi = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
+        n = len(auids)
+        self.hiv_rel_sus[auids] = self._factor_array('rel_sus', hiv_pos, is_hi, n)
+        self.hiv_rel_sev[auids] = self._factor_array('rel_sev', hiv_pos, is_hi, n)
+        self.hiv_rel_imm[auids] = self._factor_array('rel_imm', hiv_pos, is_hi, n)
+        self.hiv_rel_reactivation[auids] = self._factor_array('rel_reactivation', hiv_pos, is_hi, n)
+        # rel_sus is written for all agents, but Starsim only samples it for
+        # susceptibles during step_infect.
+        for m in self.hpv_modules:
+            m.rel_sus[auids] = m.rel_sus[auids] * self.hiv_rel_sus[auids]
+
+        # No testing cascade: diagnose all living HIV+ agents each step,
+        # matching the deleted hiv_art's old behavior. No-op for
+        # HIV_incidence (already diagnosed at infection).
+        undiagnosed = self.infected & ~self.diagnosed & self.sim.people.alive
+        uids = undiagnosed.uids
+        if len(uids):
+            self.diagnosed[uids] = True
+            self.ti_diagnosed[uids] = self.ti
+            self.ti_art[uids] = self.ti + 1
+        return
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'),
+            ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'),
+            ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False, label='Cancer incidence per 100k (HIV+)'),
+            ss.Result('cancer_incidence_no_hiv', dtype=float, scale=False, label='Cancer incidence per 100k (HIV-)'),
+            ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
+            ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
+            ss.Result('cancer_rate_ratio', dtype=float, scale=False, label='Cancer incidence rate ratio (HIV+/HIV-)'),
+        )
+
+    def update_results(self):
+        """HIV-stratified HPV/cancer outcomes (absorbed from the former
+        HIVStratifiedResults analyzer).
+
+        Cancer detection: each HPV module fires its cin->cancerous transition
+        in step_state for agents with ti_cancerous <= ti. Since ti_cancerous
+        is scheduled as ti_cin + _randround(...) (an integer step >= ti_cin)
+        and the agent is already CIN by then, the transition fires at exactly
+        ti == ti_cancerous, so detecting flips this step via
+        cancerous & (ti_cancerous == ti) matches the agents that just turned
+        cancerous. NaN ti_cancerous (no scheduled cancer) compares False, so
+        it is safely excluded.
+        """
+        super().update_results()
+        ti = self.sim.ti
+        people = self.sim.people
+        alive = people.alive.values
+        hiv_pos = self.infected.values & alive
+        hiv_neg = (~self.infected.values) & alive
+
+        any_hpv = np.zeros(alive.shape, dtype=bool)
+        for m in self.hpv_modules:
+            any_hpv |= m.infected.values
+
+        # Scale-weight all counts by people.scale so grow-multiscale fine agents
+        # (scale = 1/ms_agent_ratio) count fractionally, consistent with every
+        # other hpvsim result. Prevalence weights numerator AND denominator;
+        # an unweighted version over-counts fine agents at ms_agent_ratio > 1
+        # (cancers concentrate on fine agents).
+        scale = people.scale.values
+        n_pos = float((hiv_pos * scale).sum())
+        n_neg = float((hiv_neg * scale).sum())
+        self.results['hpv_prevalence_with_hiv'][ti] = (
+            float(((any_hpv & hiv_pos) * scale).sum()) / n_pos if n_pos else 0.0)
+        self.results['hpv_prevalence_no_hiv'][ti] = (
+            float(((any_hpv & hiv_neg) * scale).sum()) / n_neg if n_neg else 0.0)
+
+        # New cancers this step, attributed by current HIV status. NOTE: this
+        # runs after step_die in the Starsim loop, so an agent who turns
+        # cancerous in step_state AND dies from background demographics the
+        # same step has both `cancerous` and the HIV `infected` flag cleared
+        # by the time we read them here -- that cancer is counted by
+        # HPVTotal.new_cancers (recorded in step_state) but missed here. The
+        # bias is O(P_death x P_cancer_transition) per step, negligible at
+        # typical scales.
+        new_cancer = np.zeros(alive.shape, dtype=bool)
+        for m in self.hpv_modules:
+            fired = (m.cancerous.values & (m.ti_cancerous.values == ti))
+            new_cancer |= fired
+        cancers_with_hiv = float(((new_cancer & hiv_pos) * scale).sum())
+        cancers_no_hiv = float(((new_cancer & hiv_neg) * scale).sum())
+        self.results['cancers_with_hiv'][ti] = cancers_with_hiv
+        self.results['cancers_no_hiv'][ti] = cancers_no_hiv
+
+        # Per-100k incidence rate (not age-standardized -- see all_hpv's
+        # asr_cancer_incidence for the WHO2000 age-standardized version).
+        inc_with_hiv = cancers_with_hiv / n_pos * 1e5 if n_pos else 0.0
+        inc_no_hiv = cancers_no_hiv / n_neg * 1e5 if n_neg else 0.0
+        self.results['cancer_incidence_with_hiv'][ti] = inc_with_hiv
+        self.results['cancer_incidence_no_hiv'][ti] = inc_no_hiv
+        self.results['cancer_rate_ratio'][ti] = inc_with_hiv / inc_no_hiv if inc_no_hiv else 0.0
 
 
-class hiv_incidence(ss.Intervention):
-    """Incidence-driven HIV importer.
+class HIV_transmit(HIV):
+    """Network-transmitted HIV -- see HIV for the CD4-effect/results machinery
+    this inherits. Adds beta_m2f/rel_beta_f2m + validate_beta() targeting
+    hpv.SexualNetwork.
 
-    Imposes a per-(year, sex, age) HIV incidence curve directly onto STIsim's
-    HIV module instead of relying on network transmission. Each step it selects
-    living HIV-negative susceptibles, draws each at their age/sex/year-specific
-    per-timestep infection probability, and calls
-    ``sim.diseases.hiv.set_prognoses(selected)`` — which flips them to infected
-    AND wires the full CD4 trajectory (acute -> latent -> falling -> AIDS death)
-    plus ART/mortality machinery. With HIV ``beta_m2f=0`` and ``init_prev=0`` the
-    epidemic is built entirely here, so the prevalence trajectory matches the
-    target incidence curve by construction.
+    Use this when HIV prevalence should emerge from network transmission
+    dynamics; use HIV_incidence instead to impose a known incidence curve
+    directly.
+    """
 
-    The incidence DataFrame has columns ``[age, sex, year, incidence]`` (sex
-    'f'/'m'; ``incidence`` = the per-year HIV acquisition rate among
-    susceptibles). Use ``hiv_incidence.from_location(location)`` for a
-    bundled curve, or pass a frame of that shape via ``incidence``.
+    def __init__(self, init_prev_data=None, pars=None, name='hiv', **kwargs):
+        super().__init__(init_prev_data=init_prev_data, name=name)
+        self.define_pars(beta_m2f=0.0035, rel_beta_f2m=0.5)
+        self.update_pars(pars, **kwargs)
 
-    Pass explicitly via ``interventions=[...]``; it is NOT auto-wired. If no HIV
-    module is present in the sim, ``init_pre`` raises a clear ValueError (the
-    importer is meaningless without a target HIV disease).
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        if not any(isinstance(n, SexualNetwork) for n in sim.networks.values()):
+            misc.warn('hpv.HIV_transmit: no SexualNetwork found; HIV will not transmit.')
 
-    FOI -> per-step probability: a per-year rate ``r`` is converted to a
+    def validate_beta(self):
+        """Route beta_m2f/rel_beta_f2m onto every SexualNetwork's betamap entry.
+
+        hpv.SexualNetwork puts females in p1, males in p2, so betamap[net][0]
+        = f2m (smaller), betamap[net][1] = m2f = beta_m2f (larger).
+        """
+        betamap = super().validate_beta()
+        for net in self.sim.networks.values():
+            if isinstance(net, SexualNetwork):
+                key = ss.standardize_netkey(net.name)
+                betamap[key] = [self.pars.beta_m2f * self.pars.rel_beta_f2m, self.pars.beta_m2f]
+        return betamap
+
+
+class HIV_incidence(HIV):
+    """Incidence-driven HIV: imposes a per-(age,sex,year) incidence curve
+    directly as a disease, with no network transmission (infect() is fully
+    overridden -- see stisim's SimpleBV for the precedent this follows).
+
+    Every newly-infected agent is immediately diagnosed and ART-scheduled
+    (ti_art = ti + 1 -- see the note in infect() on why +1, not ti, is
+    required), so plain sti.ART(coverage=...) works against this disease
+    directly, with no separate testing-cascade intervention needed.
+
+    The incidence DataFrame has columns [age, sex, year, incidence] (sex
+    'f'/'m'; incidence = the per-year HIV acquisition rate among susceptibles).
+
+    FOI -> per-step probability: a per-year rate r is converted to a
     per-timestep infection probability with the exponential survival form
-    ``p = 1 - exp(-r * dt_years)`` (correct for non-small rates), then drawn via
-    a CRN-safe ``ss.bernoulli``. Years outside the data's [min, max] range are
+    p = 1 - exp(-r * dt_years) (correct for non-small rates), then drawn via
+    a CRN-safe ss.bernoulli. Years outside the data's [min, max] range are
     nearest-year clamped (incidence is 0 before the curve begins).
     """
 
-    def __init__(self, incidence=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, incidence=None, pars=None, init_prev_data=None, name='hiv', **kwargs):
+        super().__init__(init_prev_data=init_prev_data, name=name)
         if incidence is None:
             raise ValueError(
-                'hiv_incidence requires an incidence DataFrame '
-                '[age, sex, year, incidence]; use from_location() or pass incidence=.'
+                'HIV_incidence requires an incidence DataFrame '
+                '[age, sex, year, incidence]; pass incidence=.'
             )
         self.incidence = incidence
         # Per-agent infection draw; p is set per-step from the looked-up rates.
@@ -149,27 +265,10 @@ class hiv_incidence(ss.Intervention):
         self._age_max = None
         # rate_cube[sex][year_idx, age_idx] -> incidence rate; sex in {0:'f',1:'m'}
         self._rate_cube = None
-
-    @classmethod
-    def from_location(cls, location, **kwargs):
-        """Build an importer from a country's bundled HIV incidence curve.
-
-        Args:
-            location (str): country name with bundled HIV data (see
-                ``hpv.data.load_hiv``; currently ``'rwanda'``).
-            **kwargs: forwarded to ``hiv_incidence.__init__``.
-        """
-        from . import data as _data
-        inc = _data.load_hiv(location)['incidence']
-        return cls(incidence=inc, **kwargs)
+        self.update_pars(pars, **kwargs)
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        if 'hiv' not in sim.diseases:
-            raise ValueError(
-                'hiv_incidence requires an HIV disease in the sim '
-                "(sim.diseases.hiv); none found."
-            )
         # Precompute a fast lookup cube indexed by [sex, year, age].
         df = self.incidence
         self._years = np.sort(df['year'].unique()).astype(int)
@@ -193,15 +292,12 @@ class hiv_incidence(ss.Intervention):
     def _lookup_rates(self, year, ages, female):
         """Per-agent annual incidence rate for the given calendar year.
 
-        ``ages`` is a float array of agent ages; ``female`` a bool mask. Years
-        are nearest-year clamped to the data range; ages are clamped to the data
+        ages is a float array of agent ages; female a bool mask. Years are
+        nearest-year clamped to the data range; ages are clamped to the data
         age range; integer-floored age indexes the per-single-year curve.
         """
-        # Nearest-year clamp: years before the curve start -> first year (often
-        # 0 incidence at the curve start); after the end -> last year.
         y = int(np.clip(int(np.floor(year)), int(self._years[0]), int(self._years[-1])))
         yi = self._year_index[y]
-        # Clamp/floor ages into the per-single-year curve index space.
         ai = np.clip(np.floor(ages).astype(int), self._age_min, self._age_max) - self._age_min
         rates = np.empty(len(ages), dtype=float)
         f_curve = self._rate_cube[0][yi]
@@ -210,301 +306,50 @@ class hiv_incidence(ss.Intervention):
         rates[~female] = m_curve[ai[~female]]
         return rates
 
-    def step(self):
-        hiv = self.sim.diseases.hiv
+    def infect(self):
+        """Full override -- no super().infect() call, no network transmission."""
         people = self.sim.people
-        # Living, HIV-negative susceptibles (not currently infected).
-        eligible = (hiv.susceptible & ~hiv.infected & people.alive).uids
+        eligible = (self.susceptible & ~self.infected & people.alive).uids
         if not len(eligible):
             return
         ages = np.asarray(people.age[eligible], dtype=float)
         female = np.asarray(people.female[eligible], dtype=bool)
         year = float(self.t.now('year'))
         rates = self._lookup_rates(year, ages, female)
-        # Annual rate -> per-timestep probability via the exponential survival
-        # form (exact for non-small rates): p = 1 - exp(-rate * dt_years).
         dt_years = float(self.t.dt_year)
         p = 1.0 - np.exp(-rates * dt_years)
         self.infect_bern.set(p=p)
         selected = self.infect_bern.filter(eligible)
         if len(selected):
-            hiv.set_prognoses(selected)
-        return selected
-
-
-def _reshape_art_coverage(df):
-    """Reshape a tidy ART-coverage frame into STIsim's stratified format.
-
-    ``hpv.data.load_hiv(location)['art_coverage']`` is a long frame with columns
-    ``[age, sex, year, coverage]`` (single year of age; sex 'f'/'m'; coverage a
-    fraction of HIV+ in that stratum). ``sti.ART``'s stratified-coverage parser
-    expects columns ``Year``, ``Gender``, ``AgeBin`` (a ``'[lo,hi)'`` string) and
-    a numeric proportion column whose name does NOT start with ``n_`` (so it is
-    read as a proportion 'p', not absolute counts). Single years of age map to
-    unit bins ``[age, age+1)``.
-
-    Coverage is clamped to ``[0, 1]``: a bundled curve may carry a few values
-    slightly above 1.0 (rounding), and STIsim infers proportion-vs-count from whether the
-    max value is <= 1.0 — an un-clamped 1.0001 would flip the whole frame to
-    'absolute counts' and treat ~nobody. Clamping keeps it a proportion.
-    """
-    out = df.rename(columns={'year': 'Year', 'sex': 'Gender', 'coverage': 'p_art'}).copy()
-    out['AgeBin'] = out['age'].map(lambda a: f'[{int(a)},{int(a) + 1})')
-    out['p_art'] = out['p_art'].clip(lower=0.0, upper=1.0)
-    return out[['Year', 'Gender', 'AgeBin', 'p_art']]
-
-
-class hiv_art(sti.ART):
-    """Coverage-based ART shortcut for the HPV–HIV co-infection model.
-
-    The co-infection model has no HIV testing cascade: ART is assigned directly
-    to hit an age/sex/year coverage curve. Stock ``sti.ART`` only treats agents
-    that are already ``diagnosed`` (it expects a ``sti.HIVTest`` upstream), and
-    no testing-coverage data is used.
-    Instead, this thin ``sti.ART`` subclass marks every living HIV+
-    agent ``diagnosed`` at the start of each step, then defers to ``sti.ART`` to
-    do the actual treatment bookkeeping and CD4 reconstitution.
-
-    With all HIV+ agents diagnosed, ``sti.ART``'s diagnosed pool equals the full
-    HIV+ pool, so its ``art_coverage_correction`` drives the on-ART fraction
-    *among HIV+ agents* to the supplied age/sex/year curve (no double-discount).
-    The coverage curve is per-single-year-of-age, fed in as STIsim's
-    native stratified-DataFrame coverage (see ``_reshape_art_coverage``); STIsim
-    interpolates it to the sim's timestep grid and applies it per (age, sex).
-
-    Pass explicitly via ``interventions=[...]``; it is NOT auto-wired, because
-    ART coverage is scenario-specific. Use ``hiv_art.from_location(location)``
-    for a bundled curve, or pass any coverage form ``sti.ART`` accepts via the
-    ``coverage`` kwarg.
-    """
-
-    @classmethod
-    def from_location(cls, location, **kwargs):
-        """Build an ``hiv_art`` from a country's bundled ART-coverage curve.
-
-        Args:
-            location (str): country name with bundled HIV data (see
-                ``hpv.data.load_hiv``; currently ``'rwanda'``).
-            **kwargs: forwarded to ``sti.ART`` (e.g. ``art_initiation``).
-        """
-        from . import data as _data
-        cov = _reshape_art_coverage(_data.load_hiv(location)['art_coverage'])
-        return cls(coverage=cov, **kwargs)
-
-    def init_pre(self, sim):
-        # sti.ART.init_pre warns when no HIVTest precedes it; that is expected
-        # and intended here (we diagnose by coverage instead of by testing), so
-        # suppress only that specific warning to avoid alarming users.
-        import warnings as _warnings
-        with _warnings.catch_warnings():
-            # ss.warn prefixes the message with a newline, so match with DOTALL.
-            _warnings.filterwarnings(
-                'ignore',
-                message='(?s).*without an HIV testing intervention.*',
-                category=RuntimeWarning,
-            )
-            super().init_pre(sim)
+            self.set_prognoses(selected)
+            self.diagnosed[selected] = True
+            self.ti_diagnosed[selected] = self.ti
+            # +1, not self.ti: interventions.step() (loop position 8, where sti.ART
+            # runs) executes BEFORE diseases.step() (position 9, this method) in the
+            # SAME tick. ART's schedule-based gate is an exact-match `ti_art==self.ti`
+            # check with no <= fallback, so ti_art=self.ti would never be seen -- a
+            # permanent miss, not a one-tick lag. +1 mirrors how sti.HIVTest schedules
+            # a future ART start from its own step(), which correctly lines up with
+            # next tick's ART pass.
+            self.ti_art[selected] = self.ti + 1
+        return
 
     def step(self):
-        # Diagnose-to-coverage: make the diagnosed pool equal the living HIV+
-        # pool so sti.ART can fill its among-HIV+ coverage target. Newly flagged
-        # agents get ti_diagnosed = ti (the same bookkeeping HIVTest would do);
-        # already-diagnosed agents keep their original ti_diagnosed.
-        hiv = self.sim.diseases.hiv
-        newly = (hiv.infected & ~hiv.diagnosed).uids
-        if len(newly):
-            hiv.diagnosed[newly] = True
-            hiv.ti_diagnosed[newly] = self.ti
-        return super().step()
+        """Full override of BaseSTI.step(): infect() already calls
+        set_prognoses() directly, so there's no 3-tuple/set_outcomes() flow."""
+        self.infect()
+        return
 
-
-class hpv_hiv_connector(ss.Connector):
-    """Apply CD4-stratified HIV→HPV effects to every HPV module.
-
-    Each step: bin HIV+ agents' CD4 into discrete strata, compute per-agent
-    factor arrays (hiv_rel_sus / hiv_rel_sev / hiv_rel_imm / hiv_rel_reactivation;
-    1.0 for HIV-), and multiply each HPV module's rel_sus by hiv_rel_sus. The
-    rel_sev / rel_imm / rel_reactivation factors are *read* by
-    HPV.set_prognoses, HPV.step_state, and the vaccine products (see those
-    sites) — applied where they compose correctly with CrossImmunity, which
-    overwrites rel_sus each step before this runs. Must be registered AFTER
-    CrossImmunity in the connectors list.
-
-    Effect pars are ``{effect}_lo`` / ``{effect}_hi`` for
-    ``effect in ('rel_sus', 'rel_sev', 'rel_imm', 'rel_reactivation')``: 'lo'
-    applies to CD4 in ``[0, cd4_threshold)``, 'hi' to
-    ``[cd4_threshold, cd4_upper)``. CD4 >= ``cd4_upper`` gets no effect
-    (factor 1.0) -- see the module comment above. Being real pars (not a
-    nested ``effects=`` dict), each can be overridden independently -- e.g. a
-    location calibration passes only ``rel_sev_lo=..., rel_sev_hi=...``
-    without needing to restate every other effect's defaults. Not yet
-    reachable via ``route_pars`` -- ``route_pars`` does not currently route
-    to ``hpv_hiv_connector`` at all (a future HIV scope, see the sub-project 2
-    design work).
-    """
-
-    def __init__(self, pars=None, **kwargs):
-        super().__init__()
-        self.define_pars(
-            rel_sus_lo=2.2,   rel_sus_hi=2.2,    # increased HPV acquisition
-            rel_sev_lo=1.5,   rel_sev_hi=1.2,    # faster/worse CIN->cancer progression
-            rel_imm_lo=0.36,  rel_imm_hi=0.76,   # reduced post-infection/vaccine immunity
-            rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier (neutral default; no prior calibrated value exists for this new effect)
-            cd4_threshold=200.0,  # lo/hi stratum boundary
-            cd4_upper=500.0,      # CD4 >= this -> no effect at all (see module comment)
-        )
-        self.update_pars(pars, **kwargs)
-        self.hpv_modules = None
-        self.hiv_module = None
-        self.define_states(
-            ss.FloatArr('hiv_rel_sus', default=1.0),
-            ss.FloatArr('hiv_rel_sev', default=1.0),
-            ss.FloatArr('hiv_rel_imm', default=1.0),
-            ss.FloatArr('hiv_rel_reactivation', default=1.0),
-        )
-
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        self.hpv_modules = [m for m in sim.diseases.values() if isinstance(m, HPV)]
-        hivs = [m for m in sim.diseases.values() if isinstance(m, HIV)]
-        if not self.hpv_modules or not hivs:
-            raise ValueError(
-                'hpv_hiv_connector requires both HPV genotype module(s) and an '
-                'hpv.HIV disease in the sim.'
-            )
-        self.hiv_module = hivs[0]
-        # This connector must run AFTER CrossImmunity, which overwrites rel_sus
-        # each step; otherwise the HIV rel_sus factor is silently discarded.
-        from .cross_genotype import CrossImmunity
-        conns = list(sim.connectors.values())
-        xi = next((i for i, c in enumerate(conns) if isinstance(c, CrossImmunity)), None)
-        si = next((i for i, c in enumerate(conns) if c is self), None)
-        if xi is not None and si is not None and si < xi:
-            misc.warn('hpv_hiv_connector is registered before CrossImmunity; the '
-                      'HIV rel_sus effect will be overwritten. Register it after '
-                      'CrossImmunity.')
-
-    def _cd4_stratum(self, cd4):
-        """True for the hi stratum (CD4 >= cd4_threshold), False for lo.
-
-        This is the lo/hi split only; the CD4 >= cd4_upper 'no effect' band is
-        applied separately in ``step`` (such agents are excluded from the
-        effect mask), matching the strata [0,cd4_threshold) and [cd4_threshold,cd4_upper).
-        """
-        return cd4 >= self.pars.cd4_threshold
-
-    def _factor_array(self, effect, hiv_pos, is_hi, n):
-        """Build a per-agent factor array (1.0 for HIV-, stratum value for HIV+)."""
-        out = np.ones(n, dtype=float)
-        lo = self.pars[f'{effect}_lo']
-        hi = self.pars[f'{effect}_hi']
-        vals = np.where(is_hi, hi, lo)
-        out[hiv_pos] = vals[hiv_pos]
-        return out
-
-    def step(self):
-        if not self.hpv_modules:
-            return
-        auids = self.sim.people.auids
-        cd4 = np.asarray(self.hiv_module.cd4[auids])
-        # Effects apply only to agents who are HIV+ AND have an initialized CD4.
-        # HIV- agents have NaN cd4 (never initialized); an HIV+ agent whose cd4
-        # is still NaN (pre-init edge case) is treated as neutral (factor 1.0)
-        # rather than silently binned into a stratum.
-        # Effects apply only to HIV+ agents with an initialized CD4 in
-        # [0, cd4_upper). CD4 >= cd4_upper (newly infected at ~594, or
-        # ART-reconstituted) falls outside the hi band and gets NO effect (factor 1.0).
-        infected = self.hiv_module.infected[auids]
-        hiv_pos = infected & ~np.isnan(cd4) & (cd4 < self.pars.cd4_upper)
-        is_hi = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
-        n = len(auids)
-        rel_sus = self._factor_array('rel_sus', hiv_pos, is_hi, n)
-        rel_sev = self._factor_array('rel_sev', hiv_pos, is_hi, n)
-        rel_imm = self._factor_array('rel_imm', hiv_pos, is_hi, n)
-        rel_reactivation = self._factor_array('rel_reactivation', hiv_pos, is_hi, n)
-        self.hiv_rel_sus[auids] = rel_sus
-        self.hiv_rel_sev[auids] = rel_sev
-        self.hiv_rel_imm[auids] = rel_imm
-        self.hiv_rel_reactivation[auids] = rel_reactivation
-        # Acquisition effect: multiply each module's rel_sus (set by CrossImmunity
-        # earlier this step) by the HIV factor. rel_sus is written for all agents,
-        # but Starsim only samples it for susceptibles during step_infect.
-        for m in self.hpv_modules:
-            m.rel_sus[auids] = m.rel_sus[auids] * rel_sus
-
-
-class HIVStratifiedResults(ss.Analyzer):
-    """HPV/cancer outcomes split by HIV status.
-
-    Adds only the cross-disease stratification HPV needs; HIV's own epidemic
-    results come from sti.HIV / sti.ART. Auto-added by hpv.Sim when HIV present.
-    Accessible at ``sim.results.hivstratifiedresults``.
-
-    Cancer detection: each HPV module fires its cin->cancerous transition in
-    ``step_state`` for agents with ``ti_cancerous <= ti``. Since ``ti_cancerous``
-    is scheduled as ``ti_cin + _randround(...)`` (an integer step >= ti_cin) and
-    the agent is already CIN by then, the transition fires at exactly
-    ``ti == ti_cancerous``, so detecting flips this step via
-    ``cancerous & (ti_cancerous == ti)`` matches the agents that just turned
-    cancerous. NaN ti_cancerous (no scheduled cancer) compares False, so it is
-    safely excluded.
-    """
-
-    def init_pre(self, sim):
-        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        hivs = [d for d in sim.diseases.values() if isinstance(d, HIV)]
-        if not hivs:
-            raise ValueError('HIVStratifiedResults requires an hpv.HIV disease in the sim.')
-        self.hiv_module = hivs[0]
-        super().init_pre(sim)
-
-    def init_results(self):
-        """Declare the HIV-stratified result schema (diseases init before analyzers)."""
-        super().init_results()
-        self.define_results(
-            ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'),
-            ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'),
-            ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
-            ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
-        )
-
-    def step(self):
-        ti = self.sim.ti
-        people = self.sim.people
-        alive = people.alive.values
-        hiv_pos = self.hiv_module.infected.values & alive
-        hiv_neg = (~self.hiv_module.infected.values) & alive
-
-        # Any-genotype HPV infection (union across modules).
-        any_hpv = np.zeros(alive.shape, dtype=bool)
-        for m in self.hpv_modules:
-            any_hpv |= m.infected.values
-
-        # Scale-weight all counts by people.scale so grow-multiscale fine agents
-        # (scale = 1/ms_agent_ratio) count fractionally, consistent with every
-        # other hpvsim result (see hpv.py stocks). Prevalence weights numerator
-        # AND denominator; the previous raw-count version over-counted fine
-        # agents at ms_agent_ratio > 1 (cancers concentrate on fine agents).
-        scale = people.scale.values
-        n_pos = float((hiv_pos * scale).sum())
-        n_neg = float((hiv_neg * scale).sum())
-        self.results['hpv_prevalence_with_hiv'][ti] = (
-            float(((any_hpv & hiv_pos) * scale).sum()) / n_pos if n_pos else 0.0)
-        self.results['hpv_prevalence_no_hiv'][ti] = (
-            float(((any_hpv & hiv_neg) * scale).sum()) / n_neg if n_neg else 0.0)
-
-        # New cancers this step, attributed by current HIV status. NOTE: this
-        # analyzer runs after step_die in the Starsim loop, so an agent who turns
-        # cancerous in step_state AND dies from background demographics the same
-        # step has both `cancerous` and the HIV `infected` flag cleared by the
-        # time we read them here — that cancer is counted by HPVTotal.new_cancers
-        # (recorded in step_state) but missed here. The bias is O(P_death x
-        # P_cancer_transition) per step, negligible at typical scales. A complete
-        # fix would snapshot HIV status before step_die (e.g. via an update_results
-        # override); revisit only if the Phase-2 parity gate needs it.
-        new_cancer = np.zeros(alive.shape, dtype=bool)
-        for m in self.hpv_modules:
-            fired = (m.cancerous.values & (m.ti_cancerous.values == ti))
-            new_cancer |= fired
-        self.results['cancers_with_hiv'][ti] = float(((new_cancer & hiv_pos) * scale).sum())
-        self.results['cancers_no_hiv'][ti] = float(((new_cancer & hiv_neg) * scale).sum())
+    def init_post(self):
+        super().init_post()  # HIV.init_post(): CD4/care_seeking init, init_prev seeding
+        # Make ALL initially-seeded cases diagnosed + ART-eligible immediately
+        # (HIV.init_post() only does this for its own init_diagnosed-sampled
+        # subset, default 0). ti_art=0 (not +1) is correct here: init_post()
+        # runs entirely before the tick loop starts, matching stisim's own
+        # convention for initial cases (schedule ART start at ti=0, no delay,
+        # so an ART intervention picks them up immediately).
+        initial_cases = self.infected.uids
+        self.diagnosed[initial_cases] = True
+        self.ti_diagnosed[initial_cases] = 0
+        self.ti_art[initial_cases] = 0
+        return
