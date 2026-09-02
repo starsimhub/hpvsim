@@ -3,13 +3,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
 ## Version 3.2.0 (in progress)
 
 - Restores HPV latency modeling (dropped in the v2->v3 rewrite): a female-only `hpv_control_prob` roll at clearance redirects into a `latent` state, with a per-timestep `hpv_reactivation` hazard (an `ss.probperyear`, scaled by the agent's `sev_imm` and a new CD4-stratified `rel_reactivation` HIV connector effect) governing return to an active (freshly-drawn) trajectory. Opt-in and a true no-op when `hpv_control_prob=0` (the default).
-- `hpv_hiv_connector`'s CD4-stratified effects (`rel_sus`/`rel_sev`/`rel_imm`/`rel_reactivation`) are now `define_pars`-based, each independently overridable without restating the others. `HIV.beta_m2f`/`rel_beta_f2m` are likewise real pars now.
 - `cin_fn`/`cancer_fn`/`age_risk`/`NetworkPars.age_act_pars_*` are now `ss.Pars` instead of plain `dict`, so a partial nested override merges instead of wholesale-replacing sibling keys.
 - New: `hpv.Sim` now accepts bare hpvsim-specific kwargs equivalently to `pars=` (e.g. `hpv.Sim(beta=0.15)` now works, matching `hpv.Sim(pars=dict(beta=0.15))`); adds `nw_pars=`/`imm_pars=` construction-time sugar mirroring the existing `hiv_pars=`.
 - Fixes `hpv.SimPars().dt` drift bug: corrected from `0.5` to `0.25`, matching `hpv.Sim.__init__`'s own longstanding default.
-- *Regression information*: `hpv_hiv_connector(effects={...})` is removed. Replace with flat `{effect}_lo`/`{effect}_hi` kwargs, e.g. `effects={'rel_sus': {'lt200': 4.75, 'gt200': 2.75}}` becomes `rel_sus_lo=4.75, rel_sus_hi=2.75`.
-- *Regression information*: `hpv.hiv_incidence_import` is renamed to `hpv.hiv_incidence`.
-- *Regression information*: `hpv.HIV(beta_m2f=..., rel_beta_f2m=..., ...)` no longer accepts these as positional arguments (they are now `pars`, consistent with every other hpvsim module); pass them as keywords.
+- Unifies HIV co-infection under one `hpv.HIV` base class (CD4-stratified effects, HIV-stratified results) with two leaves, `hpv.HIV_transmit` (network transmission) and `hpv.HIV_incidence` (imposed incidence curve) -- both self-contained, no separate connector or stratified-results analyzer needed. New `hpv.Sim(model_hiv=True|'incidence'|'transmission', hiv_data=, hiv_pars=)` sugar auto-constructs the right disease (+ `sti.ART` for incidence mode, where ART data is mandatory).
+- *Regression information*: `hpv.hiv_incidence` (the intervention), `hpv.hiv_art`, `hpv_hiv_connector`, and `HIVStratifiedResults` are all removed. Use `hpv.HIV_incidence`/`hpv.HIV_transmit` (diseases) directly, or `hpv.Sim(model_hiv=...)` sugar.
 - *Regression information*: `HPV.pars.beta` is now a plain scalar at rest (was a dict `{'sexualnetwork': [f2m, m2f]}`); read the validated per-network dict via `HPV.validate_beta()` instead of `.pars.beta` directly.
 - *Regression information*: the legacy `cross_immunity.<matrix>.<tgt>.<src>` calibration key form is removed; per-cell cross-immunity calibration is no longer supported -- use the 5 scalar `CrossImmunity` pars instead (e.g. `own_imm_hr`, `cross_imm_sus_med`).
 
