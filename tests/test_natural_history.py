@@ -1,6 +1,7 @@
 """Lifecycle smoke tests for HPV16 natural history."""
 import numpy as np
 import pytest
+import sciris as sc
 
 import hpvsim as hpv
 
@@ -379,17 +380,20 @@ def test_network_acts_age_modulated():
 
 
 def test_directional_beta_sets_per_network_pair():
-    """HPV.pars.beta is a dict keyed by network with [transf2m, transm2f] pair.
+    """validate_beta() returns a dict keyed by network with [transf2m, transm2f].
 
     Verifies the sex-asymmetric transmission rates flow into Starsim's
     betamap as the per-direction values it uses inside Infection.infect.
+    pars.beta is a plain scalar at rest; validate_beta() expands it.
     """
     sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)
     sim.init()
     mod = sim.diseases.hpv16
-    beta = mod.pars.beta
+    assert sc.isnumber(mod.pars.beta), \
+        f'pars.beta should be a scalar at rest, got {type(mod.pars.beta)}'
+    beta = mod.validate_beta()
     assert isinstance(beta, dict), \
-        f'beta should be a per-network dict, got {type(beta)}'
+        f'validate_beta() should return a per-network dict, got {type(beta)}'
     assert 'sexualnetwork' in beta, \
         f'beta missing sexualnetwork key; got keys {list(beta.keys())}'
     pair = beta['sexualnetwork']
