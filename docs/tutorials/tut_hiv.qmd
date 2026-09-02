@@ -1,0 +1,230 @@
+---
+title: T8 - HIV co-infection
+jupyter: python3
+---
+
+Women living with HIV acquire HPV more readily, clear it less often, and
+progress to cervical cancer faster. In countries where a fifth of adults live
+with HIV, you cannot model cervical cancer without it. In this tutorial we add
+HIV to a South Africa model two different ways, and read the results split by
+HIV status.
+
+## Install the HIV extra
+
+HIV modelling in HPVsim is built on [STIsim](https://docs.stisim.org), which is
+an optional dependency. `pip install hpvsim` does not install it, so pure-HPV
+work stays lightweight. For this tutorial you need:
+
+```
+pip install hpvsim[hiv]
+```
+
+Without it, anything HIV-related raises an `ImportError` naming this command.
+
+## What HIV does to HPV
+
+An HIV-positive woman's parameters are modified according to her current CD4
+count, in two strata:
+
+| Effect | CD4 below 200 | CD4 200 to 500 | What it changes |
+|---|---|---|---|
+| `rel_sus` | 2.2 | 2.2 | Chance of acquiring HPV |
+| `rel_sev` | 1.5 | 1.2 | Speed of progression to cancer |
+| `rel_imm` | 0.36 | 0.76 | Immunity gained from clearing HPV or from vaccination |
+| `rel_reactivation` | 1.0 | 1.0 | Chance a dormant infection wakes up (see Tutorial 9) |
+
+Above a CD4 of 500 there is no effect at all, so a woman on suppressive ART with
+a reconstituted CD4 count behaves like an HIV-negative woman. The stratum
+boundaries are `cd4_threshold` (200) and `cd4_upper` (500), and every value in
+the table is a parameter you can change.
+
+## Impose a known HIV epidemic
+
+Most country work starts from national HIV estimates — UNAIDS, Spectrum, or a
+national survey — and wants the model to reproduce them rather than generate its
+own. That is `model_hiv='incidence'`: HPVsim takes the incidence curve directly
+and does not transmit HIV over the network at all.
+
+It needs two tables. Both use five-year age bands, which is the shape UNAIDS and
+Spectrum output. Here we build plausible South African curves; in real work you
+would read your country's files:
+
+```{python}
+import numpy as np
+import pandas as pd
+import hpvsim as hpv
+
+bands = np.arange(0, 85, 5)     # Age-band lower bounds
+data_years = np.arange(1990, 2041)
+
+def acquisition_rate(band, sex, year):
+    """Annual chance an uninfected person in this band acquires HIV."""
+    if band < 15:
+        return 0.0
+    peak_age = 25 if sex == 'f' else 32
+    by_age = np.exp(-0.5 * ((band + 2.5 - peak_age) / 9.0) ** 2)
+    epidemic = (1 / (1 + np.exp(-(year - 1995) / 2.0))) * np.exp(-max(0, year - 2000) / 20)
+    return 0.05 * by_age * epidemic
+
+incidence = pd.DataFrame(
+    [(int(b), s, int(y), acquisition_rate(b, s, y))
+     for s in ('f', 'm') for y in data_years for b in bands],
+    columns=['age', 'sex', 'year', 'incidence'])
+
+art_coverage = pd.DataFrame(
+    [(int(b), s, int(y), float(np.clip((y - 2003) / 17, 0, 0.8)))
+     for s in ('f', 'm') for y in data_years for b in bands],
+    columns=['age', 'sex', 'year', 'coverage'])
+
+incidence.head(4)
+```
+
+`incidence` is the annual rate at which uninfected people in each band acquire
+HIV, by sex and calendar year. `art_coverage` is the fraction of HIV-positive
+people in each band who are on treatment. Band widths do not have to be five
+years, and do not have to be equal; the first and last bands extend to cover
+ages outside the range you supply.
+
+ART data is required in this mode, because treatment restores CD4 and therefore
+removes the HPV effects. HPVsim adds the ART programme for you:
+
+```{python}
+PARS = dict(
+    location       = 'south africa',
+    genotypes      = [16, 18, 'hi5', 'ohr'],
+    n_agents       = 2000,
+    start          = 1990,
+    stop           = 2040,
+    ms_agent_ratio = 25,
+    rand_seed      = 0,
+    verbose        = 0,
+)
+HIV_DATA = dict(incidence=incidence, art_coverage=art_coverage, init_prev=0.005)
+
+sim = hpv.Sim(**PARS, model_hiv='incidence', hiv_data=HIV_DATA)
+sim.run()
+
+hiv = sim.results.hiv
+hiv_years = np.asarray(hiv.timevec.years)
+for year in (1995, 2005, 2015, 2025, 2040):
+    print(f'{year}  HIV prevalence 15-49: '
+          f'{float(hiv.prevalence_15_49[hiv_years == year][0]):>6.1%}   '
+          f'on ART: {float(hiv.p_on_art[hiv_years == year][0]):>6.1%}')
+```
+
+HIV results carry their own time axis, `sim.results.hiv.timevec`. Use it for
+anything under `sim.results.hiv`, and `sim.results.timevec` for the HPV results.
+
+Check this trajectory against your country's published estimates before reading
+anything else from the run. The point of this mode is that the epidemic is an
+input, so if it does not match your estimates, the input is wrong.
+
+You will also see a warning that ART was added without an HIV testing
+programme. Expect it: in this mode every new infection is recorded as diagnosed
+immediately, so no testing cascade is needed and the warning does not apply.
+
+`hiv_data=` also accepts a folder path containing `hiv_incidence.csv`,
+`art_coverage_by_age_females.csv`, `art_coverage_by_age_males.csv` and
+`hiv_prevalence.csv`, which is how country projects usually keep this data.
+HPVsim ships no country's HIV data, so these files are always yours to supply.
+
+## Read HPV by HIV status
+
+The HIV module records HPV prevalence separately for HIV-positive and
+HIV-negative people:
+
+```{python}
+def prevalence_ratio(run):
+    """HPV prevalence in HIV+ people, in HIV- people, and the ratio."""
+    h = run.results.hiv
+    pos, neg = float(h.hpv_prevalence_with_hiv[-1]), float(h.hpv_prevalence_no_hiv[-1])
+    return pos, neg, (pos / neg if neg else float('nan'))
+
+pos, neg, ratio = prevalence_ratio(sim)
+print(f'HPV prevalence in people living with HIV: {pos:.1%}')
+print(f'HPV prevalence in everyone else:          {neg:.1%}')
+print(f'Ratio: {ratio:.2f}')
+```
+
+Cross-sectional studies in Southern Africa report HPV prevalence substantially
+higher in women living with HIV. Before attributing that to biology, find out
+how much of it your model produces without any biology at all.
+
+## Separate the biology from everything else
+
+Set both `rel_sus` strata to 1 and rerun. Because HIV is an imposed input here,
+the HIV epidemic is the same in both arms — so the only thing that changed is
+the effect of HIV on HPV acquisition:
+
+```{python}
+no_biology = hpv.Sim(**PARS, model_hiv='incidence', hiv_data=HIV_DATA,
+                     hiv_pars=dict(rel_sus_lo=1.0, rel_sus_hi=1.0))
+no_biology.run()
+
+_, _, ratio_without = prevalence_ratio(no_biology)
+print(f'Prevalence ratio, CD4 effect on acquisition active:  {ratio:.2f}')
+print(f'Prevalence ratio, that effect switched off:          {ratio_without:.2f}')
+```
+
+The second number is what the model produces with no biological effect
+whatsoever. It is above 1, because people living with HIV in this run are
+concentrated in the age bands where HPV prevalence is highest — an age-structure
+artefact, not an effect. The difference between the two numbers is what
+`rel_sus` actually contributes.
+
+There is a second thing this mode cannot show you. Imposing an incidence curve
+by age and sex assigns HIV independently of sexual behaviour, so the model never
+reproduces the real correlation between HIV and HPV that arises because both
+spread through the same partnerships. That means this mode will understate the
+association you would measure in a survey. Network transmission, below, is where
+that correlation comes from.
+
+## Let HIV spread through the sexual network instead
+
+When you have no HIV data, `model_hiv='transmission'` puts HIV on the same
+sexual network HPV uses and lets prevalence emerge:
+
+```{python}
+network_hiv = hpv.Sim(**PARS, model_hiv='transmission',
+                      hiv_pars=dict(beta_m2f=0.015))
+network_hiv.run()
+
+h = network_hiv.results.hiv
+hy = np.asarray(h.timevec.years)
+for year in (2000, 2010, 2020, 2030, 2040):
+    print(f'{year}  HIV prevalence 15-49: '
+          f'{float(h.prevalence_15_49[hy == year][0]):>6.1%}')
+```
+
+`beta_m2f` is the per-act male-to-female transmission probability, and
+`rel_beta_f2m` (default 0.5) scales the reverse direction. These are the two
+handles on how big the epidemic gets, and they need calibrating like anything
+else: the epidemic is now an output, so it is yours to match against your
+country's estimates. Set `beta_m2f` too low and the epidemic dies out, which
+leaves you with too few HIV-positive agents to read anything from.
+
+## HIV-stratified cancer results
+
+Cancers split by HIV status sit on the pooled HPV results:
+
+```{python}
+pooled = sim.results.all_hpv
+with_hiv = float(np.asarray(pooled.cancers_with_hiv).sum())
+no_hiv = float(np.asarray(pooled.cancers_no_hiv).sum())
+total = with_hiv + no_hiv
+print(f'Cervical cancers 1990-2040, women living with HIV: {with_hiv:>12,.0f}')
+print(f'Cervical cancers 1990-2040, other women:           {no_hiv:>12,.0f}')
+print(f'Share in women living with HIV: {with_hiv / total:.1%}')
+```
+
+`cancer_incidence_with_hiv`, `cancer_incidence_no_hiv` and `cancer_rate_ratio`
+are also there, but read them with care. They are crude rates over everyone
+alive with that HIV status, men included, so they carry the two groups' very
+different age structures — and people living with HIV are much younger on
+average, which pulls the crude ratio down. Each timestep's ratio also rests on a
+handful of events at this population size.
+
+If a rate ratio is the number you need, raise `n_agents` substantially, run
+several seeds, and build it over a window from `cancers_with_hiv` and a
+denominator you have chosen yourself, rather than reading `cancer_rate_ratio`
+off a single timestep.

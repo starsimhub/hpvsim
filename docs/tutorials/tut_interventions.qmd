@@ -3,134 +3,190 @@ title: T5 - Using interventions
 jupyter: python3
 ---
 
+In this tutorial we build a screen-and-treat programme for Nigeria — screening,
+triage, and two treatment options wired together — and measure how many cervical
+cancers it prevents at two levels of coverage. We then add therapeutic
+vaccination on top of it.
 
-Interventions are one of the most critical parts of HPVsim. This tutorial shows how to implement standard interventions, as well as how to define your own custom interventions.
+## Products and programmes
 
+HPVsim separates the *product* from the *programme that delivers it*.
 
-<div class="alert alert-info">
+A product is a test, a treatment or a vaccine, with its own performance. The
+ones that ship with HPVsim are in three CSV files you can read directly:
 
-Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_interventions.ipynb) to open an interactive version of this notebook.
+- screening and triage tests — VIA, cytology, HPV DNA, HPV16/18 typing — in
+  `hpvsim/data/products_dx.csv`
+- treatments — ablation, excision, radiation, and the therapeutic vaccines — in
+  `hpvsim/data/products_tx.csv`
+- prophylactic vaccines — bivalent, quadrivalent, nonavalent — in
+  `hpvsim/data/products_vx.csv`
 
-</div>
+A programme decides who is offered the product, when, and how often. Screening
+programmes are `hpv.routine_screening` and `hpv.campaign_screening`, treatment
+is `hpv.treat_num` and `hpv.treat_delay`, and vaccination is `hpv.routine_vx`
+and `hpv.campaign_vx`. Naming a product as a string, as we do below, picks up
+the standard version from those files.
 
-## Products and interventions
+Every programme reaches women only, unless you pass `sex=None` for both sexes.
 
-HPVsim contains *products*, which can be thought of as the actual test, diagnostic, treatment, or vaccine product being used, as well as *interventions*, which deliver those products to the people in the simulation.
-Information about the default products included with HPVsim (e.g. attributes like test positivity and efficacy) are available in the `hpvsim/data/products_*.csv` files. Specifically:
+## Wire up a screen-and-treat cascade
 
-* Screening products (VIA, Pap smears, liquid-based cytology, HPV testing, and HPV16/18 testing): `hpvsim/data/products_dx.csv`
-* Treatment products (ablation, excision, and therapeutic vaccines): `hpvsim/data/products_tx.csv`
-* Prophylactic vaccine products (bivalent, quadrivalent, nonavalent): `hpvsim/data/products_vx.csv`
-
-It's also possible to make a custom product, e.g.
+Real programmes are a chain: screen, triage the positives, decide what treatment
+each woman needs, then deliver it. In HPVsim each link is its own programme, and
+you connect them by naming each one and pointing the next at its outcomes.
 
 ```{python}
+import numpy as np
+import starsim as ss
 import hpvsim as hpv
-import pandas as pd
-my_treatment_data = pd.DataFrame({'name':'new_tx', 'state':['precin','cin1','cin2','cin3','cancerous'],'genotype':'all','efficacy':[.2,.3,.3,.4,.4]})
-my_treatment = hpv.tx(df=my_treatment_data)
+
+def screen_and_treat(annual_prob):
+    """A VIA screen, triage to a treatment decision, then ablation or excision."""
+
+    screen = hpv.routine_screening(
+        product    = 'via',
+        prob       = annual_prob,
+        start_year = 2015,
+        age_range  = [30, 50],
+        name       = 'screen',
+    )
+    assign = hpv.routine_triage(
+        product     = 'tx_assigner',
+        prob        = 0.9,
+        eligibility = lambda sim: sim.interventions['screen'].outcomes['positive'],
+        name        = 'assign',
+    )
+    ablate = hpv.treat_num(
+        product     = 'ablation',
+        prob        = 0.9,
+        eligibility = lambda sim: sim.interventions['assign'].outcomes['ablation'],
+        name        = 'ablate',
+    )
+    excise = hpv.treat_delay(
+        product     = 'excision',
+        prob        = 0.9,
+        delay       = 0.5,                 # Six months from decision to surgery
+        eligibility = lambda sim: sim.interventions['assign'].outcomes['excision'],
+        name        = 'excise',
+    )
+    return [screen, assign, ablate, excise]
 ```
 
-Custom products can be made for diagnostics and vaccination in the same way. The efficacy of some products varies by genotype, in which case efficacy values for each genotype can be entered as separate dataframe rows.
+Three things make this work.
 
-Most of the time, it isn't necessary to create your own products if you just want to use one of the standard options. When setting up screening, triage, or treatment interventions, it's possible to pass in a string that will create a standard default product.
+Each link has a `name`, and the next link's `eligibility` is a function that
+reads the previous link's `outcomes`. Positive screens go to `assign`; the
+`tx_assigner` product sorts them into `ablation` or `excision` according to how
+advanced the lesion is; each treatment programme picks up its own group.
 
-## Screening and treatment interventions
+`prob` is an **annual** probability, not a probability per timestep and not a
+lifetime coverage. `prob=0.2` means a woman in the eligible age range has a 20%
+chance of being screened each year, which averages out to roughly one screen
+every five years — close to what WHO recommends. `prob=0.7` is almost annual
+screening.
 
-Screening and treatment is implemented in HPVsim as a flexible set of interventions that can be mixed and matched. By specifying how each of the components link together, it's possible to create quite complex algorithms. This is illustrated in the following example:
+`hpv.treat_delay(delay=0.5)` puts six months between the treatment decision and
+the treatment. Women who die or progress in the meantime are never treated,
+which is what happens when surgical capacity is scarce.
+
+## Run it and count the cancers
 
 ```{python}
-import starsim as ss
-
-# Define a series of interventions to screen, triage, assign treatment, and administer treatment
-prob = 0.6
-screen      = hpv.routine_screening(start_year=2015, prob=prob, product='via', name='screen') # Routine screening
-to_triage   = lambda sim: sim.interventions['screen'].outcomes['positive'] # Define who's eligible for triage
-triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='hpv', name='triage') # Triage people
-to_treat    = lambda sim: sim.interventions['triage'].outcomes['positive'] # Define who's eligible to be assigned treatment
-assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product='tx_assigner', name='assign_tx') # Assign treatment
-to_ablate   = lambda sim: sim.interventions['assign_tx'].outcomes['ablation'] # Define who's eligible for ablation treatment
-ablation    = hpv.treat_num(eligibility=to_ablate, prob=prob, product='ablation') # Administer ablation
-to_excise   = lambda sim: sim.interventions['assign_tx'].outcomes['excision'] # Define who's eligible for excision
-excision    = hpv.treat_delay(delay=1.0, eligibility=to_excise, prob=prob, product='excision') # Administer excision
-
-# Define the parameters
-pars = dict(
-    n_agents      = 20e3,       # Population size
-    start         = 2000,       # Simulation start year
-    stop          = 2035,       # Simulation end year
-    verbose       = 0,          # Don't print details of the run
-    rand_seed     = 2,          # Set a non-default seed
-    genotypes     = [16, 18],   # Include the two genotypes of greatest general interest
+PARS = dict(
+    location       = 'nigeria',
+    genotypes      = [16, 18, 'hi5', 'ohr'],
+    n_agents       = 2000,
+    start          = 1990,
+    stop           = 2070,
+    ms_agent_ratio = 25,
+    rand_seed      = 2,
+    verbose        = 0,
 )
 
-# Create the sim with and without interventions
-orig_sim = hpv.Sim(**pars, label='Baseline')
-sim = hpv.Sim(**pars, interventions=[screen, triage, assign_tx, ablation, excision], label='With screen & treat')
-
-# Run and plot
-msim = ss.MultiSim([orig_sim, sim]).run(parallel=False)
-msim.plot();
+arms = [
+    hpv.Sim(**PARS, label='No screening'),
+    hpv.Sim(**PARS, interventions=screen_and_treat(0.2), label='Screen every 5 years'),
+    hpv.Sim(**PARS, interventions=screen_and_treat(0.7), label='Screen every year'),
+]
+msim = ss.MultiSim(arms)
+msim.run(verbose=0, parallel=False)
+fig = msim.plot('all_hpv_cum_cancers')
 ```
-
-A few things to note here:
-
-* Each intervention is given a unique `name`. Downstream interventions reference an upstream one's results through `sim.interventions['<name>'].outcomes[...]`, which is how the cascade is wired together. A treatment intervention's `name` must differ from its `product` (they share a namespace), so the leaf treatments above are left unnamed.
-* Interventions are passed to the sim via the `interventions=` argument.
-* Several of the interventions above are defined as routine interventions, e.g. `hpv.routine_screening()` and `hpv.routine_triage()`. In general, most interventions exist as both routine and campaign versions. The difference between the two comes down to how the dates are interpreted:
-    * `hpv.routine_screening(start_year=2020, end_year=2030, prob=0.2)` implies that the intervention will be in place each year between 2020-2030;
-    * `hpv.campaign_screening(years=[2020, 2030], prob=0.2)` implies that the intervention will be delivered twice: once in 2020 and once in 2030.
-
-The script `examples/t05_screen_algorithms.py` shows how to set up each of the seven algorithms recommended in the WHO's guidelines for screening and treatment of cervical pre-cancer lesions (see https://www.ncbi.nlm.nih.gov/books/NBK572308/).
-
-## Prophylactic vaccination
-
-Prophylactic vaccination protects people before they are exposed to HPV by offering a vaccine to a chosen group — typically to girls within a target age range, before sexual debut.
 
 ```{python}
-vx = hpv.routine_vx(prob=prob, start_year=2015, age_range=[9,10], product='bivalent', name='vaccination')
-
-# Create the sim with and without interventions
-orig_sim = hpv.Sim(**pars, label='Baseline')
-sim = hpv.Sim(**pars, interventions=vx, label='With vaccination')
-
-# Run and plot
-msim = ss.MultiSim([orig_sim, sim]).run(parallel=False)
-msim.plot();
+baseline = float(msim.sims[0].results.all_hpv.cum_cancers[-1])
+for s in msim.sims:
+    total = float(s.results.all_hpv.cum_cancers[-1])
+    print(f'{s.label:24s} {total:>12,.0f} cancers   '
+          f'{(baseline - total) / baseline:>6.1%} averted')
 ```
 
-<div class="alert alert-success">
+Both screening arms avert cancers, and the more frequent one averts more. Look
+at how the two averted percentages compare against the difference in screening
+frequency between them: screening three and a half times as often does not avert
+three and a half times as much. That diminishing return is the standard finding —
+most of the benefit comes from screening a woman a few times in her thirties and
+forties, not from screening her often.
 
-Note that probabilities passed to interventions are annual probabilities, not total.
+## Add therapeutic vaccination
 
-</div>
-
-## Therapeutic vaccination
-
-Therapeutic vaccination can be delivered in a couple of ways:
-
-* as a mass campaign that reaches women in a target age range regardless of whether they have been screened, and
-* as part of a screen-and-treat pathway that reaches the women who screen positive.
-
-The following example illustrates both. Mass therapeutic vaccination delivers a product to women within a given age range directly (here a campaign dose plus an ongoing routine dose); screen-linked therapeutic vaccination uses `hpv.linked_txvx`, which offers the vaccine to the women who screened positive in an upstream screening intervention.
+A therapeutic vaccine is offered to women who already have HPV, to help them
+clear it. HPVsim delivers it either as a campaign to an age group, or to the
+women a screening programme has just found. Here we add the second kind on top
+of the five-yearly screening programme:
 
 ```{python}
-# Mass therapeutic vaccination: a one-off campaign dose plus an ongoing routine dose
-campaign_txvx = hpv.campaign_txvx(prob=0.9, years=2015, age_range=[30, 50], product='txvx1', name='campaign txvx')
-routine_txvx  = hpv.routine_txvx(prob=0.8, start_year=2016, age_range=[30, 31], product='txvx2', name='routine txvx')
-mass_vx_intvs = [campaign_txvx, routine_txvx]
+def screen_then_txvx(annual_prob):
+    cascade = screen_and_treat(annual_prob)
+    txvx = hpv.linked_txvx(
+        product     = 'txvx1',
+        prob        = 0.8,
+        eligibility = lambda sim: sim.interventions['screen'].outcomes['positive'],
+        name        = 'txvx',
+    )
+    return cascade + [txvx]
 
-# Therapeutic vaccination delivered through screening: screen, then vaccinate the positives
-screened_pos   = lambda sim: sim.interventions['routine screening'].outcomes['positive']
-routine_screen = hpv.routine_screening(start_year=2016, product='hpv', prob=0.1, age_range=[30, 50], name='routine screening')
-deliver_txvx   = hpv.linked_txvx(prob=0.8, product='txvx1', eligibility=screened_pos, name='txvx')
-screen_vx_intv = [routine_screen, deliver_txvx]
+s_screen = hpv.Sim(**PARS, interventions=screen_and_treat(0.2),
+                   label='Screen and treat')
+s_txvx   = hpv.Sim(**PARS, interventions=screen_then_txvx(0.2),
+                   label='Screen, treat, and vaccinate')
+msim2 = ss.MultiSim([s_screen, s_txvx])
+msim2.run(verbose=0, parallel=False)
 
-sim0 = hpv.Sim(**pars, label='Baseline')
-sim1 = hpv.Sim(**pars, interventions=mass_vx_intvs, label='Mass therapeutic vaccination')
-sim2 = hpv.Sim(**pars, interventions=screen_vx_intv, label='Therapeutic vaccination through screening')
-
-# Run and plot
-msim = ss.MultiSim([sim0, sim1, sim2]).run(parallel=False)
-msim.plot();
+for s in msim2.sims:
+    print(f'{s.label:30s} {float(s.results.all_hpv.cum_cancers[-1]):>12,.0f} cancers')
 ```
+
+Expect very little difference. The default `txvx1` product has an efficacy of
+0.01 against precancerous lesions in `products_tx.csv` — a placeholder standing
+in for a vaccine that does not yet exist, not a claim about any candidate. If
+you are modelling a real therapeutic vaccine, put its own efficacy numbers in
+before reading anything from this comparison.
+
+## Build your own product
+
+Every product is a table. To make your own treatment, give one row per health
+state with the efficacy you want. The states HPVsim knows are `susceptible`,
+`latent`, `precin`, `cin`, and `cancerous`:
+
+```{python}
+import pandas as pd
+
+my_product = pd.DataFrame({
+    'name':     'thermal_ablation',
+    'state':    ['precin', 'cin', 'cancerous'],
+    'genotype': 'all',
+    'efficacy': [0.90, 0.90, 0.0],
+})
+treatment = hpv.tx(df=my_product)
+```
+
+Set `genotype` to `'all'` when efficacy is the same across genotypes, or give
+one row per genotype when it is not. Diagnostics (`hpv.dx`) and vaccines
+(`hpv.vx`) work the same way; look at the shipped CSVs for the columns each one
+expects.
+
+The script `examples/t05_screen_algorithms.py` builds each of the seven
+screen-and-treat algorithms in the
+[WHO guidelines](https://www.ncbi.nlm.nih.gov/books/NBK572308/).

@@ -3,113 +3,203 @@ title: T6 - Using analyzers
 jupyter: python3
 ---
 
+An analyzer watches a run and records something the standard results do not
+cover. It never changes what happens in the model. In this tutorial we use three
+of them: cancers in the age bands our data uses, how long HPV takes to become
+cancer, and the DALYs that burden represents. Then we write one of our own.
 
-Analyzers are objects that do not change the behavior of a simulation, but just report on its internal state, almost always something to do with `sim.people`. This tutorial takes you through some of the built-in analyzers and gives a brief example of how to build your own.
+## Cancers in your data's age bands
 
+Cancer registries report cases by five- or ten-year age bands, and rarely the
+same bands HPVsim uses by default. `hpv.by_age` records any age-stratified
+result at whatever bins and years you name.
 
-<div class="alert alert-info">
-
-Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_analyzers.ipynb) to open an interactive version of this notebook.
-
-</div>
-
-
-## Results by age
-
-By far the most common reason to use an analyzer is to report results by age. The per-genotype and aggregate results in `sim.results` (e.g. `sim.results.all_hpv.cancers`) use standardized age bins which may not match the age bins for available data on cervical cancers. The `AgeResults` analyzer lets you record any HPV result at the exact age bins and years you choose. You configure it with a `result_args` dictionary whose keys are the results you want by age; each entry lists the `years` to snapshot and the bin `edges`:
+Here we match the bands in `nigeria_cancer_cases.csv`, an age-stratified count
+of cervical cancer cases in Nigeria in 2020, collapsed to ten-year bands:
 
 ```{python}
-#| collapsed: false
-#| jupyter: {outputs_hidden: false}
-#| tags: []
 import numpy as np
-import sciris as sc
+import pandas as pd
 import hpvsim as hpv
 
-# A multi-decade run with a decent population size generates enough cancers to
-# illustrate age-specific results.
-age_analyzer = hpv.AgeResults(
-    result_args=sc.objdict(
-        # The keys are any per-age result of the HPV modules.
-        hpv_prevalence=sc.objdict(
-            years=[2019],  # The year(s) to generate results for
-            edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-        ),
-        cancers=sc.objdict(
-            years=[2019],
-            edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-        ),
-    )
+edges = np.array([0., 25., 35., 45., 55., 65., 150.])
+years = list(range(2015, 2021))
+
+cancers_by_age = hpv.by_age(['cancers', 'hpv_prevalence'], years=years, edges=edges)
+
+sim = hpv.Sim(
+    location       = 'nigeria',
+    genotypes      = [16, 18, 'hi5', 'ohr'],
+    n_agents       = 2000,
+    start          = 1990,
+    stop           = 2025,
+    ms_agent_ratio = 25,
+    rand_seed      = 1,
+    verbose        = 0,
+    analyzers      = [cancers_by_age,
+                      hpv.age_causal_infection(start=2010),
+                      hpv.dalys(start=2010)],
 )
-
-sim = hpv.Sim(n_agents=20e3, genotypes=[16, 18], location='nigeria',
-              start=1970, stop=2020, dt=1.0, analyzers=[age_analyzer])
 sim.run()
-
-a = sim.analyzers['ageresults']
-hpv.plot_by_age(a, 'cancers')
 ```
 
-The recorded values are also available as a tidy dataframe, which is the easiest way to line the model up against your own data (rows are the snapshot years, columns are the age bins):
+The first argument is the list of results you want by age. The choices are
+counts (`n_infected`, `n_cin`, `n_cancerous`, `n_precin`, `hpv`), annual event
+flows (`cancers`, `cins`), and prevalences (`hpv_prevalence`,
+`cin_prevalence`, `cancer_prevalence`, `precin_prevalence`).
+
+Retrieve the analyzer from the finished run — not from the variable you created,
+which is a template the sim copied — and ask for a table:
 
 ```{python}
-#| collapsed: false
-#| jupyter: {outputs_hidden: false}
-#| tags: []
-a.to_dataframe(key='cancers')
+by_age = sim.analyzers['by_age']
+by_age.to_dataframe('cancers').round(0)
 ```
 
-To fit these age-specific outputs to observed data, pass the data to the `Calibration` object — see the [calibration tutorial](tut_calibration.qmd).
-
-## Snapshots
-
-A snapshot takes a "picture" of the `sim.people` object at specified points in time — a frozen deep copy you can inspect after the run. The following example snapshots the population and plots its age structure by sex at that moment:
+One row per year, one column per age band. Look at the individual rows: bands
+jump between zero and several thousand from one year to the next. At 2,000
+agents a single calendar year holds only a handful of cancer events, each
+carrying a large population weight. Averaging over several years gives something
+you can actually compare against data:
 
 ```{python}
-#| tags: []
-snap = hpv.snapshot(timepoints=[2020])
-sim = hpv.Sim(genotypes=[16, 18], location='nigeria',
-              start=2000, stop=2020, dt=1.0, n_agents=20e3, analyzers=[snap])
-sim.run()
+modelled = by_age.to_dataframe('cancers').mean(axis=0)
 
-# Retrieve the People snapshot taken in 2020.
-people = sim.analyzers['snapshot'].get(2020)
+observed = pd.read_csv('nigeria_cancer_cases.csv')
+observed = observed.groupby(pd.cut(observed.age, bins=edges, right=False,
+                                   labels=by_age.bin_labels),
+                            observed=False)['value'].sum()
 
-import pylab as pl
-alive = people.alive.values
-ages = people.age.values[alive]
-female = people.female.values[alive]
-
-fig, ax = pl.subplots(figsize=(6, 4))
-ax.hist([ages[female], ages[~female]], bins=np.arange(0, 90, 5),
-        stacked=True, label=['Female', 'Male'])
-ax.set_xlabel('Age')
-ax.set_ylabel('Number of people')
-ax.set_title('Population age structure in 2020')
-ax.legend()
-pl.show()
+comparison = pd.DataFrame({'modelled': modelled.round(0), 'observed': observed})
+comparison['ratio'] = (comparison.modelled / comparison.observed).round(2)
+comparison
 ```
 
-Because the snapshot is a deep copy, it is unaffected by anything that happens to `sim.people` later in the run — handy for comparing the population at two different times.
+Read the `ratio` column. The uncalibrated defaults overstate cancer counts, and
+the size of the discrepancy varies across age bands rather than being a constant
+factor — so this is not something you can fix by scaling the output. Part of the
+gap is real under-ascertainment in registry data; the rest is that the
+parameters have never been fitted to Nigeria. Closing it is what
+[Tutorial 7](tut_calibration.qmd) is about.
 
-## Age pyramids
-
-Age pyramids, like snapshots, take a picture of the people at a given point in time, and then bin them into age groups by sex. When you have a matching observed pyramid you can overlay it by passing `datafile=`:
+The same analyzer also recorded HPV prevalence by age:
 
 ```{python}
-#| tags: []
-# Make the age pyramid analyzer
-age_pyr = hpv.age_pyramid(
-    timepoints=[2010, 2020],
-    edges=np.linspace(0, 100, 21))
-
-# Make the sim, run, get the analyzer, and plot. HPVsim ships demographic
-# data for any country in the UN World Population Prospects, so we can point
-# the sim at a different location simply by name.
-sim = hpv.Sim(location='south africa', start=2000, stop=2030, dt=0.5,
-              n_agents=20e3, analyzers=[age_pyr])
-sim.run()
-
-a = sim.analyzers['age_pyramid']
-a.plot()
+by_age.to_dataframe('hpv_prevalence').mean(axis=0).round(3)
 ```
+
+Compare which band the peak falls in against prevalence surveys for your own
+setting. Most surveys put the peak in women in their early twenties. The age at
+which prevalence peaks is a second calibration target, and an informative one:
+it constrains the sexual-behaviour parameters rather than the natural-history
+ones.
+
+Each age band is also available as a timeseries of its own, named after the band:
+
+```{python}
+fig = hpv.plot_by_age(by_age, 'cancers', years=[2018])
+print('Cancers in women 35-44, last four timesteps:',
+      np.round(sim.results.by_age.cancers_35_45[-4:], 0))
+```
+
+## How long does HPV take to cause cancer?
+
+`hpv.age_causal_infection` traces every cancer back to the infection that caused
+it, and records how long each stage took:
+
+```{python}
+history = sim.analyzers['age_causal_infection']
+w = history.weights
+print(f'Mean age at the infection that caused cancer: '
+      f'{np.average(history.age_causal, weights=w):.1f}')
+print(f'Mean age at precancerous lesion:              '
+      f'{np.average(history.age_cin, weights=w):.1f}')
+print(f'Mean age at cancer:                           '
+      f'{np.average(history.age_cancer, weights=w):.1f}')
+for stage in ('precin', 'cin', 'total'):
+    print(f'  time in {stage:7s}: {np.average(history.dwelltime[stage], weights=w):.1f} years')
+```
+
+The dwell times show where those years go. Most of the time between infection
+and cancer is spent as a precancerous lesion, and that long lesion stage is why
+screening works at all — it is the window in which a woman can be found and
+treated. It is also why a vaccination programme takes decades to show up in
+cancer statistics.
+
+```{python}
+fig = history.plot()
+```
+
+## Turn cancers into DALYs
+
+`hpv.dalys` converts cancer cases into years of life lost and years lived with
+disability, using GBD 2017 disability weights and a reference life expectancy of
+84 years:
+
+```{python}
+burden = sim.analyzers['dalys']
+i2020 = burden.years == 2020
+print(f'DALYs in 2020: {float(burden.dalys[i2020][0]):>10,.0f}')
+print(f'  of which YLL: {float(burden.yll[i2020][0]):>9,.0f}')
+print(f'  of which YLD: {float(burden.yld[i2020][0]):>9,.0f}')
+fig = burden.plot()
+```
+
+Almost all of the burden is years of life lost, not years lived with disability.
+Cervical cancer kills women in their forties and fifties, so each case costs
+decades of life. Pass `life_expectancy=` to use a national figure instead of the
+reference one.
+
+## Write your own
+
+An analyzer is a class with two methods: `init_results` declares what it
+records, and `step` records it once per timestep. Here is one that answers a
+question a programme manager would ask — how many women in the screening age
+range have never been screened?
+
+```{python}
+import starsim as ss
+
+class UnscreenedWomen(ss.Analyzer):
+    """Count women aged 30-49 who have never been screened."""
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_unscreened', dtype=float, scale=True,
+                      label='Women 30-49 never screened'),
+        )
+
+    def step(self):
+        people = self.sim.people
+        in_range = (people.alive & people.female
+                    & (people.age >= 30) & (people.age < 50))
+        screen = self.sim.interventions.get('screen')
+        if screen is not None:
+            in_range = in_range & ~screen.screened
+        self.results.n_unscreened[self.ti] = people.scale_flows(in_range.uids)
+```
+
+`scale=True` on the result tells HPVsim this is a count of people, so it gets
+multiplied up to national scale like every other count. `people.scale_flows`
+handles the per-agent weighting that `ms_agent_ratio` introduces.
+
+Attach it like any other analyzer:
+
+```{python}
+screen = hpv.routine_screening(product='via', prob=0.2, start_year=2015,
+                               age_range=[30, 50], name='screen')
+sim2 = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
+               start=2000, stop=2030, verbose=0,
+               interventions=[screen], analyzers=[UnscreenedWomen()])
+sim2.run()
+
+gap = sim2.results.unscreenedwomen.n_unscreened
+yrs = sim2.results.timevec.years
+for year in (2014, 2020, 2030):
+    print(f'Never screened in {year}: {float(gap[yrs == year][0]):>12,.0f}')
+```
+
+The number falls sharply once the programme starts, then flattens as new women
+age into the range faster than the programme reaches them. That flat line is the
+unmet need a real programme has to plan for.

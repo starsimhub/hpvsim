@@ -3,174 +3,132 @@ title: T3 - Running scenarios
 jupyter: python3
 ---
 
+A single run tells you very little, because cervical cancer is rare and every
+run uses different random numbers. In this tutorial we run the same model five
+times to see how much of the result is noise, then compare three vaccination
+coverage levels with uncertainty bands around each one.
 
-While running individual sims can be interesting for simple explorations, at some point it will almost always be necessary to run a large number of simulations simultaneously -- to explore different scenarios, to perform calibration, or simply to get uncertainty bounds on a single projection. This tutorial explains how to do that.
+## How much of this is noise?
 
-
-<div class="alert alert-info">
-
-Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_running.ipynb) to open an interactive version of this notebook.
-
-</div>
-
-## Multi-seed runs and scenario sweeps
-
-HPVsim uses Starsim's native multi-sim machinery — `ss.MultiSim`,
-`ss.parallel`, and Sciris's `sc.parallelize` — for replicate runs,
-scenario comparisons, and parameter sweeps.
-
-### Replicate runs (multi-seed UQ)
-
-Making and running a MultiSim based on a single sim is straightforward.
-Passing `n_runs=N` automatically creates N copies of the sim with
-different random seeds:
+Give `ss.MultiSim` one sim and a number of runs, and it makes that many copies
+with different random seeds:
 
 ```{python}
-import hpvsim as hpv
+import numpy as np
 import starsim as ss
+import hpvsim as hpv
 
-sim = hpv.Sim(
-    n_agents=10_000,
-    location='nigeria',
-    genotypes=[16, 18, 'hi5', 'ohr'],
-    start=1990,
-    stop=2030,
-    verbose=0,
+PARS = dict(
+    location       = 'nigeria',
+    genotypes      = [16, 18, 'hi5', 'ohr'],
+    n_agents       = 2000,
+    start          = 1990,
+    stop           = 2040,
+    ms_agent_ratio = 25,
+    verbose        = 0,
 )
-msim = ss.MultiSim(sim, n_runs=5)
+
+msim = ss.MultiSim(hpv.Sim(**PARS), n_runs=5)
 msim.run(verbose=0)
-msim.plot()
+fig = msim.plot('all_hpv_asr_cancer_incidence')
 ```
 
-The individual sim results are stored in `msim.sims`. You can inspect them directly:
+Five lines, one model. The spread between them is the stochastic noise floor of
+this configuration: any difference between two scenarios smaller than this
+spread is not a result.
+
+The individual runs are in `msim.sims`:
 
 ```{python}
 for s in msim.sims:
-    s.summarize()
+    print(f'seed {s.pars.rand_seed}: {float(s.results.all_hpv.cum_cancers[-1]):>10,.0f} cancers')
 ```
 
-Often you care about *statistics* across seeds rather than individual runs. Call
-`.median()` or `.mean()` to reduce the MultiSim in place and expose quantile
-ribbons in plots:
+## Reduce to a median and a band
+
+`median()` collapses the runs into a median plus 10th and 90th percentiles:
 
 ```{python}
-msim.median()   # mutates msim in place; computes median + 10/90 quantiles
-msim.plot()
+msim.median()
+fig = msim.plot('all_hpv_asr_cancer_incidence')
 ```
 
-Note that `.median()` and `.mean()` **mutate** the MultiSim in place. Prefer
-`.median()` for metrics like cancers, infections, and prevalence: these are
-rarely normally distributed across seeds, so a mean ± 2 SD band is not a true
-95% CI and its lower edge can fall below zero.
-
-### Comparing scenarios
-
-For scenario comparisons, write a `make_sim(seed, scenario)` function that
-builds one sim per scenario, and pass the labeled sims to `ss.parallel`:
+Two things change after this call. First, `median()` rewrites the MultiSim in
+place — the individual runs are still in `msim.sims`, but `msim.results` now
+holds the reduced summary. Second, the reduced results are a flat list with
+module-prefixed names, so `all_hpv.cum_cancers` becomes `all_hpv_cum_cancers`,
+and each one carries `.low` and `.high`:
 
 ```{python}
-import hpvsim as hpv
-import starsim as ss
+r = msim.results['all_hpv_cum_cancers']
+print(f'Cancers by 2040: {float(r[-1]):,.0f} '
+      f'(10-90%: {float(np.asarray(r.low)[-1]):,.0f} to {float(np.asarray(r.high)[-1]):,.0f})')
+```
 
-PARS = dict(
-    n_agents=10_000,
-    location='nigeria',
-    genotypes=[16, 18, 'hi5', 'ohr'],
-    start=1990,
-    stop=2030,
-    verbose=0,
-)
+Prefer `median()` over `mean()` for cancers, infections and prevalence. These
+are not normally distributed across seeds, so a mean plus or minus two standard
+deviations is not a 95% interval and its lower edge can fall below zero.
+
+## Compare vaccination coverage levels
+
+Write a function that builds one sim, then build every combination you want and
+hand them all to `ss.parallel`. Here we cross three coverage levels with five
+seeds, and run to 2060 so the vaccinated girls reach the ages where cervical
+cancer occurs:
+
+```{python}
+LONG = dict(PARS, stop=2060)
+COVERAGES = [0.0, 0.5, 0.9]
+N_SEEDS = 5
 
 def make_sim(seed, coverage):
-    """Make a sim for a given random seed and coverage level."""
+    """One sim for a given random seed and vaccination coverage."""
     return hpv.Sim(
-        **PARS,
+        **LONG,
         rand_seed=seed,
         label=f'coverage={coverage:.0%}',
         interventions=[hpv.routine_vx(
             product='bivalent',
             prob=float(coverage),
             age_range=[9, 14],
-            sex='f',
             start_year=2010,
         )],
     )
 
-sims = [make_sim(seed=0, coverage=c) for c in [0.0, 0.3, 0.6, 0.9]]
+sims = [make_sim(seed=s, coverage=c) for c in COVERAGES for s in range(N_SEEDS)]
 msim = ss.parallel(*sims, verbose=0)
-msim.plot()
 ```
 
-As expected, higher vaccination coverage leads to fewer HPV infections and
-cancers over time.
-
-### Sweeping parameters with multi-seed UQ
-
-Combine both techniques: build a grid of (coverage, seed) pairs in a list
-comprehension, run all sims with `ss.parallel`, then group results by scenario
-for per-scenario median reduction:
+Now group them by coverage level and reduce each group on its own:
 
 ```{python}
-import hpvsim as hpv
-import starsim as ss
+years = np.asarray(msim.sims[0].results.timevec.years)
+i2055 = int(np.argmin(abs(years - 2055)))
 
-PARS = dict(
-    n_agents=10_000,
-    location='nigeria',
-    genotypes=[16, 18, 'hi5', 'ohr'],
-    start=1990,
-    stop=2030,
-    verbose=0,
-)
-
-def make_sim(seed, coverage):
-    return hpv.Sim(
-        **PARS,
-        rand_seed=seed,
-        label=f'coverage={coverage:.0%}',
-        interventions=[hpv.routine_vx(
-            product='bivalent',
-            prob=float(coverage),
-            age_range=[9, 14],
-            sex='f',
-            start_year=2010,
-        )],
-    )
-
-COVERAGES = [0.0, 0.3, 0.6, 0.9]
-N_SEEDS = 10
-
-# Build all sims up front, then run in one parallel batch
-sims = [make_sim(seed=s, coverage=c)
-        for c in COVERAGES for s in range(N_SEEDS)]
-msim = ss.parallel(*sims, verbose=0)
-
-# Group by scenario label and reduce each group independently
-by_cov = {}
+by_coverage = {}
 for cov in COVERAGES:
-    sub = ss.MultiSim([s for s in msim.sims
-                       if s.label.startswith(f'coverage={cov:.0%}')])
-    sub.median()
-    by_cov[cov] = sub
+    group = ss.MultiSim([s for s in msim.sims if s.label == f'coverage={cov:.0%}'])
+    group.median()
+    by_coverage[cov] = group
+    asr = group.results['all_hpv_asr_cancer_incidence']
+    print(f'coverage={cov:>4.0%}  incidence in 2055: {float(asr[i2055]):5.1f} '
+          f'({float(np.asarray(asr.low)[i2055]):.1f} to '
+          f'{float(np.asarray(asr.high)[i2055]):.1f}) per 100,000')
 ```
 
-For large grids (hundreds of sims), replace the list comprehension with
-`sc.parallelize` for parallel sim *creation* as well as parallel execution.
-Because `sc.parallelize` uses multiprocessing, `make_sim` must be defined at
-module level (not inside a notebook cell), and the call must be protected with
-`if __name__ == '__main__':`. A full worked example using `sc.parallelize` is
-in `examples/m07_uq_sweep.py`.
+Read the bands, not just the medians. Where two scenarios' bands sit clear of
+each other, the difference between them is a result. Where they overlap, it is
+not — at this population size and with five seeds those two scenarios are
+indistinguishable, however different their medians look. Either report that as
+the answer, or raise `n_agents` and `N_SEEDS` until the bands separate.
 
-<div class="alert alert-warning">
+## One thing that will catch you out
 
-**Warning:** Because `multiprocess` pickles the sims when running them,
-`sims[i]` (before being run) and `msim.sims[i]` are **not** the same object.
-After calling `ss.parallel(...)` or `msim.run()`, always retrieve sims from
-the MultiSim object (`msim.sims`), not from the original list. Conversely, if
-you construct a MultiSim from *already-run* sims (e.g. `ss.MultiSim(sims)` where
-each `s` in `sims` has already been run), the objects are the same.
+Running many sims sends each one to a separate process, so the sims that come
+back are copies, not the objects you put in. Always read results from
+`msim.sims`, never from the list you passed to `ss.parallel`. Building a
+MultiSim from sims you have already run yourself is the one case where the two
+are the same objects.
 
-</div>
-
-A full worked example — 4 × 20 (coverage × seed) routine-vx sweep with
-median + 10/90 quantile cancer plots — lives in `examples/m07_uq_sweep.py`.
+A larger worked sweep, using `sc.parallelize` so the sims are built in parallel
+as well as run in parallel, is in `examples/m07_uq_sweep.py`.
