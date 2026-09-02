@@ -61,10 +61,9 @@ def test_hiv_transmission():
 
 def test_hiv_incidence():
     """HIV_incidence builds a plausible epidemic from a real incidence curve,
-    infected agents get a CD4 trajectory, and plain sti.ART (no hiv_art
-    shortcut class) both treats a plausible fraction of HIV+ agents and
-    reconstitutes their CD4 -- the ti_art=ti+1 fix (see hiv.py) is what makes
-    this work with no separate testing-cascade intervention."""
+    infected agents get a CD4 trajectory, and plain sti.ART treats a plausible
+    fraction of them and reconstitutes their CD4 with no separate
+    testing-cascade intervention."""
     data = hpv.data.load_hiv_data(_RWANDA_HIV_DATA)
     hiv = hpv.HIV_incidence(incidence=data['incidence'])
     art = sti.ART(coverage=hpv.data.reshape_art_coverage(data['art_coverage']))
@@ -78,27 +77,23 @@ def test_hiv_incidence():
 
     on_art = infected[hivmod.on_art[infected]]
     off_art = infected[~hivmod.on_art[infected]]
-    assert len(on_art) > 0, 'plain sti.ART treated nobody -- ti_art=ti+1 fix may be broken'
+    assert len(on_art) > 0, 'plain sti.ART treated nobody: ART start must be scheduled for the step after diagnosis'
     assert len(off_art) > 0
     assert np.nanmean(hivmod.cd4[on_art]) > np.nanmean(hivmod.cd4[off_art]), \
         'CD4 not reconstituted for on-ART agents'
 
-    # Bare sti.ART() forces the ti_art-exact-match path; stratified coverage
-    # above only exercises `diagnosed`, not `ti_art`.
+    # Bare sti.ART() forces the ti_art exact-match path, unlike stratified coverage.
     hiv2 = hpv.HIV_incidence(incidence=data['incidence'])
     sim2 = hpv.Sim(location='rwanda', rand_seed=0, genotypes=[16, 18], n_agents=2000,
                   start=1985, stop=2015, dt=0.5, diseases=[hiv2], interventions=[sti.ART()])
     sim2.run()
     assert sim2.diseases.hiv.on_art.uids.__len__() > 0, \
-        'bare sti.ART() (exact-match-only path) treated nobody -- ti_art=ti+1 fix broken'
+        'bare sti.ART() treated nobody: it only treats agents whose ti_art equals the current step'
 
 
 def test_hiv_transmit_auto_diagnoses():
-    """HIV_transmit (network transmission, no infect() override, no self-
-    diagnose of its own) must still get its agents diagnosed and treated --
-    this is HIV.step_state()'s job, shared by both HIV_transmit and
-    HIV_incidence, restoring the deleted hiv_art intervention's old
-    behavior of diagnosing every living HIV+ agent each step."""
+    """HIV_transmit's agents get diagnosed and treated even though it does no
+    self-diagnosis: HIV.step_state() diagnoses every living HIV+ agent each step."""
     sim = hpv.Sim(n_agents=2000, start=2000, stop=2020, dt=0.5, location='nigeria',
                   genotypes=[16], rand_seed=0,
                   diseases=[hpv.HIV_transmit(beta_m2f=0.05)],
@@ -108,9 +103,9 @@ def test_hiv_transmit_auto_diagnoses():
     infected = hivmod.infected.uids
     assert len(infected) > 0, 'HIV_transmit infected nobody -- check beta_m2f/network'
     assert hivmod.diagnosed[infected].any(), \
-        'HIV_transmit agents never got diagnosed -- auto-diagnose fix missing'
+        'HIV_transmit agents never got diagnosed: HIV.step_state() must diagnose living HIV+ agents each step'
     assert hivmod.on_art.uids.__len__() > 0, \
-        'HIV_transmit + bare sti.ART() treated nobody -- auto-diagnose fix missing'
+        'HIV_transmit + bare sti.ART() treated nobody: agents must be diagnosed before ART can treat them'
 
 
 def test_hiv_data_loading():
@@ -193,16 +188,11 @@ def test_hiv_effect():
                 'cancer_incidence_no_hiv', 'cancer_rate_ratio'):
         assert key in all_hpv
     assert np.all((res['hpv_prevalence_with_hiv'] >= 0) & (res['hpv_prevalence_with_hiv'] <= 1))
-    # Per-capita incidence, not raw counts: at ms_agent_ratio=5 the HIV- group
-    # accumulates far more (lower-weight, fine) agents via demographic growth
-    # than the fixed HIV+ cohort, so raw cancers_no_hiv can exceed
-    # cancers_with_hiv even though per-capita risk is ~20x higher with HIV.
+    # Per-capita, not raw counts: the growing HIV- group outnumbers the fixed HIV+ cohort.
     assert all_hpv['cancer_incidence_with_hiv'].sum() > all_hpv['cancer_incidence_no_hiv'].sum()
 
-    # HIV-stratified cancers are a lower bound on the (scale-weighted) total --
-    # HIVStratifiedResults' successor runs after step_die, so an agent who
-    # turns cancerous and dies from background demographics the same step is
-    # counted by all_hpv.new_cancers but missed here.
+    # Stratified cancers are a lower bound: stratification runs after step_die,
+    # so an agent who turns cancerous and dies the same step is missed here.
     assert np.issubdtype(all_hpv['cancers_with_hiv'].dtype, np.floating)
     strat_total = all_hpv['cancers_with_hiv'].sum() + all_hpv['cancers_no_hiv'].sum()
     assert strat_total > 0
@@ -248,8 +238,7 @@ def test_hiv_rel_imm_effect():
     assert np.isclose(nab_pos, nab_neg * factor, rtol=1e-6)
     assert np.isclose(cell_pos, cell_neg * factor, rtol=1e-6)
 
-    # Vaccine / txvx immunity: an HIV+ (lo stratum) agent gets strictly less
-    # conferred immunity than an otherwise-identical HIV- agent.
+    # Vaccine/txvx immunity: HIV+ (lo stratum) gets strictly less than HIV-.
     def _coinfection_sim(product):
         interventions = [ss.treat_num(product=product, prob=0.0)]
         sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25, location='nigeria',
@@ -296,9 +285,9 @@ def test_hiv_reactivation_effect():
 
 def test_model_hiv_sim_assembly():
     """model_hiv=True/'incidence'/'transmission' construct the right pieces,
-    mutual exclusivity with a user-supplied HIV disease raises, nothing is
-    auto-wired without model_hiv=, and a raw sti.HIV (vignette B) does NOT get
-    the CD4-effect on HPV while hpv.HIV_transmit does."""
+    combining model_hiv= with a user-supplied HIV disease raises, nothing is
+    auto-wired without model_hiv=, and a raw sti.HIV gets no CD4-effect on HPV
+    while hpv.HIV_transmit does."""
     data = dict(
         incidence=pd.DataFrame({'age': [20, 20], 'sex': ['f', 'm'], 'year': [2000, 2000],
                                  'incidence': [0.01, 0.01]}),
