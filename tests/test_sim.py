@@ -164,9 +164,7 @@ def test_datafolder_override_uses_user_csv(tmp_path):
     (tmp_path / 'age_data.csv').write_text(df.to_csv(index=False))
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')  # missing birth/death/pop_total CSVs will warn
-        # location is still required (used for bundled fallbacks on other
-        # indicators + for network defaults); user CSV overrides the age
-        # distribution.
+        # location is still required for network defaults and other indicators.
         sim = hpv.Sim(location='nigeria', datafolder=str(tmp_path),
                       n_agents=200, start=2000, stop=2001, dt=1.0, rand_seed=0)
         sim.init()
@@ -177,14 +175,12 @@ def test_datafolder_override_uses_user_csv(tmp_path):
 def test_datafolder_missing_indicator_warns(tmp_path):
     """When a datafolder is given but an indicator CSV is missing, warn."""
     import hpvsim as hpv
-    # Empty datafolder: every indicator triggers a warning (and falls back
-    # to bundled UN WPP for the caller-specified location).
+    # Empty datafolder: every indicator warns and falls back to bundled UN WPP.
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
         hpv.Sim(location='nigeria', datafolder=str(tmp_path),
                 n_agents=100, start=2000, stop=2001, dt=1.0, rand_seed=0)
     msgs = [str(w.message) for w in caught]
-    # At least one indicator file should be reported missing.
     assert any('not found in datafolder' in m for m in msgs), (
         f'expected a missing-indicator warning; got {msgs}'
     )

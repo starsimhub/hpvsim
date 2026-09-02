@@ -1,10 +1,8 @@
-"""Tests for two HPV genotype-parameter override fixes.
+"""Tests for HPV genotype-parameter overrides.
 
-1. ``rel_beta`` overrides must feed into the directional transmission ``beta``
-   dict (previously silently ignored — the dict was frozen at construction from
-   the genotype defaults).
-2. Unit-less duration distributions must raise (they otherwise silently collapse
-   the epidemic: a duration without ``ss.years`` is read in timesteps).
+1. ``rel_beta`` overrides must feed into the directional transmission ``beta`` dict.
+2. Unit-less duration distributions must raise: a duration without ``ss.years``
+   is read in timesteps and silently collapses the epidemic.
 """
 import numpy as np
 import pytest
@@ -18,7 +16,7 @@ def _beta(mod):
 
 
 def test_default_beta_matches_formula():
-    """Regression guard: default beta = base * rel_beta * transf2m/transm2f."""
+    """Default beta = base * rel_beta * transf2m/transm2f."""
     g = get_genotype_pars('hpv16')
     sim = hpv.Sim(genotypes=[16], n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     sim.init()

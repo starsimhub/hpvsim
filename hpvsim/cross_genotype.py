@@ -30,8 +30,7 @@ __all__ = ['CrossImmunity', 'HPVTotal']
 # Genotypes whose own-immunity is hardcoded to 1.0; other keys use ``own_imm_hr``.
 _FULL_OWN_IMM_KEYS = frozenset({'hpv16', 'hpv18'})
 
-# Pairwise cross-protection clade map. 'high' = hpv16 <-> hpv18 (same clade);
-# everything else is 'med'.
+# Pairs with 'high' cross-protection (same clade); everything else is 'med'.
 _CLADE_HIGH_PAIRS = frozenset({
     ('hpv16', 'hpv18'),
     ('hpv18', 'hpv16'),
@@ -78,25 +77,20 @@ class CrossImmunity(ss.Connector):
 
     def __init__(self, cross_imm_sus=None, cross_imm_sev=None, pars=None, **kwargs):
         super().__init__()
-        # User-supplied matrices override the auto-built defaults; auto-built
-        # matrices are constructed at init_pre from the scalar med/high pars.
+        # None means init_pre builds the matrix from the scalar med/high pars.
         self.cross_imm_sus = cross_imm_sus
         self.cross_imm_sev = cross_imm_sev
         self.hpv_modules = None
         self.genotype_index = None
         self.define_states(
-            # Per-agent biological severity scaler, shared across all HPV
-            # genotypes. Sampled once on first need via _ensure_rel_sev.
+            # Shared across genotypes; sampled once on first need.
             ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
             ss.BoolState('rel_sev_sampled', default=False),
         )
         self.define_pars(
-            # Folded normal via abs() in _ensure_rel_sev. Default loc=1, scale=0.2
-            # has < 1e-6 negative tail so it's effectively a positive-truncated
-            # normal; calibration may lower loc (e.g. to normal(0.87, 0.2)).
+            # Folded normal: ensure_rel_sev takes abs(), so a lower loc is safe.
             rel_sev=ss.normal(loc=1.0, scale=0.2),
-            # Scalar medium/high cross-immunity used by get_cross_immunity to
-            # build the sus/sev matrices when explicit matrices aren't passed.
+            # Scalars make_cross_immunity() uses when no explicit matrix is passed.
             cross_imm_sus_med=0.3,
             cross_imm_sus_high=0.5,
             cross_imm_sev_med=0.5,
@@ -173,16 +167,14 @@ class CrossImmunity(ss.Connector):
         self.rel_sev_sampled[unset] = True
 
     def step(self):
-        # Catch any unset agents (births/immigrants since last step) before
-        # the downstream HPV step_infect samples new infections.
+        # Catch births/immigrants before HPV.step_infect samples new infections.
         self.ensure_rel_sev(self.sim.people.alive.uids)
         if not self.hpv_modules:
             return
         # Clearance-conferred immunity — flows through cross-protection matrix.
         nab  = np.column_stack([m.nab_imm.values  for m in self.hpv_modules])
         cell = np.column_stack([m.cell_imm.values for m in self.hpv_modules])
-        # Vaccine-conferred immunity — applied directly per target genotype,
-        # NOT through the matrix. Shape: (n_agents, n_genotypes).
+        # Vaccine immunity applies directly per target genotype, not via the matrix.
         vax   = np.column_stack([m.vax_imm.values   for m in self.hpv_modules])
         txvx  = np.column_stack([m.txvx_imm.values  for m in self.hpv_modules])
         sus_imm_nab = nab  @ self.cross_imm_sus.T
@@ -193,12 +185,7 @@ class CrossImmunity(ss.Connector):
         np.clip(txvx,        0.0, 1.0, out=txvx)
         auids = self.sim.people.auids
         for i, m in enumerate(self.hpv_modules):
-            # Three independent protection paths:
-            #   - clearance cross-protection (matrix path, nab_imm)
-            #   - prophylactic vaccine (direct path, vax_imm)
-            #   - therapeutic vaccine (direct path, txvx_imm)
-            # All reduce susceptibility multiplicatively. sev_imm comes only
-            # from clearance (vaccines don't reduce severity beyond rel_sus).
+            # Three independent protection paths. sev_imm comes only from clearance.
             m.rel_sus[auids] = m.rel_sus[auids] * (
                 (1.0 - sus_imm_nab[:, i])
                 * (1.0 - vax[:, i])
@@ -230,16 +217,11 @@ class HPVTotal(ss.Analyzer):
     """
 
     def __init__(self, *args, **kwargs):
-        # Results land under ``sim.results[self.name]``. Default the name to
-        # 'all_hpv' so the pooled totals read as
-        # ``sim.results.all_hpv.cum_infections`` (cleaner than the class name's
-        # 'hpvtotal'). Note 'hpv' itself is taken — the HPV DNA screening test
-        # is a product module named 'hpv', so an 'hpv' analyzer would collide.
+        # Results land under sim.results[name]; 'hpv' is taken by the DNA test product.
         kwargs.setdefault('name', 'all_hpv')
         super().__init__(*args, **kwargs)
 
-    # Per-agent state counts aggregated by boolean OR across modules.
-    # Maps result key on the HPV module -> BoolState attribute name.
+    # HPV result key -> BoolState name, aggregated by boolean OR across modules.
     _UNION_STATES = {
         'n_infected':  'infected',
         'n_precin':    'precin',
@@ -248,10 +230,8 @@ class HPVTotal(ss.Analyzer):
         'n_latent':    'latent',
     }
 
-    # WHO 2000 World Standard Population weights per 5-year age band (0-4
-    # through 100+). Sum = 100_035 (rounding artifact vs the nominal
-    # 100_000; ASR normalizes by weights.sum() so the total is harmless).
-    # Bin 21 (100+) uses an open-ended upper edge of 150.
+    # WHO 2000 World Standard Population weights per 5-year band (0-4 to 100+).
+    # Sum is 100_035, not 100_000; ASR normalizes by weights.sum().
     WHO2000_5YR_EDGES = np.array(
         [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75,
          80, 85, 90, 95, 100, 150], dtype=float)
@@ -305,9 +285,7 @@ class HPVTotal(ss.Analyzer):
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
         self.hiv_module = misc.hiv_module(sim)
         super().init_pre(sim)
-        # Allocate per-ti WHO2000-binned histograms (rows = ti, cols = 5-year
-        # bins). Populated in step() and consumed by finalize_results() to
-        # derive per-year `asr_cancer_incidence`. See compute_asr / WHO2000_*.
+        # Per-ti WHO2000-binned histograms: rows = ti, cols = 5-year bins.
         n_pts = len(sim.timevec)
         n_bins = len(self.WHO2000_5YR_EDGES) - 1
         self._cancers_by_who_bin       = np.zeros((n_pts, n_bins), dtype=float)
@@ -334,26 +312,20 @@ class HPVTotal(ss.Analyzer):
         for key, src in template.items():
             if key in self._SKIP or key in self._DERIVED:
                 continue
-            # Union-based stocks are written as scale-weighted floats in
-            # step(); all other results mirror the per-genotype dtype.
+            # Union stocks are scale-weighted floats; the rest mirror per-genotype.
             result_dtype = float if key in self._UNION_STATES else src.dtype
             defs.append(ss.Result(key, dtype=result_dtype,
                                   label=f'{src.label} (any genotype)'))
         # Derived results (computed in step()).
         defs.append(ss.Result('n_susceptible', dtype=float,
                               label='Currently uninfected with any genotype'))
-        # prevalence is a ratio in [0,1]; scale=False so finalize doesn't
-        # multiply it by pop_scale.
+        # scale=False: prevalence is a ratio, not a count.
         defs.append(ss.Result('prevalence', dtype=float, scale=False,
                               label='Prevalence of any HPV genotype'))
         # Extra result with no per-genotype counterpart.
         defs.append(ss.Result('cum_infections_unique', dtype=int,
                               label='Cumulative agents ever infected with any genotype'))
-        # Age-standardized cancer incidence / mortality (WHO 2000, per 100k
-        # person-years). Populated in finalize_results from per-ti
-        # WHO2000-binned histograms; per-ti positions carry the annualized
-        # value of that timestep's year (so every ti within a calendar year
-        # reads the same ASR).
+        # Annualized in finalize_results: every ti in a year holds that year's ASR.
         defs.append(ss.Result('asr_cancer_incidence', dtype=float, scale=False,
                               label='Age-standardized cervical cancer incidence '
                                     '(WHO 2000, per 100,000 person-years)'))
@@ -387,16 +359,12 @@ class HPVTotal(ss.Analyzer):
         if not hpvs:
             return
         people = self.sim.people
-        # auids contains all currently-tracked agents (alive + recently dead
-        # pending removal). alive.uids filters to those marked alive.
+        # auids includes agents pending removal; alive.uids does not.
         alive_uids = people.alive.uids
         n_alive_sw = people.scale_flows(alive_uids)
         if n_alive_sw == 0:
             return
-        # Per-agent state unions across modules, restricted to alive agents.
-        # `.values` is the auid-indexed active-agent view; the alive mask still
-        # matters because auids holds agents who died this step (remove_dead
-        # runs after analyzers). The mask is invariant across states, so hoist.
+        # auids holds agents who died this step, so the alive mask is needed.
         auids = people.auids
         alive_mask = people.alive.values
         union_arrays = {}
@@ -416,18 +384,13 @@ class HPVTotal(ss.Analyzer):
         sw_inf = float(self.results['n_infected'][ti])
         self.results['n_susceptible'][ti] = n_alive_sw - sw_inf
         self.results['prevalence'][ti] = sw_inf / n_alive_sw
-        # Cumulative unique: agents whose ti_first_infection has fired on
-        # any genotype (including init-seeded), among those still alive.
-        # `.values` is auid-indexed, but auids still holds agents who died
-        # this step (remove_dead runs after analyzers), so mask by alive.
+        # Cumulative unique: agents ever infected with any genotype, still alive.
         ever_infected = np.zeros_like(people.alive.values)
         for m in hpvs:
             ever_infected |= np.isfinite(m.ti_first_infection.values)
         ever_infected &= people.alive.values
         self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
 
-        # Populate WHO2000-binned histograms used to derive per-year ASR
-        # (incidence + mortality) in finalize_results.
         self._accumulate_asr_histograms(ti, people, hpvs)
 
     def _accumulate_asr_histograms(self, ti, people, hpvs):
@@ -454,9 +417,8 @@ class HPVTotal(ss.Analyzer):
             ages[new_cancer], bins=edges, weights=wts_nc)[0]
         if self.hiv_module is not None:
             self._update_hiv_cancer_results(ti, people, new_cancer)
-        # Numerator: cancer deaths realized this step, across genotypes.
-        # ``ti_dead_cancer`` is set at scheduled cancer-death time; the agent
-        # is still marked alive at ti (remove_dead runs after analyzers).
+        # Numerator: cancer deaths this step. The agent is still marked alive at
+        # ti, since remove_dead runs after analyzers.
         new_cd = np.zeros_like(alive_bool)
         for m in hpvs:
             new_cd |= (m.ti_dead_cancer.values == ti)

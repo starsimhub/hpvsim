@@ -15,20 +15,11 @@ def _hpv_mods(sim):
 @pytest.fixture(scope='module')
 def base_sim():
     """One single-scale (ratio=1), 2-genotype sim with the full analyzer stack,
-    run once and shared (read-only) across the single-scale analyzer tests.
+    shared read-only across the single-scale analyzer tests.
 
-    Carries age_causal_infection / dalys / age_pyramid / snapshot so a single
-    run backs the ordering, DALY-decomposition, pyramid-histogram, per-genotype
-    and no-fine-agent assertions, plus an early/late pair of each recorder so
-    the ``start``-filter test shares the same trajectory instead of paying for
-    its own run.
-
-    Sizing: sim cost is dominated by a fixed per-timestep overhead, so the
-    cheapest way to hold cancer signal is a wide, coarse run rather than a
-    narrow, fine one — 8000 agents at dt=0.5 over 2000-2040 yields ~45-55
-    resolved cancers, matching the old 3000-agent dt=0.25 run at half the cost
-    (checked over 6 seeds). Tests that MUTATE people (snapshot deep-copy) use
-    their own sim instead.
+    8000 agents at dt=0.5 over 2000-2040 yields ~45-55 resolved cancers. The
+    early/late recorder pairs let the ``start``-filter test reuse this
+    trajectory. Tests that mutate people build their own sim.
     """
     sim = hpv.Sim(genotypes=['hpv16', 'hpv18'], location='nigeria',
                   start=2000, stop=2040, n_agents=8000, dt=0.5, rand_seed=1,
@@ -46,13 +37,10 @@ def base_sim():
 
 @pytest.fixture(scope='module')
 def grow_sim():
-    """One multiscale (ratio=10) sim, run once and shared across the grow tests.
+    """One multiscale (ratio=10) sim, shared across the grow tests.
 
-    ratio>1 materializes real fine cancer agents. Raising the ratio (rather than
-    the agent count or the horizon) is the cheap way to buy resolved cancers for
-    the analyzer-vs-engine consistency check: at ratio=10 over 4000 agents the
-    analyzer/engine gap stays under 2% for every seed tried, well inside the 5%
-    tolerance asserted below.
+    ratio>1 materializes real fine cancer agents; at ratio=10 over 4000 agents
+    the analyzer/engine gap stays under 2%, inside the 5% tolerance asserted below.
     """
     aci = hpv.age_causal_infection()
     sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2040,
@@ -65,9 +53,7 @@ def grow_sim():
 def test_grow_spawns_fine_cancer_agents_at_ratio_gt1(grow_sim):
     """At ratio>1 the grow engine materializes real fine cancer agents.
 
-    (Replaces the ledger tuple test: the grow engine has no _cancer_events
-    ledger — extra cancers are real agents in sim.people with fine=True and the
-    shrunk multiscale scale 1/ratio.)
+    Extra cancers are real agents in sim.people with fine=True and scale 1/ratio.
     """
     ratio = int(grow_sim.diseases['hpv16'].pars.ms_agent_ratio)
     ppl = grow_sim.people
@@ -90,22 +76,16 @@ def test_no_fine_agents_at_ratio_one(base_sim):
 def test_grow_analyzer_matches_engine_cancer_total(grow_sim):
     """Consistency gate: age_causal scaled event count == engine cum_cancers.
 
-    On grow, extra cancers are real fine agents, so the analyzer (live-agent
-    path, weighted by people.scale) reproduces the engine's own realized cancer
-    accounting to within boundary/same-tick-death noise (~1-2% observed). This
-    is the acceptance test the abandoned ledger path used to paper over.
+    The analyzer weights live agents by people.scale, so it reproduces the
+    engine's realized cancer accounting to within same-tick-death noise (~1-2%).
     """
     aci = grow_sim.analyzers['age_causal_infection']
-    # Both aci.weights and sim.results.<gt>.cum_cancers are pop-scaled in v3.0.1:
-    # aci multiplies by pop_scale in finalize; sim.results Result(scale=True)
-    # is multiplied by starsim's finalize.
+    # Both aci.weights and cum_cancers carry pop_scale after finalize.
     engine_total = float(hpv.results_by_genotype(grow_sim, key='cum_cancers').iloc[-1].sum())
     analyzer_total = float(aci.weights.sum())
     assert engine_total > 0
     assert abs(analyzer_total - engine_total) / engine_total < 0.05
-    # Raw fine-agent samples (agent-scale count) exceed the pop-scaled total
-    # only in agent-scale terms: len is a raw agent count, analyzer_total
-    # includes pop_scale. Compare after dividing out pop_scale.
+    # age_cancer is a raw agent count, so divide pop_scale out of the total.
     assert len(aci.age_cancer) > analyzer_total / grow_sim.pars.pop_scale
 
 
@@ -156,9 +136,7 @@ def test_age_pyramid_bins_sum_to_alive(base_sim):
     arr = a.age_pyramids[date]                  # (nbins, 2): col0=male, col1=female
     assert arr.shape == (len(a.bins), 2)
 
-    # Ground truth: recompute the scale-weighted age histograms from the
-    # snapshot of People taken at the SAME tick. This independently verifies
-    # the male/female column assignment, the alive mask, and scale-weighting.
+    # Ground truth: recompute the histograms from the same-tick People snapshot.
     ppl = base_sim.analyzers['snapshot'].get(2010)
     alive = ppl.alive.values
     ages = ppl.age.values
@@ -170,17 +148,14 @@ def test_age_pyramid_bins_sum_to_alive(base_sim):
         ww = w[mask] if w is not None else None
         return np.histogram(ages[mask], bins=PYRAMID_EDGES, weights=ww)[0]
 
-    # Analyzer output is pop-scaled (v3.0.1); the histogram ground truth is
-    # agent-scale (people.scale only). Compare after multiplying expected by
-    # pop_scale.
+    # Analyzer output is pop-scaled; the histogram ground truth is agent-scale.
     pop_scale = base_sim.pars.pop_scale
     exp_male = hist(alive & ~female) * pop_scale
     exp_female = hist(alive & female) * pop_scale
     assert np.allclose(arr[:, 0], exp_male), 'male column mismatch (possible male/female swap)'
     assert np.allclose(arr[:, 1], exp_female), 'female column mismatch (possible male/female swap)'
 
-    # Named invariant: total binned count == scale-weighted-and-pop-scaled
-    # alive within [0, 100).
+    # Total binned count == pop-scaled alive within [0, 100).
     in_range = alive & (ages >= PYRAMID_EDGES[0]) & (ages < PYRAMID_EDGES[-1])
     expected_total = (float(w[in_range].sum()) if w is not None
                       else float(in_range.sum())) * pop_scale
@@ -202,8 +177,7 @@ def test_age_causal_infection_single_scale(base_sim):
     assert np.all(a.dwelltime['total'] >= -1e-9)
     assert np.allclose(a.dwelltime['total'],
                        a.dwelltime['precin'] + a.dwelltime['cin'], atol=1e-6)
-    # At ratio==1 every event has agent-scale weight 1 (people.scale is all 1),
-    # multiplied by pop_scale at finalize.
+    # At ratio==1 every event weight is just pop_scale.
     assert np.allclose(a.weights, base_sim.pars.pop_scale)
 
 

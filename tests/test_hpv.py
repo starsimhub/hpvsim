@@ -86,7 +86,6 @@ def test_step_state_clears_at_ti_clearance():
     assert hpv.susceptible[target].all(), "cleared agents should return to susceptible"
     assert (~hpv.infected[target]).all(), "cleared agents must not remain infected"
     # With sero_prob=0.75 and 10 females, expect ~7-8 seroconverters.
-    # At minimum, verify the array is in [0, 1] and at least one seroconverted.
     nab_vals = np.asarray(hpv.nab_imm[target])
     assert (nab_vals >= 0.0).all() and (nab_vals <= 1.0).all(), \
         f"nab_imm values should be in [0, 1]; got {nab_vals}"

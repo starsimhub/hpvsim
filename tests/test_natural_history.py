@@ -11,15 +11,9 @@ def nathist_sim():
     """One long single-genotype run (n=10000, 2000-2050, dt=0.5) that reaches
     every natural-history stage — clearance -> CIN -> cancer -> cancer death.
 
-    The progression tests below only inspect scheduled/realized state, so they
-    share this one run rather than each building a sim sized to the specific
-    stage they check (this longest window is a superset of all of them).
-
-    Sizing: cancers are the scarcest stage, and they scale with agents x steps,
-    so the population is traded up against a coarser dt to keep a handful of
-    realized cancers (and tens of scheduled cancer deaths) at half the cost.
-    The tests assert those counts are non-zero rather than skipping quietly, so
-    a future shrink that loses the cancer stage fails loudly.
+    Cancers are the scarcest stage; this sizing yields a handful of realized
+    cancers and tens of scheduled cancer deaths. The tests assert those counts
+    are non-zero rather than skipping, so shrinking the fixture fails loudly.
     """
     sim = hpv.Sim(n_agents=10000, location='nigeria',
                   start=2000, stop=2050, dt=0.5, rand_seed=0)
@@ -64,17 +58,12 @@ def test_hpv_progression_pars_hpv16():
     """Spot-check the lognormal mean/std and severity-fn dicts."""
     mod = hpv.HPV(genotype='hpv16')
     p = mod.pars
-    # cin_fn parameters
     assert p.cin_fn == dict(form='logf2', k=0.3, x_infl=0, ttc=50)
-    # cancer_fn includes the cin_fn keys (so _compute_severity's cin_integral
-    # branch can call _compute_severity_integral internally without re-merging).
+    # cancer_fn carries the cin_fn keys so the cin_integral branch can reuse them.
     assert p.cancer_fn['method'] == 'cin_integral'
     assert p.cancer_fn['transform_prob'] == 2e-3
-    # The dur_* are ss distribution instances. Initialize via mock() so we can
-    # draw samples outside a sim context.
-    p.dur_precin.mock()
+    p.dur_precin.mock()  # dur_* are Dists; mock() lets them draw outside a sim
     durs = p.dur_precin.rvs(5000)
-    # Lognormal is non-negative; check shape and positivity.
     assert len(durs) == 5000
     assert np.all(durs >= 0)
 
@@ -107,7 +96,6 @@ def test_set_prognoses_chain_consistency(nathist_sim):
     has_cancer_sched = mod.ti_cancerous.notnan
     assert has_cancer_sched.any(), 'no agent was ever scheduled for cancer — test is vacuous'
     uids = has_cancer_sched.uids
-    # Compare time-step values directly
     ti_cin = mod.ti_cin[uids]
     ti_cancerous = mod.ti_cancerous[uids]
     ti_dead = mod.ti_dead_cancer[uids]
@@ -132,10 +120,8 @@ def test_step_state_progresses_cin_to_cancerous(nathist_sim):
     mod = sim.diseases.hpv16
     cancerous_now = mod.cancerous.uids
     assert len(cancerous_now), 'no agent is cancerous at sim end — test is vacuous'
-    # Cancer agents are not currently infected and not susceptible
     assert not mod.infected[cancerous_now].any()
     assert not mod.susceptible[cancerous_now].any()
-    # And rel_trans = 0
     rel_trans_arr = np.asarray(mod.rel_trans[cancerous_now])
     assert (rel_trans_arr == 0).all()
 
@@ -162,20 +148,16 @@ def test_step_die_resets_bool_states():
     sim.init()
     mod = sim.diseases.hpv16
 
-    # Manually infect and progress some agents to each state to test cleanup
+    # Put agents in a mix of compartments, then kill them.
     test_uids = np.array([0, 1, 2, 3, 4], dtype=int)
-
-    # Set up test agents in different compartments
     mod.infected[test_uids] = True
     mod.precin[test_uids] = True
     mod.susceptible[test_uids] = True
     mod.cin[test_uids[[1, 2, 3]]] = True
     mod.cancerous[test_uids[[2, 3]]] = True
 
-    # Call step_die for these agents (simulating death)
     mod.step_die(test_uids)
 
-    # Verify all disease-compartment states are cleared for dead agents
     assert not mod.precin[test_uids].any(), "precin not cleared after step_die"
     assert not mod.cin[test_uids].any(), "cin not cleared after step_die"
     assert not mod.cancerous[test_uids].any(), "cancerous not cleared after step_die"
@@ -204,8 +186,7 @@ def test_cleared_agents_have_reduced_susceptibility(cleared_sim):
     sim = cleared_sim
     mod = sim.diseases.hpv16
 
-    # Female agents who have ever been infected, are now susceptible (cleared),
-    # and have seroconverted (nab_imm > 0 — i.e. not blocked by sero_prob gate).
+    # Cleared females who seroconverted, i.e. were not blocked by the sero_prob gate.
     ever = mod.ti_first_infection.notnan
     female = sim.people.female
     cleared_f = (ever & mod.susceptible & ~mod.cancerous & female).uids
@@ -219,17 +200,14 @@ def test_cleared_agents_have_reduced_susceptibility(cleared_sim):
 
 
 def test_clearance_writes_raw_immunity_not_effective(cleared_sim):
-    """After Task 7: HPV.step_state writes nab_imm/cell_imm; rel_sus/sev_imm are Connector-derived."""
+    """HPV.step_state writes nab_imm/cell_imm; rel_sus/sev_imm are Connector-derived."""
     sim = cleared_sim
     mod = sim.diseases.hpv16
-    # After running, agents that have ever cleared should have nab_imm > 0.
     nab = np.asarray(mod.nab_imm.values)
     cell = np.asarray(mod.cell_imm.values)
-    # At least some agents will have cleared given run length.
     assert (nab > 0).any(), 'no agents cleared and bumped nab_imm'
     assert (cell > 0).any(), 'no agents cleared and bumped cell_imm'
-    # And rel_sus / sev_imm reflect the source state through the Connector
-    # (single-genotype identity: rel_sus = 1 - nab_imm; sev_imm = cell_imm).
+    # Single-genotype Connector identity: rel_sus = 1 - nab_imm, sev_imm = cell_imm.
     rel_sus = np.asarray(mod.rel_sus.values)
     sev_imm = np.asarray(mod.sev_imm.values)
     cleared_uids = (nab > 0).nonzero()[0]
@@ -288,18 +266,13 @@ def test_clearance_sero_prob_gates_first_immunity(cleared_sim):
     first-cleared agents keep nab_imm=0 (still fully susceptible)."""
     sim = cleared_sim
     mod = sim.diseases.hpv16
-    # Females who ever cleared. Use ti_clearance.notnan as a proxy for cleared
-    # at least once. (Only females have CIN; clearance from precin can also
-    # set ti_clearance.)
+    # ti_clearance.notnan is the proxy for "cleared at least once".
     female = sim.people.female
     ever_cleared_f = (mod.ti_clearance.notnan & female).uids
     assert len(ever_cleared_f) >= 50, 'too few cleared females to estimate the sero_prob gate'
     nab = np.asarray(mod.nab_imm[ever_cleared_f])
     zero_imm_frac = float((nab == 0).sum()) / float(len(ever_cleared_f))
-    # Approximate: with sero_prob=0.75, ~25% of FIRST clearances stay 0;
-    # but agents who clear multiple times get repeat-path updates which
-    # always boost. So zero_imm_frac is bounded above by (1 - sero_prob).
-    # Some flexibility in the upper bound; just verify it's > 0 and < 0.30.
+    # Bounded above by 1 - sero_prob (=0.25): repeat clearances always boost.
     assert 0.0 < zero_imm_frac < 0.30, \
         f'zero_imm_frac={zero_imm_frac:.3f}; expected sero_prob gating in (0, 0.30)'
 
@@ -352,8 +325,7 @@ def test_network_acts_age_modulated():
     net = sim.networks.sexualnetwork
     if not len(net.edges):
         pytest.skip('No edges formed')
-    # Compute average couple age per edge.
-    # edges.p1/p2 are agent UIDs; index age via ss.FloatArr UID-based access.
+    # edges.p1/p2 are UIDs, so index age through ss.uids.
     import starsim as ss
     p1_uids = ss.uids(np.asarray(net.edges.p1).astype(int))
     p2_uids = ss.uids(np.asarray(net.edges.p2).astype(int))
@@ -363,8 +335,7 @@ def test_network_acts_age_modulated():
     layer_id = np.asarray(net.edges.layer_id)
     avg_age = (age_p1 + age_p2) / 2.0
 
-    # In each layer, peak-age couples should have higher acts on average than
-    # young or old couples. Use marital layer (layer_id 0) and bin by avg_age.
+    # Marital layer only (layer_id 0), binned by average couple age.
     m_mask = layer_id == 0
     if m_mask.sum() < 10:
         pytest.skip('Not enough marital edges')
@@ -398,8 +369,7 @@ def test_directional_beta_sets_per_network_pair():
         f'beta missing sexualnetwork key; got keys {list(beta.keys())}'
     pair = beta['sexualnetwork']
     assert len(pair) == 2, f'beta pair length {len(pair)}'
-    # F→M = gpars.beta * transf2m = 0.25 * 1.0 = 0.25;
-    # M→F = gpars.beta * transm2f = 0.25 * 2.0 = 0.5.
+    # beta * transf2m = 0.25*1.0 f2m; beta * transm2f = 0.25*2.0 m2f.
     assert float(pair[0]) == pytest.approx(0.25, abs=1e-9)
     assert float(pair[1]) == pytest.approx(0.25 * 2.0, abs=1e-9)
 

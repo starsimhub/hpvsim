@@ -50,10 +50,8 @@ def test_build_sim_raises_on_unknown_key():
 
 
 def test_build_sim_does_not_mutate_base():
-    """build_sim mutates the passed sim — ss.Calibration's dcp is the
-    no-mutate guarantee. This test confirms we mutate the *passed* sim, not
-    something else, and that the test verifies the contract by passing dcp'd
-    copies."""
+    """build_sim mutates only the sim handed to it, leaving the original the
+    copy was taken from untouched — the basis of ss.Calibration's dcp-per-trial."""
     sim_base = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     sim_base.init()
     original_seed = sim_base.pars.rand_seed
@@ -152,13 +150,9 @@ def test_default_eval_fn_weighted_sum_across_targets():
     prev_off = prev + 0.05
     data = _as_standardized({'cancers': cancers_off, 'hpv_prevalence': prev_off})
 
-    # Per-column gofs (sum-scalar by default).
-    # For each age-bin column, per-cell error = 1.0 (cancers) or 0.05 (prev).
-    # Normalization by max(|actual|) inside compute_gof matters -- easier to
-    # just call default_eval_fn twice (unweighted + weighted) and check
-    # linearity in the weights.
+    # compute_gof normalizes internally, so test linearity in the weights rather
+    # than hand-computing the per-column gofs.
     fit_unweighted = hpv.calibration.default_eval_fn(sim, data=data)
-    # Weight scaling: weighting ALL cancers columns by 2, all prev by 0.5.
     weights = {}
     for col in data.columns:
         if 'cancers' in col:

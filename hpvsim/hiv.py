@@ -54,10 +54,10 @@ class HIV(sti.HIV):
             rel_sus_lo=2.2,   rel_sus_hi=2.2,    # increased HPV acquisition
             rel_sev_lo=1.5,   rel_sev_hi=1.2,    # faster/worse CIN->cancer progression
             rel_imm_lo=0.36,  rel_imm_hi=0.76,   # reduced post-infection/vaccine immunity
-            rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier (neutral default; no prior calibrated value)
+            rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier
             cd4_threshold=200.0,  # lo/hi stratum boundary
-            cd4_upper=500.0,      # CD4 >= this -> no effect at all (see class docstring)
-            dt=ss.years(0.25),  
+            cd4_upper=500.0,      # CD4 >= this -> no effect at all
+            dt=ss.years(0.25),
         )
         self.define_states(
             ss.FloatArr('hiv_rel_sus', default=1.0),
@@ -90,9 +90,7 @@ class HIV(sti.HIV):
         super().step_state()
         auids = self.sim.people.auids
         cd4 = np.asarray(self.cd4[auids])
-        # Effects apply only to HIV+ agents with an initialized CD4 in
-        # [0, cd4_upper). CD4 >= cd4_upper (newly infected at ~594, or
-        # ART-reconstituted) falls outside the hi band and gets NO effect (factor 1.0).
+        # Only HIV+ agents with CD4 in [0, cd4_upper) get an effect; above that, 1.0.
         infected = self.infected[auids]
         hiv_pos = infected & ~np.isnan(cd4) & (cd4 < self.pars.cd4_upper)
         is_hi = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
@@ -101,23 +99,17 @@ class HIV(sti.HIV):
         self.hiv_rel_sev[auids] = self._factor_array('rel_sev', hiv_pos, is_hi, n)
         self.hiv_rel_imm[auids] = self._factor_array('rel_imm', hiv_pos, is_hi, n)
         self.hiv_rel_reactivation[auids] = self._factor_array('rel_reactivation', hiv_pos, is_hi, n)
-        # rel_sus is written for all agents, but Starsim only samples it for
-        # susceptibles during step_infect.
+        # Written for all agents; starsim only samples it for susceptibles.
         for m in self.hpv_modules:
             m.rel_sus[auids] = m.rel_sus[auids] * self.hiv_rel_sus[auids]
 
-        # No testing cascade: diagnose all living HIV+ agents each step,
-        # matching the deleted hiv_art's old behavior. No-op for
-        # HIV_incidence (already diagnosed at infection).
+        # No testing cascade: diagnose every living HIV+ agent each step.
         undiagnosed = self.infected & ~self.diagnosed & self.sim.people.alive
         uids = undiagnosed.uids
         if len(uids):
             self.diagnosed[uids] = True
             self.ti_diagnosed[uids] = self.ti
-            # self.sim.ti, not self.ti: sti.ART's schedule gate checks
-            # ti_art against ITS OWN ti, which runs in lockstep with the
-            # sim's ti regardless of HIV's own dt (see HIV_incidence.infect
-            # for the full loop-order argument).
+            # sim.ti, not self.ti: sti.ART's gate checks ti_art against the sim clock.
             self.ti_art[uids] = self.sim.ti + 1
         return
 
@@ -146,9 +138,7 @@ class HIV(sti.HIV):
         for m in self.hpv_modules:
             any_hpv |= m.infected.values
 
-        # Scale-weight by people.scale so grow-multiscale fine agents
-        # (scale = 1/ms_agent_ratio) count fractionally, consistent with every
-        # other hpvsim result. Prevalence weights numerator AND denominator.
+        # Scale-weight numerator and denominator so fine agents count fractionally.
         scale = people.scale.values
         n_pos = float((hiv_pos * scale).sum())
         n_neg = float((hiv_neg * scale).sum())
@@ -295,14 +285,8 @@ class HIV_incidence(HIV):
             self.set_prognoses(selected)
             self.diagnosed[selected] = True
             self.ti_diagnosed[selected] = self.ti
-            # self.sim.ti + 1, not self.ti + 1: interventions.step() (loop
-            # position 8, where sti.ART runs) executes BEFORE diseases.step()
-            # (position 9, this method) in the SAME tick, and ART's
-            # schedule-based gate is an exact-match `ti_art==self.ti` check
-            # against ART's OWN ti -- which runs in lockstep with the sim's ti
-            # regardless of HIV's own dt. Using self.ti here would be wrong on
-            # both counts: it's HIV's own (possibly different) clock, and it
-            # wouldn't yet reflect the +1 lookahead ART's gate needs.
+            # sim.ti + 1, not self.ti + 1: sti.ART's gate is an exact ti_art==ti
+            # match on the sim clock, and interventions run before diseases.
             self.ti_art[selected] = self.sim.ti + 1
         return
 
@@ -314,12 +298,8 @@ class HIV_incidence(HIV):
 
     def init_post(self):
         super().init_post()  # HIV.init_post(): CD4/care_seeking init, init_prev seeding
-        # Make ALL initially-seeded cases diagnosed + ART-eligible immediately
-        # (HIV.init_post() only does this for its own init_diagnosed-sampled
-        # subset, default 0). ti_art=0 (not +1) is correct here: init_post()
-        # runs entirely before the tick loop starts, matching stisim's own
-        # convention for initial cases (schedule ART start at ti=0, no delay,
-        # so an ART intervention picks them up immediately).
+        # All initially-seeded cases are diagnosed and ART-eligible immediately.
+        # ti_art=0, not +1: init_post runs entirely before the tick loop.
         initial_cases = self.infected.uids
         self.diagnosed[initial_cases] = True
         self.ti_diagnosed[initial_cases] = 0
