@@ -52,6 +52,8 @@ website:
         href: migration.qmd
       - text: Tutorials
         href: tutorials.md
+      - text: User guide
+        href: user-guide/index.qmd
       - text: Code of conduct
         href: conduct.md
       - text: API reference
@@ -78,6 +80,20 @@ website:
             - tutorials/tut_interventions.qmd
             - tutorials/tut_analyzers.qmd
             - tutorials/tut_calibration.qmd
+            - tutorials/tut_hiv.qmd
+            - tutorials/tut_latency.qmd
+        - section: "**User guide**"
+          href: user-guide/index.qmd
+          contents:
+            - user-guide/natural-history.qmd
+            - user-guide/immunity.qmd
+            - user-guide/sexual-network.qmd
+            - user-guide/demographics.qmd
+            - user-guide/interventions.qmd
+            - user-guide/hiv.qmd
+            - user-guide/parameters.qmd
+            - user-guide/results.qmd
+            - user-guide/calibration.qmd
         - href: conduct.md
           text: "**Code of conduct**"
         - text: "**API reference**"
@@ -99,7 +115,6 @@ website:
             - api/hiv.qmd
             - api/hpv.qmd
             - api/interventions.qmd
-            - api/migration_utils.qmd
             - api/misc.qmd
             - api/network.qmd
             - api/parameters.qmd
@@ -140,7 +155,7 @@ interlinks:
     matplotlib:
       url: https://matplotlib.org/stable/
     sciris:
-      url: https://docs.sciris.org/en/latest/
+      url: https://docs.sciris.org/
     starsim:
       url: https://docs.starsim.org/
   autolink: true
@@ -171,7 +186,6 @@ quartodoc:
         - hiv
         - hpv
         - interventions
-        - migration_utils
         - misc
         - network
         - parameters

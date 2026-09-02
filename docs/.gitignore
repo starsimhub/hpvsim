@@ -2,3 +2,5 @@ _site/
 _extensions/
 objects.json
 /.quarto/
+
+**/*.quarto_ipynb
