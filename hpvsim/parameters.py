@@ -13,6 +13,8 @@ import numpy as np
 import sciris as sc
 import starsim as ss
 
+from . import misc
+
 
 __all__ = ['SimPars', 'GenotypePars', 'NetworkPars', 'get_genotype_pars',
            'genotype_aliases', 'GENOTYPE_KEYS', 'route_pars',
@@ -409,9 +411,11 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
         ``expanddict`` before anything else runs.
     """
     from .hpv import HPV
-    from .hiv import HIV
     from .cross_genotype import CrossImmunity
     from .network import SexualNetwork
+
+    hiv_cls = misc.hiv_class()
+    disease_types = (HPV,) if hiv_cls is None else (HPV, hiv_cls)
 
     raw = calib_pars if calib_pars is not None else (pars or {})
     if not raw:
@@ -423,12 +427,12 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
     nested = expanddict(raw)
 
     if hasattr(sim, 'diseases') and sim.diseases is not None:
-        diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, (HPV, HIV))}
+        diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, disease_types)}
         connectors = [c for c in sim.connectors.values() if isinstance(c, CrossImmunity)]
         networks = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
     else:
         diseases = {d.name: d for d in sc.tolist(sim.pars.get('diseases'))
-                    if isinstance(d, (HPV, HIV))}
+                    if isinstance(d, disease_types)}
         connectors = [c for c in sc.tolist(sim.pars.get('connectors'))
                       if isinstance(c, CrossImmunity)]
         networks = [n for n in sc.tolist(sim.pars.get('networks'))
@@ -459,7 +463,7 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
                         d.pars.update({key: value})
             elif cat == 'hiv':
                 for d in diseases.values():
-                    if isinstance(d, HIV):
+                    if hiv_cls is not None and isinstance(d, hiv_cls):
                         d.pars.update({key: value})
             elif cat == 'connector':
                 if not connectors:

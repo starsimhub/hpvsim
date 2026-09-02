@@ -16,6 +16,8 @@ import starsim as ss
 
 from hpvsim.utils import find_genotype_module, iter_hpv_modules
 
+from . import misc
+
 __all__ = ['vx', 'dx', 'tx', 'txvx', 'radiation']
 
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
@@ -27,12 +29,11 @@ def _hiv_rel_imm_factor(sim):
     Returns the HIV disease's ``hiv_rel_imm`` FloatArr (caller indexes by the
     relevant uid subset; value is 1.0 for HIV- agents) when an ``hpv.HIV``
     disease is registered in the sim, else ``None`` so callers cleanly no-op
-    without HIV. Lazy-imports HIV to avoid a products <-> hiv circular import.
+    without HIV. Returns None when stisim isn't installed.
     """
     if not getattr(sim, 'diseases', None):
         return None
-    from .hiv import HIV  # lazy: avoid circular import
-    hivm = next((d for d in sim.diseases.values() if isinstance(d, HIV)), None)
+    hivm = misc.hiv_module(sim)
     return None if hivm is None else hivm.hiv_rel_imm
 
 

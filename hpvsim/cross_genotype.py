@@ -21,7 +21,6 @@ import starsim as ss
 
 from . import misc
 from .hpv import HPV
-from .hiv import HIV
 from .parameters import GENOTYPE_KEYS
 
 
@@ -304,7 +303,7 @@ class HPVTotal(ss.Analyzer):
         which reads them.
         """
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv_module = next((d for d in sim.diseases.values() if isinstance(d, HIV)), None)
+        self.hiv_module = misc.hiv_module(sim)
         super().init_pre(sim)
         # Allocate per-ti WHO2000-binned histograms (rows = ti, cols = 5-year
         # bins). Populated in step() and consumed by finalize_results() to

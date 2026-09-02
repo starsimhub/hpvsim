@@ -27,6 +27,7 @@ import numpy as np
 import sciris as sc
 import starsim as ss
 
+from . import misc
 from .parameters import genotype_aliases, get_genotype_pars
 from .seeding import _make_init_prev_fn
 from .utils import compute_severity
@@ -368,12 +369,7 @@ class HPV(ss.Infection):
 
     def _hiv_module(self):
         """Locate the hpv.HIV disease on the sim, if any (None when no HIV)."""
-        # Avoid circular import at module load (hiv.py imports HPV from this module).
-        from .hiv import HIV
-        for d in self.sim.diseases.values():
-            if isinstance(d, HIV):
-                return d
-        return None
+        return misc.hiv_module(self.sim)
 
     def init_results(self):
         """Per-step Results emitted from ``step_state``.

@@ -43,10 +43,12 @@ dependencies = [
     'pandas>=2.0.0',
     'sciris>=3.0.0',
     'starsim>=3.6',  # 3.6 disallows float(TimePar); verified against 3.6.0
-    'stisim>=1.5',  # transmission-based HIV for the HIV-HPV co-infection model (hpvsim/hiv.py)
     'matplotlib',
     'optuna',  # not imported directly, but hpv.Calibration subclasses ss.Calibration and starsim ships optuna only as an optional extra
 ]
+
+[project.optional-dependencies]
+hiv = ['stisim>=1.5']  # HIV-HPV co-infection (hpvsim/hiv.py); optional since 3.2.0
 
 [project.scripts]
 hpvsim-download-data = "hpvsim.data.downloaders:download_data"

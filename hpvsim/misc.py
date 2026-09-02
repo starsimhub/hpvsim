@@ -739,3 +739,29 @@ def warn(msg, category=None, verbose=None, die=None):
         raise ValueError(errormsg)
 
     return
+
+
+def require_stisim():
+    """The stisim module; raises a helpful ImportError if it isn't installed."""
+    try:
+        import stisim as sti
+    except ImportError as e:
+        raise ImportError('HIV modeling in hpvsim requires stisim, an optional '
+                          'dependency: pip install hpvsim[hiv]') from e
+    return sti
+
+
+def hiv_class():
+    """hpvsim's HIV base class, or None if stisim isn't installed."""
+    try:
+        from .hiv import HIV
+    except ImportError:
+        return None
+    return HIV
+
+
+def hiv_module(sim):
+    """The HIV disease in sim, or None (also None when stisim is absent)."""
+    cls = hiv_class()
+    return None if cls is None else next(
+        (d for d in sim.diseases.values() if isinstance(d, cls)), None)

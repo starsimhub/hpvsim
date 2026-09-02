@@ -75,16 +75,17 @@ Kwargs:
 import numpy as np
 import sciris as sc
 import starsim as ss
-import stisim as sti  # for sti.ART: model_hiv='incidence' auto-constructs one
 import hpvsim as hpv
 
-# Explicit imports for symbols referenced by bare name in this module (the HIV
-# wiring and disease/connector partition use bare names; the genotype/seeding
-# helpers use the ``hpv.`` prefix — both styles coexist post-M08 merge).
+# Explicit imports for symbols referenced by bare name in this module (the
+# disease/connector partition uses bare names; the genotype/seeding helpers
+# use the ``hpv.`` prefix — both styles coexist post-M08 merge). The HIV
+# classes and stisim itself are imported inside __init__'s model_hiv branch,
+# since stisim is an optional dependency.
+from . import misc
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration, AnnualBirths, Births
-from .hiv import HIV, HIV_transmit, HIV_incidence
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
 from .seeding import _ExclusiveSeeder
@@ -149,6 +150,8 @@ class Sim(ss.Sim):
         # Autoconstruct HIV and ART if model_hiv=True.
         auto_interventions = []
         if model_hiv:
+            sti = misc.require_stisim()
+            from .hiv import HIV_incidence, HIV_transmit
             if any(isinstance(d, sti.HIV) for d in other_diseases):
                 raise ValueError(
                     'model_hiv= is mutually exclusive with supplying your own HIV '
