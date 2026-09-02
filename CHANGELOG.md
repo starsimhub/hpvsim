@@ -10,6 +10,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 - *Regression information*: `hpv.hiv_incidence` (the intervention), `hpv.hiv_art`, `hpv_hiv_connector`, and `HIVStratifiedResults` are all removed. Use `hpv.HIV_incidence`/`hpv.HIV_transmit` (diseases) directly, or `hpv.Sim(model_hiv=...)` sugar.
 - *Regression information*: `HPV.pars.beta` is now a plain scalar at rest (was a dict `{'sexualnetwork': [f2m, m2f]}`); read the validated per-network dict via `HPV.validate_beta()` instead of `.pars.beta` directly.
 - *Regression information*: the legacy `cross_immunity.<matrix>.<tgt>.<src>` calibration key form is removed; per-cell cross-immunity calibration is no longer supported -- use the 5 scalar `CrossImmunity` pars instead (e.g. `own_imm_hr`, `cross_imm_sus_med`).
+- *Regression information*: `stisim` is now an optional dependency, not a hard one -- `pip install hpvsim` no longer installs it, and pure-HPV modeling works without it. HIV users need `pip install hpvsim[hiv]`; `hpv.HIV`/`hpv.HIV_transmit`/`hpv.HIV_incidence` and `hpv.Sim(model_hiv=...)` raise a clear `ImportError` pointing at that extra when it's missing.
 
 ## Version 3.1.0 (2026-08-20)
 Adds flat parameter routing, a redesigned calibration workflow, and real-population scaling by default; requires `starsim>=3.6`.
