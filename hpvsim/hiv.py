@@ -204,6 +204,10 @@ class HIV_incidence(HIV):
 
     The incidence DataFrame has columns [age, sex, year, incidence] (sex
     'f'/'m'; incidence = the per-year HIV acquisition rate among susceptibles).
+    ``age`` is an age-band lower bound, and any band width works: 5-year bands
+    (0, 5, 10, ... -- the usual UNAIDS/Spectrum shape) or single years of age.
+    Bands need not be evenly spaced; the first and last extend to cover ages
+    below and above the data range.
 
     FOI -> per-step probability: a per-year rate r is converted to a
     per-timestep infection probability with the exponential survival form
@@ -225,9 +229,7 @@ class HIV_incidence(HIV):
         # Filled in init_pre:
         self._years = None          # sorted unique years (int)
         self._year_index = None     # {year: row index into the rate cube}
-        self._ages = None           # sorted unique ages (int)
-        self._age_min = None
-        self._age_max = None
+        self._ages = None           # sorted unique age-band lower bounds (int)
         # rate_cube[sex][year_idx, age_idx] -> incidence rate; sex in {0:'f',1:'m'}
         self._rate_cube = None
         self.update_pars(pars, **kwargs)
@@ -239,8 +241,6 @@ class HIV_incidence(HIV):
         self._years = np.sort(df['year'].unique()).astype(int)
         self._year_index = {int(y): i for i, y in enumerate(self._years)}
         self._ages = np.sort(df['age'].unique()).astype(int)
-        self._age_min = int(self._ages.min())
-        self._age_max = int(self._ages.max())
         n_year, n_age = len(self._years), len(self._ages)
         age_index = {int(a): i for i, a in enumerate(self._ages)}
         cube = {0: np.zeros((n_year, n_age)), 1: np.zeros((n_year, n_age))}
@@ -258,12 +258,18 @@ class HIV_incidence(HIV):
         """Per-agent annual incidence rate for the given calendar year.
 
         ages is a float array of agent ages; female a bool mask. Years are
-        nearest-year clamped to the data range; ages are clamped to the data
-        age range; integer-floored age indexes the per-single-year curve.
+        nearest-year clamped to the data range.
+
+        Ages are bucketed into the age bands the data actually supplies, via
+        searchsorted on ``self._ages``: an agent falls in the band whose lower
+        bound is the greatest one <= its age, with the first/last bands
+        extending to cover ages below/above the data range. This handles any
+        band width -- 5-year bands (UNAIDS/Spectrum-style) as well as single
+        years of age, which are just the width-1 case.
         """
-        y = int(np.clip(int(np.floor(year)), int(self._years[0]), int(self._years[-1])))
-        yi = self._year_index[y]
-        ai = np.clip(np.floor(ages).astype(int), self._age_min, self._age_max) - self._age_min
+        yi = int(np.abs(self._years - np.floor(year)).argmin())
+        ai = np.clip(np.searchsorted(self._ages, np.floor(ages), side='right') - 1,
+                     0, len(self._ages) - 1)
         rates = np.empty(len(ages), dtype=float)
         f_curve = self._rate_cube[0][yi]
         m_curve = self._rate_cube[1][yi]

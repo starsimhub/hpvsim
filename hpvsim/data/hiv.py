@@ -122,12 +122,20 @@ def reshape_art_coverage(df):
     """Reshape a tidy ART-coverage frame into STIsim's stratified format.
 
     ``load_hiv_data(...)['art_coverage']`` is a long frame with columns
-    ``[age, sex, year, coverage]`` (single year of age; sex 'f'/'m'; coverage a
-    fraction of HIV+ in that stratum). ``sti.ART``'s stratified-coverage parser
-    expects columns ``Year``, ``Gender``, ``AgeBin`` (a ``'[lo,hi)'`` string) and
-    a numeric proportion column whose name does NOT start with ``n_`` (so it is
-    read as a proportion 'p', not absolute counts). Single years of age map to
-    unit bins ``[age, age+1)``.
+    ``[age, sex, year, coverage]`` (``age`` an age-band lower bound; sex 'f'/'m';
+    coverage a fraction of HIV+ in that stratum). ``sti.ART``'s
+    stratified-coverage parser expects columns ``Year``, ``Gender``, ``AgeBin``
+    (a ``'[lo,hi)'`` string) and a numeric proportion column whose name does NOT
+    start with ``n_`` (so it is read as a proportion 'p', not absolute counts).
+
+    Each band's upper edge is taken from the next age present in the frame, so
+    any band width works: 5-year bands (0, 5, 10, ... -- the usual
+    UNAIDS/Spectrum shape) as well as single years of age. Deriving the edge
+    rather than always using ``age + 1`` matters, because unit bins built from
+    5-year data would leave ages 1-4, 6-9, ... with no ART coverage at all --
+    silently treating a fraction of those who should be on ART. The top band is
+    left open-ended (upper edge 150), matching the convention elsewhere in
+    hpvsim.
 
     Coverage is clamped to ``[0, 1]``: a user-supplied curve may carry a few values
     slightly above 1.0 (rounding), and STIsim infers proportion-vs-count from whether the
@@ -135,6 +143,9 @@ def reshape_art_coverage(df):
     'absolute counts' and treat ~nobody. Clamping keeps it a proportion.
     """
     out = df.rename(columns={'year': 'Year', 'sex': 'Gender', 'coverage': 'p_art'}).copy()
-    out['AgeBin'] = out['age'].map(lambda a: f'[{int(a)},{int(a) + 1})')
+    ages = np.sort(out['age'].unique())
+    upper = {int(a): int(ages[i + 1]) if i + 1 < len(ages) else 150
+             for i, a in enumerate(ages)}
+    out['AgeBin'] = out['age'].map(lambda a: f'[{int(a)},{upper[int(a)]})')
     out['p_art'] = out['p_art'].clip(lower=0.0, upper=1.0)
     return out[['Year', 'Gender', 'AgeBin', 'p_art']]

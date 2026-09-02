@@ -130,6 +130,40 @@ def test_hiv_data_loading():
         hpv.data.load_hiv_data(Path(__file__).parent)  # no HIV CSVs here
 
 
+def test_hiv_banded_age_data():
+    """Age-banded HIV inputs work, not just single years of age.
+
+    UNAIDS/Spectrum outputs come in 5-year bands, so both the incidence
+    lookup and the ART reshape must bucket by the bands the data supplies.
+    """
+    ages = [0, 5, 10, 15, 20]
+    inc = pd.DataFrame([(a, s, y, a / 1000) for a in ages for s in 'fm'
+                        for y in (1990, 2000)],
+                       columns=['age', 'sex', 'year', 'incidence'])
+    hiv = hpv.HIV_incidence(incidence=inc)
+    sim = hpv.Sim(location='rwanda', rand_seed=0, genotypes=[16], n_agents=500,
+                  start=1990, stop=1995, dt=1.0, diseases=[hiv])
+    sim.run()  # would IndexError if ages were treated as single years
+
+    # Each agent gets the rate of the band its age falls into. Read the sim's
+    # own module, not the local one -- copy_inputs= deep-copies it on the way in.
+    mod = sim.diseases.hiv
+    mod._rate_cube = {0: np.array([[0, .05, .10, .15, .20]] * 2),
+                      1: np.array([[0, .05, .10, .15, .20]] * 2)}
+    probe = np.array([0., 4.9, 5., 9., 14., 19., 20., 99.])
+    rates = mod._lookup_rates(1990, probe, np.ones(len(probe), bool))
+    assert np.allclose(rates, [0, 0, .05, .05, .10, .15, .20, .20])
+
+    # Nearest-year: a year absent from the data resolves to the closest one.
+    assert np.allclose(mod._lookup_rates(1991, probe, np.ones(len(probe), bool)), rates)
+
+    # Band upper edges come from the data, not age+1; top band is open-ended.
+    art = pd.DataFrame({'age': ages, 'sex': 'f', 'year': 2010,
+                        'coverage': [.1, .2, .3, .4, .5]})
+    bins = hpv.data.reshape_art_coverage(art)['AgeBin'].tolist()
+    assert bins == ['[0,5)', '[5,10)', '[10,15)', '[15,20)', '[20,150)']
+
+
 # --------------------------------------------------------------------------- #
 # Effect on HPV/cancer outcomes
 # --------------------------------------------------------------------------- #
