@@ -119,6 +119,28 @@ def test_sim_construction():
     assert a.diseases.hpv16.pars.cin_fn['k'] == b.diseases.hpv16.pars.cin_fn['k'] == 0.55
     assert a.diseases.hpv18.pars.cin_fn['k'] != 0.55
 
+
+def test_absent_scope_is_skipped_not_fatal():
+    """A scope whose module is absent warns and is skipped; typos still raise.
+
+    One calibrated parameter set has to drive a whole scenario sweep -- an HIV
+    counterfactual turns HIV off, and a sensitivity run may drop genotypes --
+    without the caller filtering the parameter set per scenario.
+    """
+    for pars in (dict(hiv=dict(rel_sus_lo=3.0)),          # no HIV module
+                 dict(hpv18=dict(cin_fn=dict(k=0.3)))):   # genotype not in sim
+        with pytest.warns(RuntimeWarning, match='no module for'):
+            make_sim(genotypes=[16], pars=pars).init()
+
+    # Flat dotted keys take the same path, since route_pars nests them first.
+    with pytest.warns(RuntimeWarning, match='no module for'):
+        make_sim(genotypes=[16], pars={'hiv.rel_sus_lo': 3.0}).init()
+
+    # A misspelled scope or bare par is still an error, not a silent no-op.
+    for pars in (dict(hvi=dict(rel_sus_lo=3.0)), dict(betaa=0.2)):
+        with pytest.raises(ValueError, match='unrecognized par'):
+            make_sim(genotypes=[16], pars=pars).init()
+
     with pytest.raises(ValueError):
         make_sim(genotypes=[16], not_a_real_par=1)
 

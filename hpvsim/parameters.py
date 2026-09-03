@@ -447,12 +447,24 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
                     if isinstance(n, SexualNetwork)]
 
     registry = par_registry()
-    scoped, broadcast = {}, {}
+    # Scope names that are meaningful in hpvsim even when the module they
+    # address is absent from this particular sim: an HIV scope in a no-HIV
+    # counterfactual, or a genotype scope in a sim running a subset of
+    # genotypes. Overrides aimed at a missing module are skipped with a
+    # warning rather than raising, so one calibrated parameter set can drive a
+    # whole scenario sweep without the caller pre-filtering it per scenario.
+    optional_scopes = set(GENOTYPE_KEYS) | {'hiv'}
+    scoped, broadcast, absent = {}, {}, []
     for key, value in nested.items():
         if key in diseases or key in ('cross_immunity', 'crossimmunity', 'network', 'sexualnetwork'):
             scoped[key] = value
+        elif key in optional_scopes:
+            absent.append(key)
         else:
             broadcast[key] = value
+    if absent:
+        misc.warn(f'route_pars: no module for {sorted(absent)} in this sim; '
+                  f'those overrides were skipped.')
 
     unmatched = {}
     for key, value in broadcast.items():

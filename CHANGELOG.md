@@ -8,7 +8,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 **STIsim is no longer required.** `pip install hpvsim` gives you a working HPV model on its own; add `pip install hpvsim[hiv]` when you need HIV.
 
-**Parameters are easier to pass.** Any parameter can go straight into `hpv.Sim(...)` as a keyword, including `location`, and setting one value inside a nested group no longer discards the others alongside it.
+**Parameters are easier to pass.** Any parameter can go straight into `hpv.Sim(...)` as a keyword, including `location`, and setting one value inside a nested group no longer discards the others alongside it. A parameter scoped to a module the sim does not have -- `hiv=` in a no-HIV counterfactual, or a genotype the sim is not running -- is now skipped with a warning instead of raising, so one calibrated parameter set can drive a whole scenario sweep. Misspelled parameters still raise.
 
 **More of the model reports itself.** `hpv.by_age` now gives population denominators next to case counts, so you can build age-specific rates from a single analyzer. Vaccination programs now report doses given and women reached as time series.
 
