@@ -18,7 +18,7 @@ Three kinds of target, in the format cancer data usually arrives in:
 
 - **Cancer or lesion counts by age**, for one or more years. A long CSV with
   columns `year, name, age, sex, genotype, value`.
-- **Population-level numbers over time**, such as age-standardised cancer
+- **Population-level numbers over time**, such as age-standardized cancer
   incidence. The same CSV shape without the `age` column.
 - **The genotype distribution of cancers**, from typing studies. The same shape
   with a `genotype` column and no `age` column.
@@ -77,7 +77,7 @@ as the parameter itself is. A key nested under `network` is a partnership
 parameter, and one under `cross_immunity` is a cross-protection parameter.
 
 Note that the sim runs the three genotype groups the data reports, so every
-observed share maps onto exactly one modelled group. If you run genotypes your
+observed share maps onto exactly one modeled group. If you run genotypes your
 data does not distinguish, you have to decide how to split the observed share
 between them — and there is usually no defensible way to do it.
 
@@ -107,7 +107,7 @@ calib = hpv.Calibration(
     data         = targets,
     total_trials = 4,      # Far too few; see below
     n_workers    = 2,
-    verbose      = False,
+    verbose      = 0,
 )
 calib.calibrate()
 print('Best fit:', calib.best_pars)

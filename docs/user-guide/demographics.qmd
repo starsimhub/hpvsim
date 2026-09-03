@@ -53,7 +53,37 @@ print(f'population 2020:  {float(sim.results.n_alive[-1]):,.0f}')
 
 Both runs cost the same. The second builds its cancer estimate from hundreds of trajectories rather than a dozen, which is what you want before comparing scenarios that differ by a few percent.
 
-To use your own demographic data instead of the bundled WPP tables, put `age_data.csv`, `birth_rate.csv`, `death_rate.csv` and `pop_total.csv` in a folder and pass `datafolder=`. Any file you leave out falls back to the bundled data for that country, with a warning. Migration targets are not read from `datafolder`; supply those directly with `hpv.AgeMigration(pop_total=..., pop_by_age=...)` in `demographics=`.
+## Modeling a state, province, or district
+
+The bundled data covers countries, because that is what UN World Population Prospects publishes. Plenty of real questions are not national — a single state's screening program, one province's vaccination rollout, a district-level pilot. For those you supply your own demographic inputs.
+
+Put any of these four files in a folder and pass `datafolder=`:
+
+| File | Columns | Notes |
+|---|---|---|
+| `age_data.csv` | `AgeGrpStart`, `PopTotal` | The starting age distribution. `PopTotal` is read **in thousands**, matching the WPP convention |
+| `birth_rate.csv` | `Time`, `CBR` | Crude birth rate per 1,000 population, by year |
+| `death_rate.csv` | `Time`, `Sex`, `AgeGrpStart`, `mx` | Mortality rate by year, sex and age. `Sex` takes `Male` and `Female` |
+| `pop_total.csv` | `year`, `pop_size` | Total population by year, used to set `pop_scale` |
+
+You still pass `location=`, and it still matters. Any file you omit falls back to that country's bundled data, with a warning naming the file — so a state model with only its own age structure and total population will inherit national fertility and mortality. That is often a reasonable first approximation, and the warning is there so it is a choice rather than an accident.
+
+```python
+sim = hpv.Sim(
+    location   = 'nigeria',        # Fallback source, and network parameters
+    datafolder = './kano_data',    # age_data.csv, pop_total.csv, ...
+    genotypes  = [16, 18],
+    n_agents   = 5000,
+    start      = 2000,
+    stop       = 2040,
+)
+```
+
+Two limitations worth knowing before you start.
+
+**Migration targets are not read from `datafolder`.** The age-pyramid pinning described above needs a population-by-age trajectory, and that only comes from the bundled country tables. For a subnational run, either pass it yourself with `hpv.AgeMigration(pop_total=..., pop_by_age=...)` in `demographics=`, where `pop_by_age` has columns `year`, `age`, `male`, `female`; or leave migration out and accept that your age structure will drift from the observed one over a long run. If the area you are modeling has significant net migration — most cities do — the second option will bias the age distribution, and cervical cancer burden is sensitive to it.
+
+**Network parameters come from `location` and are not subnational.** Partnership formation rates are calibrated at country level, so a district model inherits national sexual behavior. If local survey data says otherwise, override the network parameters directly; see [Sexual network](sexual-network.qmd).
 
 ## See also
 

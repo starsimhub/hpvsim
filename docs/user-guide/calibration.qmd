@@ -37,7 +37,7 @@ calib_pars = dict(
 
 The scopes are the same ones described in [Parameters](parameters.qmd). Flat dotted keys, and the older `dict(low=..., high=..., guess=...)` leaf form, are no longer accepted — both raise an error telling you which form to use.
 
-Mismatch is a weighted sum over columns. Each column's error is normalised by the largest observed value in it, so a cancer count in the thousands and a prevalence of 0.1 contribute comparably; `weights={'all_hpv.prevalence': 2.0}` then adjusts deliberately. Because normalisation depends on the data you supplied, mismatch values are comparable within one calibration and meaningless between two.
+Mismatch is a weighted sum over columns. Each column's error is normalized by the largest observed value in it, so a cancer count in the thousands and a prevalence of 0.1 contribute comparably; `weights={'all_hpv.prevalence': 2.0}` then adjusts deliberately. Because normalization depends on the data you supplied, mismatch values are comparable within one calibration and meaningless between two.
 
 Two defaults exist because of how rare cervical cancer is. `reseed=False` keeps the random seed fixed across trials — with reseeding, cancer counts move more with the seed than with the parameters, and the search converges on the luckiest seed rather than the best parameters. And Optuna trials are stored in an append-only journal file rather than SQLite, which deadlocks past about 32 concurrent workers.
 
@@ -80,7 +80,7 @@ print(calib.df[['mismatch', 'beta', 'hpv16.cin_fn.k']].head())
 fig = hpv.plot_calibration(calib, top_n=4)
 ```
 
-Six trials over two parameters is a plumbing test, not a calibration. For real work: fit the sexual network to behavioural data first, then transmission to prevalence, then progression to cancer, adding parameters only where the data can identify them. Expect several hundred to a few thousand trials, and run those on a machine you are not also using for anything else.
+Six trials over two parameters is a plumbing test, not a calibration. For real work: fit the sexual network to behavioral data first, then transmission to prevalence, then progression to cancer, adding parameters only where the data can identify them. Expect several hundred to a few thousand trials, and run those on a machine you are not also using for anything else.
 
 Coverage runs matter more than trial counts. Before spending compute, run 50 parameter sets drawn from your ranges and check that your data falls inside the resulting spread. If it does not, no number of trials will help — the model as configured cannot produce your data, and something structural (network, demographics, the target itself) needs attention first.
 

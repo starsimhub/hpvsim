@@ -11,7 +11,7 @@ One `hpv.SexualNetwork` holds both kinds of partnership in a single table, tagge
 Each timestep the network dissolves every pair whose duration has expired, then forms new ones layer by layer:
 
 1. **Debut.** Each agent has one age at first sex, shared across both layers: `debut_f` is normal(15.0, 2.1), `debut_m` normal(17.6, 1.8). Agents younger than their debut age never partner.
-2. **Participation.** `layer_probs_marital` and `layer_probs_casual` are (3, N) arrays: row 0 is the lower bound of each five-year age band, rows 1 and 2 the annual probability that a woman or a man in that band seeks a partner in that layer. These annual probabilities are converted to the timestep in use, so changing `dt` does not change behaviour.
+2. **Participation.** `layer_probs_marital` and `layer_probs_casual` are (3, N) arrays: row 0 is the lower bound of each five-year age band, rows 1 and 2 the annual probability that a woman or a man in that band seeks a partner in that layer. These annual probabilities are converted to the timestep in use, so changing `dt` does not change behavior.
 3. **Concurrency.** Each agent has a per-layer target partner count, drawn from a Poisson and then **shifted up by one** — a participating agent wants at least one partner by definition, so `lam` (0.01 marital, 0.5 casual) governs only the tail of extra concurrent partners. Agents already partnered in the other layer must also pass an annual cross-layer roll: `m_cross_layer` 0.760, `f_cross_layer` 0.185.
 4. **Age mixing.** `mixing_marital` and `mixing_casual` say which men a woman of a given age partners with. Column 0 holds the age-band labels; each remaining column belongs to one band of women, and the values down that column weight male partners by their own band (the rows). Where a band has more women seeking partners than there are eligible men, a random subset of those women goes unpartnered this timestep — which is how a shortage of men in one band propagates.
 5. **Acts.** The drawn annual act count is scaled by the couple's average age: linearly from half (`debut_ratio` 0.5) at debut to full at `peak` (30 marital, 25 casual), then down to a tenth (`retirement_ratio` 0.1) by `retirement`. It is then converted to acts per timestep.
@@ -24,11 +24,11 @@ Values above 1 are clipped with a warning, since the compounding formula otherwi
 
 Condom use is not a network parameter in v3; any protective effect has to be absorbed into `beta`.
 
-HPVsim ships demographic data per country but not network parameters, so the defaults above are location-agnostic starting points. Supplying local behavioural data is the highest-value change you can make to a country model.
+HPVsim ships demographic data per country but not network parameters, so the defaults above are location-agnostic starting points. Supplying local behavioral data is the highest-value change you can make to a country model.
 
 ## How to put local survey data into the network
 
-Behavioural surveys usually give you age at first sex, the proportion reporting a partner in the last year, and the number of partners. Those map onto `debut_*`, `layer_probs_*` and `*_partners_*`. Pass them with `nw_pars=`:
+Behavioral surveys usually give you age at first sex, the proportion reporting a partner in the last year, and the number of partners. Those map onto `debut_*`, `layer_probs_*` and `*_partners_*`. Pass them with `nw_pars=`:
 
 ```{python}
 import starsim as ss
@@ -55,7 +55,7 @@ print('HPV prevalence in 2020:', round(float(sim.results.all_hpv.prevalence[-1])
 
 Every value in `hpv.NetworkPars` can be replaced this way. `nw_pars=` is a shortcut for the network HPVsim builds for you; if you construct your own `hpv.SexualNetwork(...)` and pass it as `networks=`, set its parameters there instead — passing both raises an error rather than silently ignoring one.
 
-Change the network and you change transmission, so `beta` will need recalibrating alongside it. Fit behaviour to behavioural data first, then fit `beta` to prevalence.
+Change the network and you change transmission, so `beta` will need recalibrating alongside it. Fit behavior to behavioral data first, then fit `beta` to prevalence.
 
 ## See also
 

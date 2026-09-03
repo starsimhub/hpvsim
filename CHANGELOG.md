@@ -2,35 +2,19 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 ## Version 3.2.0 (2026-09-02)
 
-- Restores female HPV latency, dropped in the v2→v3 rewrite. Opt-in via `hpv_control_prob`; a no-op at its default of 0. Once enabled it has a large effect — latency withholds women from their genotype's cancer pathway, roughly halving cancer counts at the default reactivation hazard — and `hpv_reactivation` carries v2's never-fitted placeholder value of 0.025/year, so fit it for your setting rather than relying on the default.
-- Unifies HIV co-infection under `hpv.HIV`, with `hpv.HIV_transmit` and `hpv.HIV_incidence` leaves and new `hpv.Sim(model_hiv=...)` sugar. CD4 stratum now also scales latency reactivation.
-- `hpv.Sim` accepts bare hpvsim kwargs as well as `pars=`, so `hpv.Sim(beta=0.15)` works. Adds `nw_pars=` and `imm_pars=`.
-- Nested parameter overrides now merge rather than replace sibling keys (`cin_fn`, `cancer_fn`, `age_risk`, `age_act_pars_*`).
-- Fixes `hpv.SimPars().dt`, which was 0.5 while `hpv.Sim` used 0.25.
-- `hpv.HIV_incidence` and `hpv.data.reshape_art_coverage` now accept age-banded HIV and ART inputs, such as the 5-year bands UNAIDS and Spectrum emit. Banded incidence previously raised `IndexError`, and banded ART coverage silently left most ages untreated. Year lookup is now nearest-year rather than exact-match.
-- `hpv.by_age` now accepts the population denominators `n_alive`, `n_females` and `n_males`, so crude age-specific rates no longer need a second analyzer. These keys were declared but unimplemented, and previously raised `ValueError`.
-- Vaccination interventions now define `new_vaccinated`, `new_doses`, `cum_vaccinated` and `cum_doses`, so counting doses no longer needs a manual `vaccinated.sum() * pop_scale`.
-- Naming an intervention after its own product (`hpv.routine_vx(product='bivalent', name='vx')`) now raises a clear error at construction instead of an opaque `AttributeError: Module vx already added` at init.
-- Fixes `hpv.dx(df=...)` and `hpv.tx(df=...)` crashing at `sim.init()` with `TypeError: attribute name must be string, not 'NoneType'`.
-- Adds a user guide, refreshes the tutorials, and fixes the docs build, broken since v3.1.0.
-- *Regression information*: treatment and therapeutic-vaccine interventions honour `sex=` correctly. `sex=['f','m']` previously restricted silently to women, and `hpv.BaseTxVx` ignored `sex=` altogether. `sex='f'` and `sex=None` are unchanged.
-- *Regression information*: the `age_range` upper bound is now exclusive for treatment and txvx, matching vaccination, screening and triage. Agents alive at sim start are unaffected (float ages never land exactly on the bound), but agents born during the run lose one timestep of eligibility at the top of the band — up to `dt/(hi-lo)` of eligible person-time.
-- *Regression information*: treating a woman who had entered the latency branch now returns her to susceptible rather than leaving her latent. Only affects runs with `hpv_control_prob > 0`.
-- *Regression information*: `reshape_art_coverage` leaves the top age band open-ended, so ART now reaches agents above the last data row (over-80s in a band ending at 80) who previously received none.
-- *Regression information*: the internal `n_to_latent` result is no longer published on genotypes or on `all_hpv`. It was scheduling bookkeeping, unscaled, and meaningless once summed across genotypes. `n_latent` is unchanged. Anything indexing `all_hpv` results positionally will shift by one.
-- *Regression information*: `stisim` is now optional; HIV users need `pip install hpvsim[hiv]`.
-- *Regression information*: `hpv.hiv_incidence`, `hpv.hiv_art`, `hpv_hiv_connector`, and `HIVStratifiedResults` are removed. Use `hpv.HIV_incidence`/`hpv.HIV_transmit` or `model_hiv=`.
-- *Regression information*: `HPV.pars.beta` is now a scalar; use `HPV.validate_beta()` for the per-network dict.
-- *Regression information*: per-cell `cross_immunity.<matrix>.<tgt>.<src>` calibration keys are removed; use the scalar `CrossImmunity` pars.
+**HPV latency is back**, having been dropped in the move to v3. Some women who appear to clear an infection instead carry it silently and can become infectious again years later. This matters for screening: a woman who tests negative at 35 and reactivates at 45 was not protected by that test. Latency is switched off by default; turn it on with `hpv_control_prob`. Once on it changes cancer burden substantially, and the rate at which dormant infections wake up has never been fitted to data, so treat it as a parameter to calibrate rather than a default to trust.
 
-### Known issues
+**HIV co-infection is much easier to set up.** `hpv.Sim(model_hiv=True)` now builds everything needed, and you can choose whether HIV spreads through the sexual network or follows an incidence curve you supply. HIV and ART data can now be given in five-year age bands, which is how UNAIDS and Spectrum publish it -- previously only single years of age worked, and banded data either failed outright or quietly left most ages untreated. A woman's CD4 count now affects how fast her HPV progresses and how often a latent infection reactivates.
 
-These predate v3.2 and are not introduced by it, but they are documented here because they affect how results should be interpreted.
+**STIsim is no longer required.** `pip install hpvsim` gives you a working HPV model on its own; add `pip install hpvsim[hiv]` when you need HIV.
 
-- **Results depend on `dt`.** The same parameters give substantially different epidemiology at different timesteps: HPV prevalence is 0.001, 0.044 and 0.200 at `dt` of 1.0, 0.5 and 0.25, and cervical cancer counts scale similarly. The values do not converge as `dt` falls. Treat `dt=0.25` (the default) as the reference, keep `dt` fixed across any comparison, and recalibrate if you change it — a calibration is specific to the `dt` it was fitted at. The likely cause is that `layer_probs` specifies the fraction of an age band that is partnered, a stock, but is consumed as a per-year partnership formation rate.
-- **Multiscale over-reports agent counts.** With `ms_agent_ratio > 1`, agents grown to follow extra cancer trajectories carry a reduced per-agent weight, but `n_alive` and the intervention flow results (`n_screened`, `new_cin_treated`, `new_doses`) count them at full weight. The error grows with both the ratio and the length of the run, because it compounds: exact at ratio 1, about 1.01x at ratio 5, and at ratio 100 roughly 1.3x after one year rising to 3.4x over a sixty-year run. This is a reporting bug only — the underlying dynamics are correct. `sum(people.scale)` is conserved and grows at the right rate, so `sum(people.scale) * pop_scale` recovers the true population, and results whose denominators are already scale-weighted, including `asr_cancer_incidence` and the per-genotype disease results, are unaffected.
-- **Two interventions cannot share one product.** Products are registered as modules keyed by name, so `hpv.routine_vx(product='bivalent')` alongside `hpv.campaign_vx(product='bivalent')` raises `AttributeError: Module vx already added`. This blocks the routine-plus-catch-up pattern; use a single intervention with a time-varying `prob`, or distinct product types, until this is fixed.
-- **`hpv.tx` on a latent infection is a silent no-op.** A therapeutic-vaccine product with `latent` rows will report a woman as treated and set her clearance time, but she is not `infected`, so clearance never fires and she stays latent. Does not affect `ablation` or `excision`.
+**Parameters are easier to pass.** Any parameter can go straight into `hpv.Sim(...)` as a keyword, including `location`, and setting one value inside a nested group no longer discards the others alongside it.
+
+**More of the model reports itself.** `hpv.by_age` now gives population denominators next to case counts, so you can build age-specific rates from a single analyzer. Vaccination programs now report doses given and women reached as time series.
+
+**New documentation.** A user guide explaining how each part of the model works and how to change it, and nine tutorials, including new ones on HIV co-infection and on latency.
+
+**Fixes.** Treatment and therapeutic vaccination now respect the `sex` argument, which was previously ignored in places. Age ranges are applied the same way across every intervention. Treating a woman with a latent infection now clears it. Building a test or treatment product from a data file no longer fails when the simulation starts. The documentation build works again, having been broken since v3.1.0.
 
 ## Version 3.1.0 (2026-08-20)
 Adds flat parameter routing, a redesigned calibration workflow, and real-population scaling by default; requires `starsim>=3.6`.

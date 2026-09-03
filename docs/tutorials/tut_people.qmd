@@ -24,9 +24,9 @@ Passing `location='south africa'` loads all three, and also sets the total
 population so results come out at real national scale rather than per 2,000
 simulated people. Country names are case-insensitive.
 
-Sexual behaviour is *not* loaded per country. Every location starts from the same
+Sexual behavior is *not* loaded per country. Every location starts from the same
 default partnership parameters (`hpv.NetworkPars`), because HPVsim ships no
-per-country network calibration. If you are modelling a specific country, those
+per-country network calibration. If you are modeling a specific country, those
 parameters are among the first things you will want to calibrate.
 
 ## Build the population
@@ -82,9 +82,9 @@ observed pyramid side by side. `south_africa_age_pyramid.csv` holds the UN
 figures for 1990:
 
 ```{python}
-modelled = pyramid.to_dataframe()
-modelled = modelled[modelled.date == modelled.date.min()]
-modelled = modelled.groupby('age_bin', sort=False)['count'].sum()
+modeled = pyramid.to_dataframe()
+modeled = modeled[modeled.date == modeled.date.min()]
+modeled = modeled.groupby('age_bin', sort=False)['count'].sum()
 
 observed = pd.read_csv('south_africa_age_pyramid.csv')
 observed = observed[observed.year == 1990].set_index('age')
@@ -92,17 +92,17 @@ observed = observed['males'] + observed['females']
 
 comparison = pd.DataFrame({
     'age':      np.arange(0, 100, 5),
-    'modelled': modelled.values.round(0),
+    'modeled': modeled.values.round(0),
 })
 comparison['observed'] = observed.reindex(comparison.age).values
-comparison['ratio'] = (comparison.modelled / comparison.observed).round(2)
+comparison['ratio'] = (comparison.modeled / comparison.observed).round(2)
 comparison.head(8)
 ```
 
 A small systematic offset is expected here, because this CSV comes from an
 older population estimate than the bundled WPP 2024 data. What you are checking
 for is a bin off by a factor of two, or ratios that swing wildly between
-neighbouring bins. Either means the starting population is wrong in a way that
+neighboring bins. Either means the starting population is wrong in a way that
 will distort everything downstream — most obviously cancer counts, which depend
 on how many women are alive at ages 40 to 60.
 

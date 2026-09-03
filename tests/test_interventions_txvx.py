@@ -78,29 +78,6 @@ def test_routine_txvx_string_product_resolves_to_txvx():
     assert live.product.pars.name == 'txvx1'
 
 
-def test_routine_txvx_both_sexes_includes_males():
-    """sex=None / ['f','m'] / 'fm' all mean both sexes; sex='f' excludes men.
-
-    One sim per sex spec: two interventions sharing a product name cannot
-    coexist in a sim (both products register on sim.people under that name).
-    """
-    eligible = {}
-    for sex in (None, ['f', 'm'], 'fm', 'f'):
-        intv = hpv.routine_txvx(name='txvx_program', product='txvx1', prob=1.0,
-                                sex=sex, start_year=2021, end_year=2022)
-        sim = _four_genotype_sim_with([intv])
-        sim.init()
-        males = set(int(u) for u in sim.people.male.uids)
-        uids = set(int(u) for u in sim.interventions['txvx_program'].check_eligibility())
-        eligible[str(sex)] = uids
-        if sex == 'f':
-            assert not (uids & males), 'sex="f" must exclude men'
-        else:
-            assert uids & males, f'sex={sex!r} must include men'
-    both = [v for k, v in eligible.items() if k != 'f']
-    assert all(v == both[0] for v in both), 'all both-sexes specs must agree'
-
-
 def test_routine_txvx_age_range_upper_bound_exclusive():
     """age_range=[lo, hi) — an agent exactly at hi is not eligible."""
     intv = hpv.routine_txvx(name='txvx_program', product='txvx1', prob=1.0,

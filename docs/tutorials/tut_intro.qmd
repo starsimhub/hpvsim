@@ -84,7 +84,7 @@ sim.run()
 ```
 
 The run takes a few seconds. Now plot the two cancer outputs side by side —
-cumulative cases, and age-standardised incidence per 100,000 women per year,
+cumulative cases, and age-standardized incidence per 100,000 women per year,
 which is what cancer registries and GLOBOCAN report:
 
 ```{python}
@@ -92,7 +92,7 @@ fig = sim.plot(['all_hpv_cum_cancers', 'all_hpv_asr_cancer_incidence'])
 ```
 
 Compare the two panels. The cumulative curve rises smoothly. The incidence curve
-is jagged, and neighbouring years disagree sharply. Both come from the same
+is jagged, and neighboring years disagree sharply. Both come from the same
 handful of simulated cancer events; the cumulative curve averages over all of
 them, while each year of the incidence curve rests on very few.
 
@@ -123,7 +123,7 @@ Compare HPV16's share against genotyping studies for your own setting — it is
 one of the first things calibration should get right. To see the whole list of
 pooled results, use `sim.results.all_hpv.keys()`.
 
-## Add a vaccination programme
+## Add a vaccination program
 
 Now the question that motivates most HPVsim work: how much cancer does
 vaccinating girls prevent? We give the bivalent vaccine to 90% of girls aged 9
@@ -160,7 +160,7 @@ print(f'Averted:                                {c0 - c1:>10,.0f}  ({(c0 - c1) /
 
 Because the window starts in 1990, that percentage includes twenty-five years in
 which vaccination could not have changed anything, so it understates what the
-programme does for girls alive today. When you report vaccination impact, always
+program does for girls alive today. When you report vaccination impact, always
 say which window you are reporting over.
 
 ## Why not just quote one year?
@@ -183,7 +183,7 @@ for y in (2020, 2030, 2040, 2045, 2050, 2060):
 print(f'\nSpread across those years: {min(ratios):.2f} to {max(ratios):.2f}')
 ```
 
-Look at the spread on the last line. Neighbouring years can disagree by a wide
+Look at the spread on the last line. Neighboring years can disagree by a wide
 margin, and a year can even come out above 1 — saying vaccination made things
 worse — purely because that year happened to hold a cluster of cancer events in
 one run and not the other.
@@ -196,5 +196,5 @@ size can point either way.
 
 Tutorial 2 covers plotting and saving, Tutorial 3 covers running many
 simulations at once and putting uncertainty bands on a result, and Tutorial 5
-covers screening and treatment programmes. Tutorial 7 covers calibration, which
+covers screening and treatment programs. Tutorial 7 covers calibration, which
 is what turns any of this into a statement about a real population.

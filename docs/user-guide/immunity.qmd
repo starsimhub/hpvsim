@@ -24,7 +24,7 @@ Vaccine immunity works differently on purpose. It is stored per **target** genot
 
 Vaccine protection is all-or-nothing per woman: one draw at `sterilizing_p` (0.95) settles her fate for every genotype at once. Women who draw sterilizing immunity get `vax_imm[g] = rel_imm[g]`; the rest get `rel_imm[g] × 0.95` as leaky protection. Existing immunity is never downgraded.
 
-The same module owns `rel_sev`, each woman's intrinsic progression speed. It is not immunity, but it lives here for the same reason the matrices do: it must be one draw per woman, shared across every genotype she carries. It is sampled from a folded normal — `ss.normal(loc=1.0, scale=0.2)` with the sign discarded — and multiplies the time axis of both progression curves in [Natural history](natural-history.qmd). Calibrations often lower its centre.
+The same module owns `rel_sev`, each woman's intrinsic progression speed. It is not immunity, but it lives here for the same reason the matrices do: it must be one draw per woman, shared across every genotype she carries. It is sampled from a folded normal — `ss.normal(loc=1.0, scale=0.2)` with the sign discarded — and multiplies the time axis of both progression curves in [Natural history](natural-history.qmd). Calibrations often lower its center.
 
 Two limits to state plainly. Immunity does not wane in v3: protection earned is kept for life. And because immunity is applied before interventions within a timestep, a woman vaccinated in one timestep is protected from the next onwards — three months at the default `dt`.
 

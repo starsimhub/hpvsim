@@ -71,7 +71,7 @@ Results are grouped by the module that produced them: `sim.results.hpv16.new_can
 | [Interventions](interventions.qmd) | Products versus delivery, vaccination, screening and treatment cascades |
 | [HIV co-infection](hiv.qmd) | The two ways to drive HIV, CD4-stratified effects on HPV, ART |
 | [Parameters](parameters.qmd) | Where each parameter lives, and how one dictionary reaches every module |
-| [Results and analyzers](results.qmd) | Result structure, age-standardised rates, results by age, DALYs |
+| [Results and analyzers](results.qmd) | Result structure, age-standardized rates, results by age, DALYs |
 | [Calibration](calibration.qmd) | Fitting to sparse local data and checking whether the fit is real |
 
 ## See also

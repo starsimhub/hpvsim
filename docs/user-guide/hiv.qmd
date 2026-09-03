@@ -10,9 +10,9 @@ HIV support is an optional install: `pip install hpvsim[hiv]`, which adds STIsim
 
 The choice is whether HIV is an input or an outcome.
 
-`hpv.HIV_incidence` imposes a known epidemic. You supply a table of `[age, sex, year, incidence]`, and each timestep susceptible agents acquire HIV at the rate their age band, sex and calendar year specify, so prevalence follows your data rather than emerging from behaviour. This suits most country work: national HIV estimates already exist and reproducing them is not the point of the analysis. Every new case is diagnosed and made ART-eligible at once, so `sti.ART(coverage=...)` drives treatment with no testing cascade to configure.
+`hpv.HIV_incidence` imposes a known epidemic. You supply a table of `[age, sex, year, incidence]`, and each timestep susceptible agents acquire HIV at the rate their age band, sex and calendar year specify, so prevalence follows your data rather than emerging from behavior. This suits most country work: national HIV estimates already exist and reproducing them is not the point of the analysis. Every new case is diagnosed and made ART-eligible at once, so `sti.ART(coverage=...)` drives treatment with no testing cascade to configure.
 
-`hpv.HIV_transmit` spreads HIV along the same sexual network as HPV, governed by `beta_m2f` (0.0035 per act) and `rel_beta_f2m` (0.5). Use it when HIV prevalence has to respond to behaviour or to an HIV intervention. It is harder to calibrate — two epidemics to fit — and brings no ART programme of its own.
+`hpv.HIV_transmit` spreads HIV along the same sexual network as HPV, governed by `beta_m2f` (0.0035 per act) and `rel_beta_f2m` (0.5). Use it when HIV prevalence has to respond to behavior or to an HIV intervention. It is harder to calibrate — two epidemics to fit — and brings no ART program of its own.
 
 `hpv.Sim(model_hiv=True)` builds the incidence version and its ART intervention; `model_hiv='transmission'` builds the transmitting version. `hiv_data=` supplies the data, `hiv_pars=` the parameters. Passing your own HIV module in `diseases=` also works; combining both raises an error. A bare `sti.HIV` from STIsim runs, but carries none of the effects below.
 
@@ -93,7 +93,7 @@ print('HPV prevalence, HIV-:    ', round(float(hiv.hpv_prevalence_no_hiv[-1]), 2
 
 With this synthetic input the run reaches about 8% HIV prevalence with 63% of those infected on treatment, and HPV prevalence of roughly 0.47 among women with HIV against 0.25 among women without. The gap comes from the CD4-stratified acquisition and immunity effects, and from both infections travelling through the same partnerships.
 
-STIsim warns that ART was added without a testing intervention. That warning does not apply here: HPVsim's HIV classes diagnose every case as it arises, which is what makes a coverage-only ART programme work.
+STIsim warns that ART was added without a testing intervention. That warning does not apply here: HPVsim's HIV classes diagnose every case as it arises, which is what makes a coverage-only ART program work.
 
 Cancer counts by HIV status are rare events twice over, so raise `ms_agent_ratio` before comparing rate ratios between scenarios — at a few thousand agents `cancer_rate_ratio` will often be zero because no woman with HIV happened to reach cancer.
 

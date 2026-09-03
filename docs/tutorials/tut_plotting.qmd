@@ -29,9 +29,10 @@ sim = hpv.Sim(
 sim.run()
 ```
 
-`verbose=0` keeps the run silent. Setting `verbose=0.1` prints an update every
-ten timesteps, which is what you want when a run is long enough that you start
-wondering whether it is stuck.
+`verbose=0` keeps the run silent, and `verbose=-1` silences the setup messages
+too. Setting `verbose=0.25` prints an update once a simulated year, which is
+what you want when a run is long enough that you start wondering whether it is
+stuck.
 
 ## One result at a time
 
@@ -110,7 +111,7 @@ annual_years = np.floor(annual.timevec.years).astype(int)
 print('Cancers in 2035:', round(float(annual.values[annual_years == 2035][0])))
 ```
 
-An annualised timestamp sits in the middle of its year, so match on `np.floor`
+An annualized timestamp sits in the middle of its year, so match on `np.floor`
 of the year rather than on equality.
 
 ## Printing a run

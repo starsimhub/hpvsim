@@ -3,14 +3,14 @@ title: T5 - Using interventions
 jupyter: python3
 ---
 
-In this tutorial we build a screen-and-treat programme for Nigeria — screening,
+In this tutorial we build a screen-and-treat program for Nigeria — screening,
 triage, and two treatment options wired together — and measure how many cervical
 cancers it prevents at two levels of coverage. We then add therapeutic
 vaccination on top of it.
 
-## Products and programmes
+## Products and programs
 
-HPVsim separates the *product* from the *programme that delivers it*.
+HPVsim separates the *product* from the *program that delivers it*.
 
 A product is a test, a treatment or a vaccine, with its own performance. The
 ones that ship with HPVsim are in three CSV files you can read directly:
@@ -22,18 +22,18 @@ ones that ship with HPVsim are in three CSV files you can read directly:
 - prophylactic vaccines — bivalent, quadrivalent, nonavalent — in
   `hpvsim/data/products_vx.csv`
 
-A programme decides who is offered the product, when, and how often. Screening
-programmes are `hpv.routine_screening` and `hpv.campaign_screening`, treatment
+A program decides who is offered the product, when, and how often. Screening
+programs are `hpv.routine_screening` and `hpv.campaign_screening`, treatment
 is `hpv.treat_num` and `hpv.treat_delay`, and vaccination is `hpv.routine_vx`
 and `hpv.campaign_vx`. Naming a product as a string, as we do below, picks up
 the standard version from those files.
 
-Every programme reaches women only, unless you pass `sex=None` for both sexes.
+Every program reaches women only, unless you pass `sex=None` for both sexes.
 
 ## Wire up a screen-and-treat cascade
 
-Real programmes are a chain: screen, triage the positives, decide what treatment
-each woman needs, then deliver it. In HPVsim each link is its own programme, and
+Real programs are a chain: screen, triage the positives, decide what treatment
+each woman needs, then deliver it. In HPVsim each link is its own program, and
 you connect them by naming each one and pointing the next at its outcomes.
 
 ```{python}
@@ -78,7 +78,7 @@ Three things make this work.
 Each link has a `name`, and the next link's `eligibility` is a function that
 reads the previous link's `outcomes`. Positive screens go to `assign`; the
 `tx_assigner` product sorts them into `ablation` or `excision` according to how
-advanced the lesion is; each treatment programme picks up its own group.
+advanced the lesion is; each treatment program picks up its own group.
 
 `prob` is an **annual** probability, not a probability per timestep and not a
 lifetime coverage. `prob=0.2` means a woman in the eligible age range has a 20%
@@ -133,8 +133,8 @@ forties, not from screening her often.
 
 A therapeutic vaccine is offered to women who already have HPV, to help them
 clear it. HPVsim delivers it either as a campaign to an age group, or to the
-women a screening programme has just found. Here we add the second kind on top
-of the five-yearly screening programme:
+women a screening program has just found. Here we add the second kind on top
+of the five-yearly screening program:
 
 ```{python}
 def screen_then_txvx(annual_prob):
@@ -161,7 +161,7 @@ for s in msim2.sims:
 Expect very little difference. The default `txvx1` product has an efficacy of
 0.01 against precancerous lesions in `products_tx.csv` — a placeholder standing
 in for a vaccine that does not yet exist, not a claim about any candidate. If
-you are modelling a real therapeutic vaccine, put its own efficacy numbers in
+you are modeling a real therapeutic vaccine, put its own efficacy numbers in
 before reading anything from this comparison.
 
 ## Build your own product

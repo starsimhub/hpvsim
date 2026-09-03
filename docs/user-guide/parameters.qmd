@@ -23,24 +23,22 @@ Three rules govern the routing:
 
 **HIV is never reached by a bare key.** HIV shares parameter names with HPV (`beta`, `init_prev`), so a bare `beta=` would silently switch on HIV transmission. HIV parameters must be scoped: `hiv=dict(beta_m2f=0.008)` or `hiv_pars=dict(...)`.
 
-**Scoped beats bare.** Scoped entries are applied after bare ones, whatever order your dictionary is in, so `dict(beta=0.2, hpv16=dict(beta=0.3))` gives HPV16 0.3 and every other genotype 0.2. Dotted keys are accepted too — `'hpv16.cin_fn.k'` is the same as `hpv16=dict(cin_fn=dict(k=...))` — which is what calibration output looks like.
+**Specific beats general.** Scoped entries are applied after bare ones, whatever order your dictionary is in, so `dict(beta=0.2, hpv16=dict(beta=0.3))` gives HPV16 0.3 and every other genotype 0.2. Dotted keys are accepted too — `'hpv16.cin_fn.k'` is the same as `hpv16=dict(cin_fn=dict(k=...))` — which is what calibration output looks like.
 
-Nested parameter groups merge rather than replace. `cin_fn`, `cancer_fn`, `age_risk` and the network's `age_act_pars_*` are parameter objects, so `hpv16=dict(cin_fn=dict(k=0.4))` changes `k` and leaves `form`, `x_infl` and `ttc` alone. Before v3.2 this replaced the whole group, silently dropping the siblings.
+Nested parameter groups merge rather than replace. `cin_fn`, `cancer_fn`, `age_risk` and the network's `age_act_pars_*` are parameter objects, so `hpv16=dict(cin_fn=dict(k=0.4))` changes `k` and leaves `form`, `x_infl` and `ttc` alone.
 
-An unrecognised name raises a `ValueError` listing it. That is deliberate: a typo in a country parameter file should stop the run, not run the defaults.
-
-Durations need units. Write `ss.years(3)`, or a distribution whose parameters carry them: `ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))`. A unit-less duration is read as a number of timesteps, so at `dt=0.25` it is four times too short; HPVsim raises rather than running it.
+An unrecognized name raises a `ValueError` listing it. That is deliberate: a typo in a country parameter file should stop the run, not run the defaults.
 
 The sim-level defaults are in `hpv.SimPars`: 10,000 agents, 1990 to 2060, `dt=0.25` (three months), seed 0. `hpv.Sim` itself does not assume a country — pass `location=` or you get the location-free playground described in [Demographics](demographics.qmd).
 
-## How to organise a country parameter set
+## How to organize a country parameter set
 
-Keep one dictionary per country, grouped by scope, and splat it into `hpv.Sim`. For module parameters, bare keyword arguments and `pars=` are equivalent — that equivalence is new in v3.2.
+The simplest option is the define a dictionary of inputs for your setting, grouped by purpose, and pass it into `hpv.Sim`. 
 
 ```{python}
 import hpvsim as hpv
 
-nigeria = dict(
+nigeria_inputs = dict(
     location = 'nigeria',
     n_agents = 2000,
     start = 2000,
@@ -52,7 +50,7 @@ nigeria = dict(
     verbose = 0,
 )
 
-sim = hpv.Sim(genotypes=[16, 18], **nigeria)
+sim = hpv.Sim(genotypes=[16, 18], **nigeria_inputs)
 sim.init()
 
 print('HPV16 beta:      ', sim.diseases.hpv16.pars.beta)
@@ -66,9 +64,7 @@ print('people per agent:', f'{sim.pars.pop_scale:,.0f}')
 
 `beta` reached both genotypes but their per-act transmission probabilities still differ, because each genotype scales `beta` by its own `rel_beta`. Check what the model actually uses with `sim.diseases.hpv16.validate_beta()`.
 
-Splatting the dictionary matters here. `location` is a constructor argument, not a routed parameter, so `hpv.Sim(**nigeria)` works while `hpv.Sim(pars=nigeria)` stops with `unrecognized par(s): ['location']`. Keep the country name in the dictionary and splat it, or pass it separately.
-
-Always initialise and print the values back, as above, when you first wire up a parameter file. It takes a second and catches the whole class of errors where a value goes somewhere you did not intend. To apply a parameter set to a sim you have already built, call `hpv.route_pars(sim, pars)` directly — it accepts the same flat, dotted or nested forms, and prints a note when a bare key lands in more than one place.
+Within the `nigeria_inputs` dictionary there are different kinds of inputs: `location` is a constructor argument, not a routed parameter, so `hpv.Sim(**nigeria)` works while `hpv.Sim(pars=nigeria)` does not.
 
 ## See also
 

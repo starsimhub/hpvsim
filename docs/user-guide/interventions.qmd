@@ -2,7 +2,7 @@
 title: "Interventions"
 ---
 
-HPVsim separates *what* is given from *who gets it*. A **product** is the vaccine, screening test or treatment itself, with its own efficacy or test-positivity by genotype and disease state. An **intervention** is the delivery programme: which people, from which year, at what coverage. The same product can be delivered several ways, and the same delivery pattern can carry different products.
+HPVsim separates *what* is given from *who gets it*. A **product** is the vaccine, screening test or treatment itself, with its own efficacy or test-positivity by genotype and disease state. An **intervention** is the delivery program: which people, from which year, at what coverage. The same product can be delivered several ways, and the same delivery pattern can carry different products.
 
 Product characteristics live in CSVs under `hpvsim/data/`, so you can read exactly what the model assumes:
 
@@ -22,13 +22,13 @@ Treatment products act on the model's disease states directly. Ablation and exci
 
 Every intervention is either routine or campaign. `hpv.routine_screening(start_year=2015, prob=0.3)` offers a screen every year from 2015; `hpv.campaign_screening(years=[2015, 2025], prob=0.3)` offers it twice. `prob` is an **annual** probability, converted internally to the timestep in use — so `prob=0.3` with quarterly steps does not mean 30% per quarter. Pass a list of probabilities alongside a list of years to ramp coverage over time. `start_year` and `end_year` must fall inside the simulation window or the run stops with an error.
 
-All vaccination, screening, treatment and therapeutic-vaccination interventions default to `sex='f'`. That changed in v3.1: pass `sex=None` explicitly for gender-neutral vaccination. Age targeting uses `age_range=[lo, hi]`, and the upper bound is treated as exclusive for vaccination, screening and triage but inclusive for treatment — so `age_range=[30, 50]` on a screening programme reaches women up to their 50th birthday.
+All vaccination, screening, treatment and therapeutic-vaccination interventions default to `sex='f'`. That changed in v3.1: pass `sex=None` explicitly for gender-neutral vaccination. Age targeting uses `age_range=[lo, hi]`, and the upper bound is treated as exclusive for vaccination, screening and triage but inclusive for treatment — so `age_range=[30, 50]` on a screening program reaches women up to their 50th birthday.
 
 Give every intervention in a cascade a `name`, since downstream steps refer to it by name. Names share a namespace with product modules, so avoid `'vx'`, `'dx'`, `'tx'` and `'radiation'` as intervention names — a collision raises `Module vx already added` at initialisation.
 
 ## How to build a screen-and-treat cascade
 
-A screening programme is a chain: screen, triage the positives, treat what triage finds. Each link is its own intervention, and eligibility functions connect them.
+A screening program is a chain: screen, triage the positives, treat what triage finds. Each link is its own intervention, and eligibility functions connect them.
 
 ```{python}
 import numpy as np
@@ -52,10 +52,10 @@ ablate = hpv.treat_num(product='ablation', prob=0.9, eligibility=lesions,
 pars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,
             start=2000, stop=2020, verbose=0)
 baseline = hpv.Sim(**pars, label='no screening')
-programme = hpv.Sim(**pars, interventions=[screen, triage, ablate],
+program = hpv.Sim(**pars, interventions=[screen, triage, ablate],
                     label='screen and treat')
 
-msim = ss.MultiSim([baseline, programme])
+msim = ss.MultiSim([baseline, program])
 msim.run(parallel=False, verbose=0)
 
 for sim in msim.sims:
@@ -69,7 +69,7 @@ print('women treated:     ', f'{float(prog.interventions["treat_num"].results.ne
 
 `max_capacity=None` treats everyone eligible. Set it to a number of women per timestep to represent a service constrained by staff or theatre time, which is usually closer to reality than unlimited treatment. Use `hpv.treat_delay(delay=1.0, ...)` where women are referred and treated later, and expect loss to follow-up to matter: the cascade multiplies, so 35% screened × 90% triaged × 90% treated reaches under 30% of the women you intended.
 
-To ramp a programme's coverage over calendar time without writing several interventions, use `hpv.dynamic_pars` with a dotted path, for example `{'screen.prob': {'years': [2010, 2030], 'vals': [0.1, 0.7]}}`.
+To ramp a program's coverage over calendar time without writing several interventions, use `hpv.dynamic_pars` with a dotted path, for example `{'screen.prob': {'years': [2010, 2030], 'vals': [0.1, 0.7]}}`.
 
 ## See also
 

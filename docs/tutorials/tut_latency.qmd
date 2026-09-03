@@ -3,14 +3,15 @@ title: T9 - HPV latency
 jupyter: python3
 ---
 
-Some women who appear to clear HPV have not cleared it. The infection becomes
-undetectable and then, sometimes years later, becomes active again. This matters
-for policy: a woman who screens negative at 35 and reactivates at 45 is not
+There is some uncertainty about whether apparent clearance of HPV represents true clearance, or 
+whether the infection becomes undetectable and then, sometimes years later, becomes active again. 
+This matters for policy: a woman who screens negative at 35 and reactivates at 45 is not
 protected by having been screened, and a therapeutic vaccine that reaches
 dormant infections would prevent cancers that screening cannot.
 
-In this tutorial we switch latency on, see the reservoir it creates, and find
-out what it does to the cancer burden.
+By default, we do not model latency in HPVsim, but there is a parameter that allows you 
+to switch latency on. In this tutorial demonstrate this switch, see the reservoir it creates,
+and find out what it does to the cancer burden.
 
 ## The two parameters
 
@@ -29,26 +30,17 @@ print('hpv_reactivation:', blank.diseases.hpv16.pars.hpv_reactivation)
 ```
 
 `hpv_control_prob` is the chance that a woman who would otherwise clear an
-infection instead becomes latent. It is 0 by default, which makes latency a true
-no-op: nothing enters the latent state and no reactivation code runs.
+infection instead becomes latent. It is 0 by default: nobody enters the latent
+state and no reactivation code runs.
 
-`hpv_reactivation` is the yearly hazard of a latent infection waking up.
+`hpv_reactivation` is the yearly hazard of a latent infection reactivating.
 
-Two more things to know. Latency is female-only: men clear or stay infected. And
+Latency only applies to women: men clear or stay infected. And
 a woman's accumulated `sev_imm`, the immunity she built by clearing infections
 before, scales her reactivation hazard down, so women with a longer history of
-clearance reactivate less.
-
-### The reactivation hazard has never been fitted
-
-The default of 0.025 per year is a placeholder inherited from HPVsim v2, where
-the parameter was written into `parameters.py` with the comment *"Placeholder;
-unused unless hpv_control_prob>0"*. It was never fitted to data, in v2 or since.
-
-That is a statement about its provenance, not about its influence. As the runs
-below show, this parameter has a large effect on the cancer burden — which is
-exactly why an unfitted default is worth knowing about. Treat it as a parameter
-to calibrate.
+clearance reactivate less. The default of reactivation rate is 0.025 per year, 
+but given the uncertainty about this parameter, we would recommend treating it 
+as a parameter to calibrate.
 
 ## Three ways to run it
 
@@ -90,8 +82,6 @@ for label, latency_pars in arms.items():
         sim.run()
         runs[label].append(sim)
 ```
-
-That is nine runs, and it is the slowest cell in this tutorial series.
 
 ## What changes
 

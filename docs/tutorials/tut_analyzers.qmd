@@ -10,8 +10,7 @@ cancer, and the DALYs that burden represents. Then we write one of our own.
 
 ## Cancers in your data's age bands
 
-Cancer registries report cases by five- or ten-year age bands, and rarely the
-same bands HPVsim uses by default. `hpv.by_age` records any age-stratified
+Cancer registries typically report cases by five- or ten-year age bands. `hpv.by_age` records any age-stratified
 result at whatever bins and years you name.
 
 Here we match the bands in `nigeria_cancer_cases.csv`, an age-stratified count
@@ -63,15 +62,15 @@ carrying a large population weight. Averaging over several years gives something
 you can actually compare against data:
 
 ```{python}
-modelled = by_age.to_dataframe('cancers').mean(axis=0)
+modeled = by_age.to_dataframe('cancers').mean(axis=0)
 
 observed = pd.read_csv('nigeria_cancer_cases.csv')
 observed = observed.groupby(pd.cut(observed.age, bins=edges, right=False,
                                    labels=by_age.bin_labels),
                             observed=False)['value'].sum()
 
-comparison = pd.DataFrame({'modelled': modelled.round(0), 'observed': observed})
-comparison['ratio'] = (comparison.modelled / comparison.observed).round(2)
+comparison = pd.DataFrame({'modeled': modeled.round(0), 'observed': observed})
+comparison['ratio'] = (comparison.modeled / comparison.observed).round(2)
 comparison
 ```
 
@@ -91,7 +90,7 @@ by_age.to_dataframe('hpv_prevalence').mean(axis=0).round(3)
 Compare which band the peak falls in against prevalence surveys for your own
 setting. Most surveys put the peak in women in their early twenties. The age at
 which prevalence peaks is a second calibration target, and an informative one:
-it constrains the sexual-behaviour parameters rather than the natural-history
+it constrains the sexual-behavior parameters rather than the natural-history
 ones.
 
 Each age band is also available as a timeseries of its own, named after the band:
@@ -123,7 +122,7 @@ for stage in ('precin', 'cin', 'total'):
 The dwell times show where those years go. Most of the time between infection
 and cancer is spent as a precancerous lesion, and that long lesion stage is why
 screening works at all — it is the window in which a woman can be found and
-treated. It is also why a vaccination programme takes decades to show up in
+treated. It is also why a vaccination program takes decades to show up in
 cancer statistics.
 
 ```{python}
@@ -154,7 +153,7 @@ reference one.
 
 An analyzer is a class with two methods: `init_results` declares what it
 records, and `step` records it once per timestep. Here is one that answers a
-question a programme manager would ask — how many women in the screening age
+question a program manager would ask — how many women in the screening age
 range have never been screened?
 
 ```{python}
@@ -200,6 +199,6 @@ for year in (2014, 2020, 2030):
     print(f'Never screened in {year}: {float(gap[yrs == year][0]):>12,.0f}')
 ```
 
-The number falls sharply once the programme starts, then flattens as new women
-age into the range faster than the programme reaches them. That flat line is the
-unmet need a real programme has to plan for.
+The number falls sharply once the program starts, then flattens as new women
+age into the range faster than the program reaches them. That flat line is the
+unmet need a real program has to plan for.

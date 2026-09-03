@@ -11,7 +11,7 @@ HIV status.
 
 ## Install the HIV extra
 
-HIV modelling in HPVsim is built on [STIsim](https://docs.stisim.org), which is
+HIV modeling in HPVsim is built on [STIsim](https://docs.stisim.org), which is
 an optional dependency. `pip install hpvsim` does not install it, so pure-HPV
 work stays lightweight. For this tutorial you need:
 
@@ -86,7 +86,7 @@ years, and do not have to be equal; the first and last bands extend to cover
 ages outside the range you supply.
 
 ART data is required in this mode, because treatment restores CD4 and therefore
-removes the HPV effects. HPVsim adds the ART programme for you:
+removes the HPV effects. HPVsim adds the ART program for you:
 
 ```{python}
 PARS = dict(
@@ -120,7 +120,7 @@ anything else from the run. The point of this mode is that the epidemic is an
 input, so if it does not match your estimates, the input is wrong.
 
 You will also see a warning that ART was added without an HIV testing
-programme. Expect it: in this mode every new infection is recorded as diagnosed
+program. Expect it: in this mode every new infection is recorded as diagnosed
 immediately, so no testing cascade is needed and the warning does not apply.
 
 `hiv_data=` also accepts a folder path containing `hiv_incidence.csv`,
@@ -173,7 +173,7 @@ artefact, not an effect. The difference between the two numbers is what
 `rel_sus` actually contributes.
 
 There is a second thing this mode cannot show you. Imposing an incidence curve
-by age and sex assigns HIV independently of sexual behaviour, so the model never
+by age and sex assigns HIV independently of sexual behavior, so the model never
 reproduces the real correlation between HIV and HPV that arises because both
 spread through the same partnerships. That means this mode will understate the
 association you would measure in a survey. Network transmission, below, is where
@@ -181,7 +181,7 @@ that correlation comes from.
 
 ## Let HIV spread through the sexual network instead
 
-When you have no HIV data, `model_hiv='transmission'` puts HIV on the same
+If you want to simulate the transmission of HIV rather than simply imposing incidence, `model_hiv='transmission'` puts HIV on the same
 sexual network HPV uses and lets prevalence emerge:
 
 ```{python}

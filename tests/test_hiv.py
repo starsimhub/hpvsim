@@ -8,7 +8,9 @@ import numpy as np
 import pandas as pd
 import pytest
 import starsim as ss
-import stisim as sti
+
+# stisim is the optional [hiv] extra; skip the file rather than fail collection.
+sti = pytest.importorskip('stisim')
 
 import hpvsim as hpv
 from hpvsim.network import SexualNetwork

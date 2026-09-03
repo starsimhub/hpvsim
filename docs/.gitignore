@@ -4,3 +4,6 @@ objects.json
 /.quarto/
 
 **/*.quarto_ipynb
+
+# Tutorial output artifacts (also cleaned by quarto_utils.py post)
+my-*
