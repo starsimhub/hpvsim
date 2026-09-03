@@ -12,7 +12,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 **More of the model reports itself.** `hpv.by_age` now gives population denominators next to case counts, so you can build age-specific rates from a single analyzer. Vaccination programs now report doses given and women reached as time series.
 
+**Cervical cancer rates are now reported correctly by HIV status.** `all_hpv.cancer_incidence_with_hiv`, `cancer_incidence_no_hiv` and `cancer_rate_ratio` previously divided female cancers by an all-sex headcount and reported a single timestep's count rather than an annual rate, so at `dt=0.25` the rates read several times too low and the rate ratio was biased -- HIV prevalence is sex-skewed, so the two strata were deflated by different amounts. All three are now annual rates over a female denominator, computed per calendar year like the age-standardized results. A new `all_hpv.cancer_incidence` gives the crude rate per 100,000 women per year, the unstandardized companion to `asr_cancer_incidence`. All of these use scale-weighted denominators, so they are correct under multiscale.
+
 **New documentation.** A user guide explaining how each part of the model works and how to change it, and nine tutorials, including new ones on HIV co-infection and on latency.
+
+*Regression information*: the HIV-stratified cancer rates above change value substantially (annual and female-denominated, where they were per-timestep and all-sex), and `cancer_rate_ratio` is now `nan` rather than `0.0` in a year with no HIV-negative cancers. Any parameter set fitted against these results should be refitted.
 
 **Fixes.** Treatment and therapeutic vaccination now respect the `sex` argument, which was previously ignored in places. Age ranges are applied the same way across every intervention. Treating a woman with a latent infection now clears it. Building a test or treatment product from a data file no longer fails when the simulation starts. The documentation build works again, having been broken since v3.1.0.
 
