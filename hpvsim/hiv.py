@@ -22,41 +22,19 @@ __all__ = ['HIV_transmit', 'HIV_incidence']
 class HIV(sti.HIV):
     """Shared base for hpvsim's HIV variants (HIV_transmit, HIV_incidence).
 
-    Owns the CD4-stratified HIV->HPV effect pars (rel_sus/rel_sev/rel_imm/
-    rel_reactivation, each {effect}_lo/{effect}_hi, plus cd4_threshold/
-    cd4_upper) and HPV prevalence by HIV status -- the place to look for HIV's
-    effect on HPV, regardless of which subclass drives infection. Cancer
-    counts/incidence/rate-ratio by HIV status live on HPVTotal
-    (sim.results.all_hpv) instead, since that module always ticks at the
-    sim's own cadence.
+    Owns the CD4-stratified HIV->HPV effect pars -- rel_sus, rel_sev, rel_imm
+    and rel_reactivation, each as ``_lo``/``_hi`` either side of
+    ``cd4_threshold`` -- and HPV prevalence by HIV status. Cancer by HIV status
+    lives on ``HPVTotal`` (``sim.results.all_hpv``), which ticks at the sim's
+    cadence rather than HIV's.
 
-    rel_sus is written directly onto every HPV module in step_state(), with
-    no separate connector: HPV.step_state() resets rel_sus=1.0 before any
-    disease's step_state() runs (inside hpv.Sim, hpv diseases are always
-    registered before other diseases, so this is guaranteed to have already
-    happened -- a fully-manual diseases=[...] construction outside hpv.Sim
-    does not get this guarantee automatically), and
-    CrossImmunity multiplies (not assigns) its own factor onto rel_sus too --
-    the two compose correctly regardless of order. rel_sev/rel_imm/
-    rel_reactivation are read lazily by HPV's own set_prognoses/step_state at
-    their point of use, unchanged from before.
-
-    A raw `sti.HIV()` instance, constructed by a user bypassing hpvsim's
-    classes entirely, does NOT get these HPV-modulation effects -- only
-    `HIV_transmit`/`HIV_incidence` do. This is an intentional tradeoff:
-    the CD4-effect pars/states/results live directly on this class, not a
-    separate connector that could discover any `sti.HIV`-shaped disease.
+    Only these subclasses modulate HPV; a bare ``sti.HIV`` in ``diseases=``
+    does not, since the effects live on this class rather than a connector.
     """
 
     def __init__(self, init_prev_data=None, name='hiv'):
-        # age_bins/sex_keys=None (stisim >= 1.6.1) suppresses stisim's ~120
-        # age- and sex-stratified results rather than generating them. They are
-        # built with ``stisim.utils.count`` (``np.count_nonzero``), which
-        # ignores per-agent ``scale``, so under grow-multiscale they
-        # over-report by the fine-agent fraction and hpvsim cannot correct
-        # them without reimplementing ``BaseSTI.update_results``. Use
-        # ``hpv.by_age`` or a scale-weighted analyzer for age-stratified
-        # output. Upstream fix: starsimhub/stisim#574.
+        # Skip stisim's stratified results: they are raw agent counts, so
+        # wrong under multiscale (starsimhub/stisim#574). Use hpv.by_age.
         super().__init__(init_prev_data=init_prev_data, name=name,
                          age_bins=None, sex_keys=None)
         self.define_pars(
@@ -130,25 +108,12 @@ class HIV(sti.HIV):
         )
 
     def _rescale_stisim_results(self):
-        """Recompute the inherited HIV results with per-agent scale weighting.
+        """Recompute the inherited HIV results weighted by per-agent scale.
 
-        ``stisim.utils.count`` is ``np.count_nonzero``, so every count-type STI
-        result is a raw agent tally. Under grow-multiscale a fine agent carries
-        ``scale = 1/ms_agent_ratio`` but is counted as a whole person, and the
-        result is then multiplied by ``pop_scale`` -- so HIV stocks over-report
-        by roughly the fraction of fine agents. At ``ms_agent_ratio=100`` that
-        was ~6x in hpvsim's Zambia setup: 8.0M infections against a true 1.1M.
-
-        The stratified results that shared this defect are not corrected but
-        suppressed: ``__init__`` passes ``age_bins=None, sex_keys=None``, so
-        stisim never builds them. What remains are the whole-population
-        quantities, recomputed below. Ratios of two equally-biased stocks
-        (``p_on_art``) were already close to right; they are recomputed anyway
-        so numerator and denominator are consistently weighted.
-
-        The handful of results left untouched are for features hpvsim does not
-        model -- PrEP, circumcision, a testing cascade, MTCT -- and stay at
-        zero, so there is nothing to rescale.
+        stisim counts agents with ``np.count_nonzero``, which ignores the
+        ``scale = 1/ms_agent_ratio`` a grow-multiscale fine agent carries, so
+        every stock over-reports. Results left untouched are for features
+        hpvsim does not model (PrEP, circumcision, testing, MTCT) and stay 0.
         """
         ti = self.ti
         res = self.results
@@ -217,13 +182,10 @@ class HIV(sti.HIV):
         return
 
     def update_results(self):
-        """HPV prevalence by HIV status, plus scale-correction of the inherited
-        stisim HIV results.
+        """HPV prevalence by HIV status, and scale-correct the stisim results.
 
-        Cancer counts/incidence by HIV status live on HPVTotal
-        (sim.results.all_hpv) instead -- that module always ticks at the sim's
-        own cadence, so a single new-cancer event can't be recorded more than
-        once even if HIV's own dt differs from the sim's.
+        Cancer by HIV status lives on ``HPVTotal`` instead, which ticks at the
+        sim's cadence so an event cannot be counted twice when HIV's dt differs.
         """
         super().update_results()
         self._rescale_stisim_results()
@@ -282,27 +244,17 @@ class HIV_transmit(HIV):
 
 
 class HIV_incidence(HIV):
-    """Incidence-driven HIV: imposes a per-(age,sex,year) incidence curve
-    directly as a disease, with no network transmission (infect() is fully
-    overridden -- see stisim's SimpleBV for the precedent this follows).
+    """HIV driven by an imposed incidence curve, with no network transmission.
 
-    Every newly-infected agent is immediately diagnosed and ART-scheduled
-    (ti_art = ti + 1 -- see the note in infect() on why +1, not ti, is
-    required), so plain sti.ART(coverage=...) works against this disease
-    directly, with no separate testing-cascade intervention needed.
+    New infections are diagnosed and ART-scheduled immediately, so plain
+    ``sti.ART(coverage=...)`` works without a testing cascade.
 
-    The incidence DataFrame has columns [age, sex, year, incidence] (sex
-    'f'/'m'; incidence = the per-year HIV acquisition rate among susceptibles).
-    ``age`` is an age-band lower bound, and any band width works: 5-year bands
-    (0, 5, 10, ... -- the usual UNAIDS/Spectrum shape) or single years of age.
-    Bands need not be evenly spaced; the first and last extend to cover ages
-    below and above the data range.
-
-    FOI -> per-step probability: a per-year rate r is converted to a
-    per-timestep infection probability with the exponential survival form
-    p = 1 - exp(-r * dt_years) (correct for non-small rates), then drawn via
-    a CRN-safe ss.bernoulli. Years outside the data's [min, max] range are
-    nearest-year clamped (incidence is 0 before the curve begins).
+    Args:
+        incidence: DataFrame ``[age, sex, year, incidence]``; sex 'f'/'m',
+            incidence the annual acquisition rate among susceptibles. ``age``
+            is a band lower bound, of any width (5-year UNAIDS/Spectrum bands
+            or single years) and not necessarily even; the first and last bands
+            extend past the data range, as do the first and last years.
     """
 
     def __init__(self, incidence=None, pars=None, init_prev_data=None, name='hiv', **kwargs):
@@ -344,17 +296,11 @@ class HIV_incidence(HIV):
         self._rate_cube = cube
 
     def _lookup_rates(self, year, ages, female):
-        """Per-agent annual incidence rate for the given calendar year.
+        """Per-agent annual incidence rate for a calendar year.
 
-        ages is a float array of agent ages; female a bool mask. Years are
-        nearest-year clamped to the data range.
-
-        Ages are bucketed into the age bands the data actually supplies, via
-        searchsorted on ``self._ages``: an agent falls in the band whose lower
-        bound is the greatest one <= its age, with the first/last bands
-        extending to cover ages below/above the data range. This handles any
-        band width -- 5-year bands (UNAIDS/Spectrum-style) as well as single
-        years of age, which are just the width-1 case.
+        Nearest year, and the age band whose lower bound is the greatest one
+        <= the agent's age, so any band width works. ``ages`` is a float array,
+        ``female`` a bool mask.
         """
         yi = int(np.abs(self._years - np.floor(year)).argmin())
         ai = np.clip(np.searchsorted(self._ages, np.floor(ages), side='right') - 1,
