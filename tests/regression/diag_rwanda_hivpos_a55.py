@@ -1,5 +1,14 @@
 """Diagnose the stubborn HIV+ 55+ cancer bin (model ~0 vs registry 30/100k).
 
+SLATED FOR DELETION IN v3.3 (test cleanup). This is a one-off script from the
+v2 -> v3 Rwanda migration, not a test: it is not collected by pytest, it has
+no assertions, and several of these run a full Optuna calibration or a
+multi-seed sim. They are kept for now because the v3 HIV-HPV parameterization
+was derived here and the derivation is worth being able to re-read. Anything
+here that should outlive 3.3 -- most likely the CalibProbe-style age-by-HIV
+probes, which localizations reimplement -- needs promoting into the package
+or into ``tests/`` first.
+
 Hypothesis: the HIV+ 55+ stratum is nearly empty (women infected young in the
 1985-2004 pre-ART epidemic largely died before 55), so 30/100k over a tiny
 denominator rounds to ~0 cancers -- a demographic/sparsity feature, not a
