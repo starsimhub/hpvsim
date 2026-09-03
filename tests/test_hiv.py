@@ -127,6 +127,43 @@ def test_hiv_data_loading():
         hpv.data.load_hiv_data(Path(__file__).parent)  # no HIV CSVs here
 
 
+def test_hiv_results_are_scale_weighted():
+    """Inherited stisim HIV stocks are recomputed with per-agent scale.
+
+    stisim.utils.count is np.count_nonzero, so under grow-multiscale a fine
+    agent (scale = 1/ratio) is counted as a whole person and the result is then
+    multiplied by pop_scale, over-reporting every HIV stock. hpv.HIV overrides
+    update_results to fix the all-age quantities.
+    """
+    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=1000, rand_seed=0,
+                  start=1990, stop=2000, dt=1.0, ms_agent_ratio=10,
+                  model_hiv='transmission', verbose=0)
+    sim.run()
+    r, ppl, hiv = sim.results.hiv, sim.people, sim.diseases.hiv
+    w, alive = ppl.scale.values, ppl.alive.values
+    infected = hiv.infected.values & alive
+    scale = sim.pars.pop_scale
+
+    # Multiscale actually engaged, or the test proves nothing.
+    assert (w < 1).any(), 'no fine agents; ms_agent_ratio had no effect'
+
+    wtd = float((w * infected).sum())
+    raw = float(infected.sum())
+    assert wtd < raw, 'fine agents should weigh less than whole people'
+    assert np.isclose(float(r['n_infected'][-1]), wtd * scale, rtol=0.02)
+    # The uncorrected value would have been the raw count x pop_scale.
+    assert not np.isclose(float(r['n_infected'][-1]), raw * scale, rtol=0.02)
+
+    # Prevalence is a scale-weighted fraction, and stays a fraction.
+    n_alive = float((w * alive).sum())
+    assert np.isclose(float(r['prevalence'][-1]), wtd / n_alive, rtol=0.02)
+    assert 0 <= r['prevalence'][-1] <= 1
+    assert 0 <= r['prevalence_15_49'][-1] <= 1
+    # Cumulative flows are rebuilt from the corrected per-step series.
+    assert np.isclose(float(r['cum_infections'][-1]),
+                      float(np.sum(r['new_infections'])), rtol=1e-6)
+
+
 def test_hiv_banded_age_data():
     """Age-banded HIV inputs work, not just single years of age.
 

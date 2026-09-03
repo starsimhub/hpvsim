@@ -120,14 +120,80 @@ class HIV(sti.HIV):
             ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
         )
 
+    def _rescale_stisim_results(self):
+        """Recompute the inherited HIV results with per-agent scale weighting.
+
+        ``stisim.utils.count`` is ``np.count_nonzero``, so every count-type STI
+        result is a raw agent tally. Under grow-multiscale a fine agent carries
+        ``scale = 1/ms_agent_ratio`` but is counted as a whole person, and the
+        result is then multiplied by ``pop_scale`` -- so HIV stocks over-report
+        by roughly the fraction of fine agents. At ``ms_agent_ratio=100`` that
+        was ~6x in hpvsim's Zambia setup: 8.0M infections against a true 1.1M.
+
+        Only the all-age quantities are corrected here. stisim's sex-by-age
+        strata (``n_infected_f_15_20`` and friends) are built the same way and
+        remain raw counts; use ``hpv.by_age`` or a scale-weighted analyzer for
+        age-stratified output rather than those. Ratios of two equally-biased
+        stocks (``p_on_art``) were already close to right; they are recomputed
+        anyway so numerator and denominator are consistently weighted.
+        """
+        ti = self.ti
+        res = self.results
+        people = self.sim.people
+        w = people.scale.values
+        alive = people.alive.values
+        infected = self.infected.values & alive
+
+        def wsum(mask):
+            return float((w * mask).sum())
+
+        n_inf = wsum(infected)
+        n_alive = wsum(alive)
+        if 'n_infected' in res:
+            res['n_infected'][ti] = n_inf
+        if 'n_susceptible' in res:
+            res['n_susceptible'][ti] = wsum(self.susceptible.values & alive)
+        if 'n_diagnosed' in res:
+            res['n_diagnosed'][ti] = wsum(infected & self.diagnosed.values)
+        if 'n_on_art' in res:
+            n_art = wsum(infected & self.on_art.values)
+            res['n_on_art'][ti] = n_art
+            if 'p_on_art' in res:
+                res['p_on_art'][ti] = n_art / n_inf if n_inf else 0.0
+        if 'prevalence' in res:
+            res['prevalence'][ti] = n_inf / n_alive if n_alive else 0.0
+        if 'prevalence_15_49' in res:
+            age = people.age.values
+            adult = alive & (age >= 15) & (age < 50)
+            denom = wsum(adult)
+            res['prevalence_15_49'][ti] = (wsum(adult & infected) / denom
+                                            if denom else 0.0)
+
+        # Per-step flows, then their cumulative partners from the fixed series.
+        flows = (('new_infections', self.ti_infected),
+                 ('new_diagnoses', self.ti_diagnosed),
+                 ('new_deaths', self.ti_dead))
+        for key, ti_arr in flows:
+            if key in res and ti_arr is not None:
+                res[key][ti] = wsum(np.asarray(ti_arr.values) == ti)
+        for new_key, cum_key in (('new_infections', 'cum_infections'),
+                                 ('new_diagnoses', 'cum_diagnoses'),
+                                 ('new_deaths', 'cum_deaths')):
+            if new_key in res and cum_key in res:
+                res[cum_key][ti] = float(np.sum(res[new_key][:ti + 1]))
+        return
+
     def update_results(self):
-        """HPV prevalence by HIV status (absorbed from the former
-        HIVStratifiedResults analyzer). Cancer counts/incidence by HIV status
-        live on HPVTotal (sim.results.all_hpv) instead -- that module always
-        ticks at the sim's own cadence, so a single new-cancer event can't be
-        recorded more than once even if HIV's own dt differs from the sim's.
+        """HPV prevalence by HIV status, plus scale-correction of the inherited
+        stisim HIV results.
+
+        Cancer counts/incidence by HIV status live on HPVTotal
+        (sim.results.all_hpv) instead -- that module always ticks at the sim's
+        own cadence, so a single new-cancer event can't be recorded more than
+        once even if HIV's own dt differs from the sim's.
         """
         super().update_results()
+        self._rescale_stisim_results()
         ti = self.ti
         people = self.sim.people
         alive = people.alive.values
