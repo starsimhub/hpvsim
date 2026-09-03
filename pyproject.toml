@@ -48,7 +48,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-hiv = ['stisim>=1.5']  # HIV-HPV co-infection (hpvsim/hiv.py); optional since 3.2.0
+hiv = ['stisim>=1.6.1']  # HIV-HPV co-infection (hpvsim/hiv.py); optional since 3.2.0. 1.6.1 for age_bins/sex_keys=None
 
 [project.scripts]
 hpvsim-download-data = "hpvsim.data.downloaders:download_data"

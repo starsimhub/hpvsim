@@ -129,28 +129,28 @@ def test_hiv_data_loading():
         hpv.data.load_hiv_data(Path(__file__).parent)  # no HIV CSVs here
 
 
-def test_hiv_results_are_a_vetted_subset():
-    """hpv.HIV exposes only results it scale-weights itself.
+def test_hiv_results_are_unstratified():
+    """hpv.HIV suppresses stisim's stratified results rather than shipping them.
 
-    sti.HIV defines ~170 results, built with a scale-unaware counter. Rather
-    than ship numbers we know to be wrong under multiscale, hpv.HIV keeps the
-    subset it recomputes and deletes the rest -- stisim's sex-by-age strata,
-    and results for features hpvsim does not model.
+    They are built with a scale-unaware counter, so under multiscale they
+    over-report; hpvsim cannot correct them without reimplementing
+    BaseSTI.update_results, so it passes age_bins=None, sex_keys=None
+    (stisim >= 1.6.1) and they are never created.
     """
     sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=500, rand_seed=0,
                   start=1990, stop=1995, dt=1.0, model_hiv='transmission', verbose=0)
     sim.run()
     keys = set(sim.results.hiv.keys())
 
-    assert keys == set(hpv.hiv.HIV._KEEP_RESULTS), 'exposed results drifted from the allowlist'
-
-    # The scale-unaware strata are gone, not merely undocumented.
+    # No sex suffix, and no age-bin suffix other than the adult prevalence result.
     assert not [k for k in keys if re.search(r'_(f|m)(_\d+_\d+)?$', k)]
     assert not [k for k in keys if re.search(r'_\d+_\d+$', k) and k != 'prevalence_15_49']
-    # Features hpvsim does not model do not ship as flat zeros.
-    for absent in ('n_on_prep', 'n_circumcised', 'new_false_pos', 'prevalence_sw'):
-        assert absent not in keys
-    # Every survivor is populated or a legitimate zero, never NaN.
+    # Far fewer than stisim's default, and the whole-population ones survive.
+    assert len(keys) < 60
+    for kept in ('n_infected', 'prevalence', 'prevalence_15_49', 'p_on_art',
+                 'new_infections', 'cum_infections', 'n_acute', 'n_latent'):
+        assert kept in keys, kept
+    # Nothing NaN.
     for k in keys - {'timevec'}:
         assert not np.isnan(np.asarray(sim.results.hiv[k], dtype=float)).any(), k
 

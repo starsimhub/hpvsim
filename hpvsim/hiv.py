@@ -48,39 +48,17 @@ class HIV(sti.HIV):
     separate connector that could discover any `sti.HIV`-shaped disease.
     """
 
-    # The results hpv.HIV exposes -- a deliberate subset of sti.HIV's ~170.
-    #
-    # stisim builds every count-type result with ``stisim.utils.count``
-    # (``np.count_nonzero``), which ignores per-agent ``scale``, so under
-    # grow-multiscale they over-report by the fine-agent fraction. Each result
-    # below is recomputed with per-agent weighting in ``_rescale_stisim_results``;
-    # everything else sti.HIV would define is DELETED in ``finalize_results``
-    # rather than shipped wrong. That removes stisim's ~104 sex-by-age strata
-    # (``n_infected_f_15_20`` and friends) -- correcting those from here would
-    # mean reimplementing ``BaseSTI.update_results`` wholesale -- and ~42
-    # results for features hpvsim does not model (PrEP, circumcision, a testing
-    # cascade, MTCT), which would otherwise ship as flat zeros.
-    #
-    # For age-stratified output use ``hpv.by_age`` or a scale-weighted analyzer.
-    # See https://github.com/starsimhub/stisim/issues/574 for the upstream fix.
-    _KEEP_RESULTS = (
-        'timevec',
-        # Stocks
-        'n_infected', 'n_susceptible', 'n_diagnosed', 'n_on_art',
-        'n_on_effective_art', 'n_art_naive', 'n_art_discontinued',
-        # CD4 stage -- drives the HIV->HPV effects, so worth keeping
-        'n_acute', 'n_latent', 'n_falling',
-        # Flows and their cumulative partners
-        'new_infections', 'new_diagnoses', 'new_deaths', 'new_agents_on_art',
-        'cum_infections', 'cum_diagnoses', 'cum_deaths',
-        # Rates and fractions
-        'prevalence', 'prevalence_15_49', 'incidence', 'p_on_art',
-        # hpvsim's own
-        'hpv_prevalence_with_hiv', 'hpv_prevalence_no_hiv',
-    )
-
     def __init__(self, init_prev_data=None, name='hiv'):
-        super().__init__(init_prev_data=init_prev_data, name=name)
+        # age_bins/sex_keys=None (stisim >= 1.6.1) suppresses stisim's ~120
+        # age- and sex-stratified results rather than generating them. They are
+        # built with ``stisim.utils.count`` (``np.count_nonzero``), which
+        # ignores per-agent ``scale``, so under grow-multiscale they
+        # over-report by the fine-agent fraction and hpvsim cannot correct
+        # them without reimplementing ``BaseSTI.update_results``. Use
+        # ``hpv.by_age`` or a scale-weighted analyzer for age-stratified
+        # output. Upstream fix: starsimhub/stisim#574.
+        super().__init__(init_prev_data=init_prev_data, name=name,
+                         age_bins=None, sex_keys=None)
         self.define_pars(
             rel_sus_lo=2.2,   rel_sus_hi=2.2,    # increased HPV acquisition
             rel_sev_lo=1.5,   rel_sev_hi=1.2,    # faster/worse CIN->cancer progression
@@ -161,12 +139,16 @@ class HIV(sti.HIV):
         by roughly the fraction of fine agents. At ``ms_agent_ratio=100`` that
         was ~6x in hpvsim's Zambia setup: 8.0M infections against a true 1.1M.
 
-        Only the all-age quantities are corrected here. stisim's sex-by-age
-        strata (``n_infected_f_15_20`` and friends) are built the same way and
-        remain raw counts; use ``hpv.by_age`` or a scale-weighted analyzer for
-        age-stratified output rather than those. Ratios of two equally-biased
-        stocks (``p_on_art``) were already close to right; they are recomputed
-        anyway so numerator and denominator are consistently weighted.
+        The stratified results that shared this defect are not corrected but
+        suppressed: ``__init__`` passes ``age_bins=None, sex_keys=None``, so
+        stisim never builds them. What remains are the whole-population
+        quantities, recomputed below. Ratios of two equally-biased stocks
+        (``p_on_art``) were already close to right; they are recomputed anyway
+        so numerator and denominator are consistently weighted.
+
+        The handful of results left untouched are for features hpvsim does not
+        model -- PrEP, circumcision, a testing cascade, MTCT -- and stay at
+        zero, so there is nothing to rescale.
         """
         ti = self.ti
         res = self.results
@@ -218,7 +200,9 @@ class HIV(sti.HIV):
                           ('n_falling', 'falling'),
                           ('n_on_effective_art', 'on_effective_art'),
                           ('n_art_naive', 'art_naive'),
-                          ('n_art_discontinued', 'art_discontinued')):
+                          ('n_art_discontinued', 'art_discontinued'),
+                          ('n_on_nonsuppressive_art', 'on_nonsuppressive_art'),
+                          ('n_prep_naive', 'prep_naive')):
             state = getattr(self, attr, None)
             if key in res and state is not None:
                 res[key][ti] = wsum(state.values & alive)
@@ -230,17 +214,6 @@ class HIV(sti.HIV):
             n_sus = wsum(self.susceptible.values & alive)
             res['incidence'][ti] = (res['new_infections'][ti] / n_sus
                                     if n_sus else 0.0)
-        return
-
-    def finalize_results(self):
-        """Drop every inherited result hpvsim does not vouch for.
-
-        Runs after stisim has written its own results, since assigning to a
-        removed key raises. See ``_KEEP_RESULTS`` for what survives and why.
-        """
-        super().finalize_results()
-        for key in [k for k in self.results.keys() if k not in self._KEEP_RESULTS]:
-            del self.results[key]
         return
 
     def update_results(self):
