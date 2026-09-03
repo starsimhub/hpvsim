@@ -48,6 +48,37 @@ class HIV(sti.HIV):
     separate connector that could discover any `sti.HIV`-shaped disease.
     """
 
+    # The results hpv.HIV exposes -- a deliberate subset of sti.HIV's ~170.
+    #
+    # stisim builds every count-type result with ``stisim.utils.count``
+    # (``np.count_nonzero``), which ignores per-agent ``scale``, so under
+    # grow-multiscale they over-report by the fine-agent fraction. Each result
+    # below is recomputed with per-agent weighting in ``_rescale_stisim_results``;
+    # everything else sti.HIV would define is DELETED in ``finalize_results``
+    # rather than shipped wrong. That removes stisim's ~104 sex-by-age strata
+    # (``n_infected_f_15_20`` and friends) -- correcting those from here would
+    # mean reimplementing ``BaseSTI.update_results`` wholesale -- and ~42
+    # results for features hpvsim does not model (PrEP, circumcision, a testing
+    # cascade, MTCT), which would otherwise ship as flat zeros.
+    #
+    # For age-stratified output use ``hpv.by_age`` or a scale-weighted analyzer.
+    # See https://github.com/starsimhub/stisim/issues/574 for the upstream fix.
+    _KEEP_RESULTS = (
+        'timevec',
+        # Stocks
+        'n_infected', 'n_susceptible', 'n_diagnosed', 'n_on_art',
+        'n_on_effective_art', 'n_art_naive', 'n_art_discontinued',
+        # CD4 stage -- drives the HIV->HPV effects, so worth keeping
+        'n_acute', 'n_latent', 'n_falling',
+        # Flows and their cumulative partners
+        'new_infections', 'new_diagnoses', 'new_deaths', 'new_agents_on_art',
+        'cum_infections', 'cum_diagnoses', 'cum_deaths',
+        # Rates and fractions
+        'prevalence', 'prevalence_15_49', 'incidence', 'p_on_art',
+        # hpvsim's own
+        'hpv_prevalence_with_hiv', 'hpv_prevalence_no_hiv',
+    )
+
     def __init__(self, init_prev_data=None, name='hiv'):
         super().__init__(init_prev_data=init_prev_data, name=name)
         self.define_pars(
@@ -181,6 +212,35 @@ class HIV(sti.HIV):
                                  ('new_deaths', 'cum_deaths')):
             if new_key in res and cum_key in res:
                 res[cum_key][ti] = float(np.sum(res[new_key][:ti + 1]))
+
+        # Simple state counts, same weighting.
+        for key, attr in (('n_acute', 'acute'), ('n_latent', 'latent'),
+                          ('n_falling', 'falling'),
+                          ('n_on_effective_art', 'on_effective_art'),
+                          ('n_art_naive', 'art_naive'),
+                          ('n_art_discontinued', 'art_discontinued')):
+            state = getattr(self, attr, None)
+            if key in res and state is not None:
+                res[key][ti] = wsum(state.values & alive)
+        if 'new_agents_on_art' in res:
+            started = (np.asarray(self.ti_art.values) == ti) & self.on_art.values
+            res['new_agents_on_art'][ti] = wsum(started & alive)
+        if 'incidence' in res:
+            # New infections over susceptible person-time, both now weighted.
+            n_sus = wsum(self.susceptible.values & alive)
+            res['incidence'][ti] = (res['new_infections'][ti] / n_sus
+                                    if n_sus else 0.0)
+        return
+
+    def finalize_results(self):
+        """Drop every inherited result hpvsim does not vouch for.
+
+        Runs after stisim has written its own results, since assigning to a
+        removed key raises. See ``_KEEP_RESULTS`` for what survives and why.
+        """
+        super().finalize_results()
+        for key in [k for k in self.results.keys() if k not in self._KEEP_RESULTS]:
+            del self.results[key]
         return
 
     def update_results(self):

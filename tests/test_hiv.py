@@ -4,6 +4,8 @@ CD4-stratified HPV-modulation effects and HIV-stratified results.
 """
 from pathlib import Path
 
+import re
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -125,6 +127,32 @@ def test_hiv_data_loading():
 
     with pytest.raises(ValueError, match='missing'):
         hpv.data.load_hiv_data(Path(__file__).parent)  # no HIV CSVs here
+
+
+def test_hiv_results_are_a_vetted_subset():
+    """hpv.HIV exposes only results it scale-weights itself.
+
+    sti.HIV defines ~170 results, built with a scale-unaware counter. Rather
+    than ship numbers we know to be wrong under multiscale, hpv.HIV keeps the
+    subset it recomputes and deletes the rest -- stisim's sex-by-age strata,
+    and results for features hpvsim does not model.
+    """
+    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=500, rand_seed=0,
+                  start=1990, stop=1995, dt=1.0, model_hiv='transmission', verbose=0)
+    sim.run()
+    keys = set(sim.results.hiv.keys())
+
+    assert keys == set(hpv.hiv.HIV._KEEP_RESULTS), 'exposed results drifted from the allowlist'
+
+    # The scale-unaware strata are gone, not merely undocumented.
+    assert not [k for k in keys if re.search(r'_(f|m)(_\d+_\d+)?$', k)]
+    assert not [k for k in keys if re.search(r'_\d+_\d+$', k) and k != 'prevalence_15_49']
+    # Features hpvsim does not model do not ship as flat zeros.
+    for absent in ('n_on_prep', 'n_circumcised', 'new_false_pos', 'prevalence_sw'):
+        assert absent not in keys
+    # Every survivor is populated or a legitimate zero, never NaN.
+    for k in keys - {'timevec'}:
+        assert not np.isnan(np.asarray(sim.results.hiv[k], dtype=float)).any(), k
 
 
 def test_hiv_results_are_scale_weighted():
