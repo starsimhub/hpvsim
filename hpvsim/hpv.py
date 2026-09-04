@@ -194,11 +194,7 @@ class HPV(ss.Infection):
             # Per-target: protection against this genotype, applied directly in
             # CrossImmunity.step() and never through the cross-immunity matrix.
             ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (against this/target genotype)', default=0.0),
-            ss.FloatArr(
-                'txvx_imm',
-                label='Therapeutic-vaccine-conferred immunity (this genotype)',
-                default=0.0,
-            ),
+            ss.FloatArr('txvx_sev_imm', label='Therapeutic-conferred severity immunity (against this/target genotype)', default=0.0),
         )
         # p is overwritten via .set(p=...) at each use site.
         self._cin_bern = ss.bernoulli(p=0.5)

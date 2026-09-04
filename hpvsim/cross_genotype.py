@@ -58,15 +58,18 @@ class CrossImmunity(ss.Connector):
     Per-step, reads each registered ``HPV`` instance's clearance-conferred
     ``nab_imm`` / ``cell_imm`` and writes per-target ``sev_imm`` and a
     nab-based susceptibility reduction via cross-protection matrices.
-    Vaccine-conferred ``vax_imm`` and therapeutic-vaccine-conferred
-    ``txvx_imm`` are each combined with the nab contribution via
-    independent-protection paths — neither is matrix-multiplied, so the
-    CSV per-genotype ``rel_imm`` values are the complete vaccine
-    cross-protection profile.
+    Vaccine-conferred ``vax_imm`` is combined with the nab contribution as an
+    independent-protection path — it is not matrix-multiplied, so the CSV
+    per-genotype ``rel_imm`` values are the complete vaccine cross-protection
+    profile. Therapeutic-conferred ``txvx_sev_imm`` is likewise pre-scaled per
+    target genotype, and adds to the severity term rather than passing through
+    the matrix.
 
-    Combining formula for ``rel_sus``:
+    Combining formulas:
         sus_imm_nab[target] = sum_k cross_imm_sus[target, k] * nab_imm[uid, k]
-        rel_sus[target]     = (1 - sus_imm_nab[target]) * (1 - vax_imm[target]) * (1 - txvx_imm[target])
+        rel_sus[target]     = (1 - sus_imm_nab[target]) * (1 - vax_imm[target])
+        sev_imm[target]     = sum_k cross_imm_sev[target, k] * cell_imm[uid, k]
+                              + txvx_sev_imm[target]
 
     Also owns per-agent ``rel_sev`` — an intrinsic biological severity
     scaler sampled once per agent and shared across every genotype's
@@ -176,20 +179,25 @@ class CrossImmunity(ss.Connector):
         cell = np.column_stack([m.cell_imm.values for m in self.hpv_modules])
         # Vaccine immunity applies directly per target genotype, not via the matrix.
         vax   = np.column_stack([m.vax_imm.values   for m in self.hpv_modules])
-        txvx  = np.column_stack([m.txvx_imm.values  for m in self.hpv_modules])
+        # Therapeutic-conferred severity immunity: already scaled per target
+        # genotype by the product's rel_imm, so it adds to the matrix product
+        # rather than passing through it. Mirrors v2, where the therapeutic
+        # occupied its own immunity source and cross_immunity_sev supplied the
+        # per-genotype scaling; summed with clearance immunity, then clipped.
+        txvx_sev = np.column_stack([m.txvx_sev_imm.values for m in self.hpv_modules])
         sus_imm_nab = nab  @ self.cross_imm_sus.T
-        sev_imm     = cell @ self.cross_imm_sev.T
+        sev_imm     = cell @ self.cross_imm_sev.T + txvx_sev
         np.clip(sus_imm_nab, 0.0, 1.0, out=sus_imm_nab)
         np.clip(sev_imm,     0.0, 1.0, out=sev_imm)
         np.clip(vax,         0.0, 1.0, out=vax)
-        np.clip(txvx,        0.0, 1.0, out=txvx)
         auids = self.sim.people.auids
         for i, m in enumerate(self.hpv_modules):
-            # Three independent protection paths. sev_imm comes only from clearance.
+            # Two susceptibility paths: clearance-conferred nabs and the
+            # prophylactic vaccine. The therapeutic acts on severity, not
+            # acquisition, so it does not appear here.
             m.rel_sus[auids] = m.rel_sus[auids] * (
                 (1.0 - sus_imm_nab[:, i])
                 * (1.0 - vax[:, i])
-                * (1.0 - txvx[:, i])
             )
             m.sev_imm[auids] = sev_imm[:, i]
 

@@ -14,7 +14,7 @@ sti = pytest.importorskip('stisim')
 
 import hpvsim as hpv
 from hpvsim.network import SexualNetwork
-from hpvsim.products import vx as hpv_vx, txvx as hpv_txvx
+from hpvsim.products import vx as hpv_vx
 
 _RWANDA_HIV_DATA = Path(__file__).parent / 'regression' / 'data' / 'hiv' / 'rwanda'
 
@@ -355,7 +355,8 @@ def test_hiv_rel_imm_effect():
     assert np.isclose(nab_pos, nab_neg * factor, rtol=1e-6)
     assert np.isclose(cell_pos, cell_neg * factor, rtol=1e-6)
 
-    # Vaccine/txvx immunity: HIV+ (lo stratum) gets strictly less than HIV-.
+    # Prophylactic vaccine immunity: HIV+ (lo stratum) gets strictly less than HIV-.
+    # The therapeutic is not scaled by HIV, matching v2.
     def _coinfection_sim(product):
         interventions = [ss.treat_num(product=product, prob=0.0)]
         sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25, location='nigeria',
@@ -370,12 +371,10 @@ def test_hiv_rel_imm_effect():
         hivmod.step_state()
         return sim, uid_pos, uid_neg, sim.interventions[0].product
 
-    for product, imm_attr in ((hpv_vx(name='nonavalent', sterilizing_p=1.0), 'vax_imm'),
-                              (hpv_txvx(name='txvx1', sterilizing_p=1.0), 'txvx_imm')):
-        sim, uid_pos, uid_neg, product = _coinfection_sim(product)
-        product.administer(sim.people, np.array([uid_pos, uid_neg]))
-        hpvmod = sim.diseases.hpv16
-        assert float(getattr(hpvmod, imm_attr)[uid_pos]) < float(getattr(hpvmod, imm_attr)[uid_neg])
+    sim, uid_pos, uid_neg, product = _coinfection_sim(hpv_vx(name='nonavalent', sterilizing_p=1.0))
+    product.administer(sim.people, np.array([uid_pos, uid_neg]))
+    hpvmod = sim.diseases.hpv16
+    assert float(hpvmod.vax_imm[uid_pos]) < float(hpvmod.vax_imm[uid_neg])
 
 def test_hiv_reactivation_effect():
     """rel_reactivation defaults to a no-op (1.0) with no HIV+ agents, and can

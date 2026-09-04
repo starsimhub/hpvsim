@@ -2,6 +2,10 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 ## Version 3.2.0 (2026-09-02)
 
+**Reimplement the therapeutic vaccine (`hpv.txvx`) as a treatment product with conferred immunity.** It subclasses `hpv.tx` again, clearing infections and lesions per the efficacy table and conferring severity immunity, rather than reducing susceptibility as a prophylactic.
+
+*Regression information*: `txvx_imm` and its `rel_sus` path are gone, replaced by `txvx_sev_imm` feeding `sev_imm`. Any therapeutic-vaccine scenario changes substantially.
+
 **HPV latency is back**, having been dropped in the move to v3. Some women who appear to clear an infection instead carry it silently and can become infectious again years later. This matters for screening: a woman who tests negative at 35 and reactivates at 45 was not protected by that test. Latency is switched off by default; turn it on with `hpv_control_prob`. Once on it changes cancer burden substantially, and the rate at which dormant infections wake up has never been fitted to data, so treat it as a parameter to calibrate rather than a default to trust.
 
 **HIV co-infection is much easier to set up.** `hpv.Sim(model_hiv=True)` now builds everything needed, and you can choose whether HIV spreads through the sexual network or follows an incidence curve you supply. HIV and ART data can now be given in five-year age bands, which is how UNAIDS and Spectrum publish it -- previously only single years of age worked, and banded data either failed outright or quietly left most ages untreated. A woman's CD4 count now affects how fast her HPV progresses and how often a latent infection reactivates.

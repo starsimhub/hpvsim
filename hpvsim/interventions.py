@@ -508,9 +508,9 @@ class BaseTxVx(BaseTreatment):
     small memory + introspection cost in exchange for keeping the
     BaseTreatment state-definition path single-sourced.
 
-    On each delivery the agent's txvx_imm is bumped per genotype (via
-    hpv.txvx.administer). The intervention's own dose counters track
-    program-level uptake.
+    Delivery clears infection/lesions and confers severity immunity via
+    hpv.txvx.administer (a treatment product). The intervention's own dose
+    counters track program-level uptake.
     """
 
     def __init__(self, *args, **kwargs):
@@ -559,7 +559,7 @@ class BaseTxVx(BaseTreatment):
         """One-step delivery — finds accepters, administers, bumps counters."""
         accept_uids = self.get_accept_inds()
         if len(accept_uids):
-            self.product.administer(self.sim.people, accept_uids)
+            self.product.administer(accept_uids)
             new = accept_uids[~self.tx_vaccinated[accept_uids]]
             self.tx_vaccinated[accept_uids] = True
             self.txvx_doses[accept_uids] += 1

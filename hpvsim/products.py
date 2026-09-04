@@ -449,64 +449,70 @@ class tx(ss.Tx):
             return {'successful': successful, 'unsuccessful': unsuccessful}
         return successful
 
+class txvx(tx):
+    """HPV therapeutic vaccine — clears infection/lesions, then confers immunity.
 
-class txvx(ss.Vx):
-    """HPV therapeutic vaccine product (parallel structure to hpv.vx).
+    A treatment product, not a prophylactic. It flips per-genotype disease
+    state through the same state x genotype efficacy table as ``hpv.tx``
+    (the ``txvx1``/``txvx2`` rows of ``products_tx.csv``), and additionally
+    confers severity immunity via ``imm_init``/``imm_boost``, scaled per
+    target genotype by ``rel_imm`` (``products_txvx.csv``).
 
-    Two modes:
-    - Initial dose (default): per-agent sterilizing draw at sterilizing_p,
-      then per-genotype scaling by rel_imm[g] writing into txvx_imm.
-    - Booster (imm_boost not None): multiplies existing txvx_imm in place.
+    Named products reproduce the v2 defaults: ``txvx1`` is a first dose
+    conferring ``beta_mean(0.35, 0.025)`` immunity, ``txvx2`` a booster
+    multiplying existing immunity by 1.5.
     """
 
-    def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95,
-                 imm_boost=None, **kwargs):
-        super().__init__(**kwargs)
-        self.define_pars(
-            name=name,
-            rel_imm=rel_imm,
-            sterilizing_p=sterilizing_p,
-            imm_boost=imm_boost,
-        )
-        # Avoids an add_module() collision with an intervention also named 'txvx'.
-        if name is not None:
-            self.name = name
-        if imm_boost is None:
-            # First-dose path requires resolved rel_imm
-            self.rel_imm = _resolve_txvx_pars(name, rel_imm)
-        else:
-            # Booster path: rel_imm is optional (in-place multiply doesn't need it)
-            if name is not None or rel_imm is not None:
-                self.rel_imm = _resolve_txvx_pars(name, rel_imm)
-            else:
-                self.rel_imm = {}
-        self._sterilizing_dist = ss.bernoulli(p=0.0)
+    #: v2 default immunity per named product: (imm_init, imm_boost).
+    _DEFAULTS = {
+        'txvx1': (ss.beta_mean(mean=0.35, var=0.025), None),
+        'txvx2': (None, 1.5),
+    }
 
-    def administer(self, people, uids):
-        if len(uids) == 0:
+    def __init__(self, name=None, df=None, rel_imm=None, imm_init=None,
+                 imm_boost=None, **kwargs):
+        if name is None and df is None:
+            name = 'txvx1'
+        if imm_init is None and imm_boost is None and name in self._DEFAULTS:
+            imm_init, imm_boost = self._DEFAULTS[name]
+        if imm_init is not None and imm_boost is not None:
+            raise ValueError('hpv.txvx takes at most one of `imm_init` or `imm_boost`.')
+        super().__init__(name=name, df=df, **kwargs)
+        self.imm_init = imm_init
+        self.imm_boost = imm_boost
+        # Per-target-genotype scaling of the conferred immunity. Defaults to the
+        # named product's row in products_txvx.csv; 1.0 for anything unlisted.
+        if rel_imm is None and name is not None:
+            rel_imm = _load_txvx_products().get(name)
+        self.rel_imm = dict(rel_imm) if rel_imm is not None else {}
+
+    def administer(self, uids, return_format='dict'):
+        """Clear disease state as ``hpv.tx`` does, then confer immunity."""
+        out = super().administer(uids, return_format=return_format)
+        self._confer_immunity(uids)
+        return out
+
+    def _confer_immunity(self, uids):
+        """Give every dosed agent severity immunity against future infection.
+
+        Applied to everyone dosed, not only those whose clearance draw
+        succeeded — matching v2, where the immunity block sat outside the
+        state loop. Writes ``txvx_sev_imm`` pre-scaled by ``rel_imm`` per
+        target genotype, which CrossImmunity adds to ``sev_imm`` directly
+        rather than passing through the cross-protection matrix.
+        """
+        if len(uids) == 0 or (self.imm_init is None and self.imm_boost is None):
             return
-        if self.pars.imm_boost is not None:
-            # Booster: multiplicative in place. No HIV scaling — the first dose
-            # was already scaled, so applying it again would double-count.
-            for module in iter_hpv_modules(self.sim):
-                module.txvx_imm[uids] *= float(self.pars.imm_boost)
-            return
-        # First dose: per-agent sterilizing draw (rvs returns bools in uids-order).
-        self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
-        is_sterilizing = self._sterilizing_dist.rvs(uids)
-        # HIV reduces vaccine take (gated no-op); uids-order matches peak below.
-        rel_imm_hiv = _hiv_rel_imm_factor(self.sim)
-        hiv_scale = 1.0 if rel_imm_hiv is None else rel_imm_hiv[uids]
-        for genotype, rel_imm_g in self.rel_imm.items():
-            module = find_genotype_module(self.sim, genotype)
-            if module is None:
-                continue  # inactive-genotype tolerance
-            peak = np.where(
-                is_sterilizing,
-                float(rel_imm_g),
-                float(rel_imm_g) * float(self.pars.sterilizing_p),
-            ) * hiv_scale
-            module.txvx_imm[uids] = np.maximum(module.txvx_imm[uids], peak)
+        # One draw per agent, scaled per target genotype — v2 stored a single
+        # value per agent and applied the per-genotype scaling at read time, so
+        # drawing once here keeps the genotypes correlated as they were.
+        base = self.imm_init.rvs(uids) if self.imm_init is not None else None
+        for module in iter_hpv_modules(self.sim):
+            scale = float(self.rel_imm.get(module.genotype, 1.0))
+            if base is not None:
+                module.txvx_sev_imm[uids] = base * scale
+            else:
+                module.txvx_sev_imm[uids] = module.txvx_sev_imm[uids] * self.imm_boost
 
 
 class radiation(ss.Product):
