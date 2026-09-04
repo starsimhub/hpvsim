@@ -105,8 +105,8 @@ class HIV(sti.HIV):
         self.define_results(
             ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
             ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
-            ss.Result('prevalence_f', dtype=float, scale=False, label='HIV prevalence (female)'),
-            ss.Result('prevalence_m', dtype=float, scale=False, label='HIV prevalence (male)'),
+            ss.Result('prevalence_f', dtype=float, scale=False, label='HIV prevalence (female, 15-49)'),
+            ss.Result('prevalence_m', dtype=float, scale=False, label='HIV prevalence (male, 15-49)'),
         )
 
     def _rescale_stisim_results(self):
@@ -210,13 +210,17 @@ class HIV(sti.HIV):
         self.results['hpv_prevalence_no_hiv'][ti] = (
             float(((any_hpv & hiv_neg) * scale).sum()) / n_neg if n_neg else 0.0)
 
-        # HIV prevalence by sex. stisim's own _f/_m strata are suppressed for
-        # being scale-unaware, so compute these here with the same weighting.
+        # Adult (15-49) HIV prevalence by sex -- matches UNAIDS / Spectrum
+        # convention. stisim's own _f/_m strata are suppressed for being
+        # scale-unaware; computed here with per-agent weighting and the same
+        # age window as `prevalence_15_49`.
         female = people.female.values
+        age = people.age.values
+        adult = (age >= 15) & (age < 50)
         for key, in_sex in (('prevalence_f', female), ('prevalence_m', ~female)):
-            denom = float(((alive & in_sex) * scale).sum())
+            denom = float(((alive & in_sex & adult) * scale).sum())
             self.results[key][ti] = (
-                float(((hiv_pos & in_sex) * scale).sum()) / denom if denom else 0.0)
+                float(((hiv_pos & in_sex & adult) * scale).sum()) / denom if denom else 0.0)
 
 
 class HIV_transmit(HIV):

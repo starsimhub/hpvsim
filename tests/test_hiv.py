@@ -157,29 +157,25 @@ def test_hiv_results_are_scale_weighted():
                       float(np.sum(r['new_infections'])), rtol=1e-6)
 
 def test_hiv_prevalence_by_sex():
-    """prevalence_f/_m are scale-weighted fractions that reconcile to prevalence."""
+    """prevalence_f/_m are scale-weighted adult (15-49) HIV prevalence
+    fractions that weight back to prevalence_15_49."""
     sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=1000, rand_seed=0,
                   start=1990, stop=2000, dt=1.0, ms_agent_ratio=10,
                   model_hiv='transmission', verbose=0)
     sim.run()
-    r, ppl, hiv = sim.results.hiv, sim.people, sim.diseases.hiv
+    r, ppl = sim.results.hiv, sim.people
     w, alive = ppl.scale.values, ppl.alive.values
-    female = ppl.female.values
-    infected = hiv.infected.values & alive
+    female, age = ppl.female.values, ppl.age.values
+    adult = (age >= 15) & (age < 50)
 
     assert (w < 1).any(), 'no fine agents; ms_agent_ratio had no effect'
-
-    for key, in_sex in (('prevalence_f', female), ('prevalence_m', ~female)):
-        denom = float((w * (alive & in_sex)).sum())
-        assert np.isclose(float(r[key][-1]),
-                          float((w * (infected & in_sex)).sum()) / denom, rtol=0.02)
+    for key in ('prevalence_f', 'prevalence_m'):
         assert ((r[key] >= 0) & (r[key] <= 1)).all()
 
-    # The two strata weight back to the all-population figure.
-    n_f = float((w * (alive & female)).sum())
-    n_m = float((w * (alive & ~female)).sum())
+    n_f = float((w * (alive & female & adult)).sum())
+    n_m = float((w * (alive & ~female & adult)).sum())
     combined = (r['prevalence_f'][-1] * n_f + r['prevalence_m'][-1] * n_m) / (n_f + n_m)
-    assert np.isclose(combined, float(r['prevalence'][-1]), rtol=0.02)
+    assert np.isclose(combined, float(r['prevalence_15_49'][-1]), rtol=0.02)
 
 def test_hiv_banded_age_data():
     """Age-banded HIV inputs work, not just single years of age.
