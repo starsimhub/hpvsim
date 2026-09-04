@@ -135,15 +135,17 @@ def test_hiv_results_are_unstratified():
     They are built with a scale-unaware counter, so under multiscale they
     over-report; hpvsim cannot correct them without reimplementing
     BaseSTI.update_results, so it passes age_bins=None, sex_keys=None
-    (stisim >= 1.6.1) and they are never created.
+    (stisim >= 1.6.1) and they are never created. The exception is
+    prevalence_f/_m, which hpvsim defines and weights itself.
     """
     sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=500, rand_seed=0,
                   start=1990, stop=1995, dt=1.0, model_hiv='transmission', verbose=0)
     sim.run()
     keys = set(sim.results.hiv.keys())
+    own = {'prevalence_f', 'prevalence_m'}
 
-    # No sex suffix, and no age-bin suffix other than the adult prevalence result.
-    assert not [k for k in keys if re.search(r'_(f|m)(_\d+_\d+)?$', k)]
+    # No inherited sex suffix, and no age-bin suffix other than adult prevalence.
+    assert not [k for k in keys - own if re.search(r'_(f|m)(_\d+_\d+)?$', k)]
     assert not [k for k in keys if re.search(r'_\d+_\d+$', k) and k != 'prevalence_15_49']
     # Far fewer than stisim's default, and the whole-population ones survive.
     assert len(keys) < 60
@@ -190,6 +192,32 @@ def test_hiv_results_are_scale_weighted():
     # Cumulative flows are rebuilt from the corrected per-step series.
     assert np.isclose(float(r['cum_infections'][-1]),
                       float(np.sum(r['new_infections'])), rtol=1e-6)
+
+
+def test_hiv_prevalence_by_sex():
+    """prevalence_f/_m are scale-weighted fractions that reconcile to prevalence."""
+    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=1000, rand_seed=0,
+                  start=1990, stop=2000, dt=1.0, ms_agent_ratio=10,
+                  model_hiv='transmission', verbose=0)
+    sim.run()
+    r, ppl, hiv = sim.results.hiv, sim.people, sim.diseases.hiv
+    w, alive = ppl.scale.values, ppl.alive.values
+    female = ppl.female.values
+    infected = hiv.infected.values & alive
+
+    assert (w < 1).any(), 'no fine agents; ms_agent_ratio had no effect'
+
+    for key, in_sex in (('prevalence_f', female), ('prevalence_m', ~female)):
+        denom = float((w * (alive & in_sex)).sum())
+        assert np.isclose(float(r[key][-1]),
+                          float((w * (infected & in_sex)).sum()) / denom, rtol=0.02)
+        assert ((r[key] >= 0) & (r[key] <= 1)).all()
+
+    # The two strata weight back to the all-population figure.
+    n_f = float((w * (alive & female)).sum())
+    n_m = float((w * (alive & ~female)).sum())
+    combined = (r['prevalence_f'][-1] * n_f + r['prevalence_m'][-1] * n_m) / (n_f + n_m)
+    assert np.isclose(combined, float(r['prevalence'][-1]), rtol=0.02)
 
 
 def test_hiv_banded_age_data():
