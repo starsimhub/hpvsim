@@ -21,7 +21,6 @@ from hpvsim.utils import any_genotype_cancer
 
 __all__ = [
     'BaseVaccination', 'routine_vx', 'campaign_vx',
-    # M06
     'BaseTest', 'BaseScreening', 'BaseTriage',
     'routine_screening', 'campaign_screening',
     'routine_triage', 'campaign_triage',
@@ -37,19 +36,27 @@ def _cast_sex(sex):
     Accepts:
       - None: no sex filter (returns None)
       - 'f' / 'm': single sex
+      - 'fm' / 'mf': both sexes (equivalent to None)
       - 0 / 1 (int): single sex by int convention
       - list of 'f'/'m'/0/1: union of sexes
 
-    Anything else raises ValueError.
+    Anything else raises ValueError. A both-sexes request (None, 'fm',
+    ['f','m'], [0,1]) applies no sex restriction at all.
     """
     if sex is None:
         return None
     if isinstance(sex, str):
-        if sex == 'f':
-            return {0}
-        if sex == 'm':
-            return {1}
-        raise ValueError(f"sex string must be 'f' or 'm', got {sex!r}")
+        if len(sex) == 0:
+            raise ValueError("sex string must not be empty; pass None for 'no sex filter'")
+        out = set()
+        for char in sex:
+            if char == 'f':
+                out.add(0)
+            elif char == 'm':
+                out.add(1)
+            else:
+                raise ValueError(f"sex string must contain only 'f' and 'm', got {sex!r}")
+        return out
     if isinstance(sex, (list, tuple, set, np.ndarray)):
         if len(sex) == 0:
             raise ValueError("sex list must not be empty; pass None for 'no sex filter'")
@@ -83,6 +90,52 @@ def _as_boolarr(extra_result, people):
     return out
 
 
+def _apply_age_sex(cond, people, age_range, sex_set):
+    """Intersect ``cond`` with the age-range and sex restrictions.
+
+    Age bounds are half-open, ``[age_range[0], age_range[1])`` — the same
+    convention for every intervention family (vaccination, screening,
+    treatment, txvx). A both-sexes request (``sex_set`` None or containing
+    both 0 and 1) applies no sex restriction at all.
+    """
+    if age_range is not None:
+        lo, hi = age_range
+        cond = cond & (people.age >= lo) & (people.age < hi)
+    if sex_set is not None and len(sex_set) == 1:
+        (s,) = sex_set
+        # Starsim has no numeric sex array; map int -> BoolArr.
+        cond = cond & (people.female if s == 0 else people.male)
+    return cond
+
+
+# Products are Starsim modules too, registered on sim.people under their own
+# name, so an intervention sharing that name dies at sim.init(). These are the
+# default module names of the HPV product classes; an explicitly named product
+# (e.g. hpv.dx(name='via')) reserves that name instead.
+_RESERVED_PRODUCT_NAMES = ('vx', 'dx', 'tx', 'txvx', 'radiation')
+
+
+def _check_name_collision(intervention):
+    """Raise a clear error if the intervention's name is its product's name.
+
+    Without this, ``sim.init()`` fails much later with an opaque
+    ``AttributeError: Module <name> already added`` from People.add_module.
+    """
+    product = getattr(intervention, 'product', None)
+    product_name = getattr(product, 'name', None)
+    name = intervention.name
+    if product_name is not None and name == product_name:
+        raise ValueError(
+            f'Intervention name {name!r} is reserved: its product '
+            f'({type(product).__name__}) is itself a module registered on '
+            f'sim.people under the name {name!r}, so both would claim it and '
+            f'sim.init() would fail. Rename the intervention, e.g. '
+            f'name={name + "_program"!r}. Reserved names are the product '
+            f'module names {_RESERVED_PRODUCT_NAMES}, plus any explicit '
+            f"product name (hpv.dx(name='via') reserves 'via')."
+        )
+
+
 def _compose_vaccine_eligibility(age_range, sex, extra):
     """Compose age/sex/eligibility targeting into a Starsim eligibility callable.
 
@@ -95,18 +148,7 @@ def _compose_vaccine_eligibility(age_range, sex, extra):
     sex_set = _cast_sex(sex)
 
     def elig(sim):
-        cond = sim.people.alive
-        if age_range is not None:
-            lo, hi = age_range
-            cond = cond & (sim.people.age >= lo) & (sim.people.age < hi)
-        if sex_set is not None and len(sex_set) == 1:
-            (s,) = sex_set
-            # Starsim uses people.female (0) / people.male (1) BoolArrs
-            # rather than a numeric sex array; map int -> BoolArr
-            if s == 0:
-                cond = cond & sim.people.female
-            else:
-                cond = cond & sim.people.male
+        cond = _apply_age_sex(sim.people.alive, sim.people, age_range, sex_set)
         if extra is not None:
             cond = cond & _as_boolarr(extra(sim), sim.people)
         return cond.uids
@@ -131,13 +173,7 @@ def _compose_screening_eligibility(age_range, sex, extra, debut_age):
     sex_set = _cast_sex(sex)
 
     def elig(sim):
-        cond = sim.people.alive
-        if sex_set is not None and len(sex_set) == 1:
-            (s,) = sex_set
-            cond = cond & (sim.people.female if s == 0 else sim.people.male)
-        if age_range is not None:
-            lo, hi = age_range
-            cond = cond & (sim.people.age >= lo) & (sim.people.age < hi)
+        cond = _apply_age_sex(sim.people.alive, sim.people, age_range, sex_set)
         if debut_age is not None:
             cond = cond & (sim.people.age >= debut_age)
         if extra is not None:
@@ -164,16 +200,48 @@ class BaseVaccination(ss.BaseVaccination):
                  **kwargs):
         composed = _compose_vaccine_eligibility(age_range, sex, eligibility)
         super().__init__(*args, eligibility=composed, **kwargs)
-        # Raw constructor args, preserved for introspection (e.g.
-        # M04 by_age stratification by vaccination cohort).
+        # Raw constructor args, preserved for introspection.
         self.age_range = age_range
         self.sex_raw = sex
         self.sex = _cast_sex(sex)
         self.eligibility_raw = eligibility
+        _check_name_collision(self)
 
     def _parse_product_str(self, product):
         """Resolve a string product name through hpv.vx default lookup."""
         return _vx(name=product)
+
+    def init_results(self):
+        """Dose time series, mirroring the screening/treatment results.
+
+        ``new_vaccinated`` counts first doses only; ``new_doses`` counts every
+        dose. Both are ``scale=True``, so they come out in real-population
+        units. The ``cum_*`` pair is filled in :meth:`finalize_results`.
+        """
+        super().init_results()
+        self.define_results(
+            ss.Result('new_vaccinated',  dtype=int,   scale=True, label='Number newly vaccinated'),
+            ss.Result('new_doses',       dtype=int,   scale=True, label='Number of doses administered'),
+            ss.Result('cum_vaccinated',  dtype=float, scale=True, label='Cumulative number vaccinated'),
+            ss.Result('cum_doses',       dtype=float, scale=True, label='Cumulative doses administered'),
+        )
+
+    def step(self):
+        accept_uids = super().step()
+        if len(accept_uids):
+            # super().step() already bumped n_doses, so ==1 marks a first dose.
+            first = accept_uids[self.n_doses[accept_uids] == 1]
+            self.results['new_vaccinated'][self.ti] += len(first)
+            self.results['new_doses'][self.ti] += len(accept_uids)
+        return accept_uids
+
+    def finalize_results(self):
+        # super() scales the per-step counts by pop_scale first, so the cumsums
+        # inherit the scaling (same pattern as hpv.HPV.finalize_results).
+        super().finalize_results()
+        res = self.results
+        res['cum_vaccinated'][:] = np.cumsum(res['new_vaccinated'])
+        res['cum_doses'][:] = np.cumsum(res['new_doses'])
 
 
 class routine_vx(BaseVaccination, ss.RoutineDelivery):
@@ -204,6 +272,7 @@ class BaseTest(ss.BaseTest):
         self.sex = _cast_sex(sex)
         self.eligibility_raw = eligibility
         self.debut_age = debut_age
+        _check_name_collision(self)
 
     def _parse_product_str(self, product):
         from hpvsim.products import dx as _dx
@@ -272,9 +341,8 @@ class BaseTriage(BaseTest, ss.BaseTriage):
     def step(self):
         self.outcomes = {k: ss.uids() for k in self.product.hierarchy}
         accept_uids = ss.uids()
-        # timepoints are sim-ti indices (RoutineDelivery/CampaignDelivery build
-        # them from sim.t.yearvec and deliver() indexes them by sim.ti), so the
-        # schedule gate stays on sim.ti; module-owned state below uses self.ti.
+        # timepoints are sim-ti indices, so the schedule gate uses sim.ti;
+        # module-owned state below uses self.ti.
         if self.sim.ti in self.timepoints:
             accept_uids = self.deliver()
             if len(accept_uids):
@@ -336,6 +404,7 @@ class BaseTreatment(ss.BaseTreatment):
             ss.FloatArr('cancer_treatments', default=0),
             ss.FloatArr('ti_cancer_treated'),
         )
+        _check_name_collision(self)
 
     def _parse_product_str(self, product):
         from hpvsim.products import tx as _tx
@@ -349,16 +418,9 @@ class BaseTreatment(ss.BaseTreatment):
         )
 
     def check_eligibility(self):
+        """Alive + sex + age_range ``[lo, hi)`` + cancer-status match."""
         sim = self.sim
-        cond = sim.people.alive
-        if self.sex is not None:
-            if 0 in self.sex:
-                cond = cond & sim.people.female
-            elif 1 in self.sex:
-                cond = cond & sim.people.male
-        if self.age_range is not None:
-            lo, hi = self.age_range
-            cond = cond & (sim.people.age >= lo) & (sim.people.age <= hi)
+        cond = _apply_age_sex(sim.people.alive, sim.people, self.age_range, self.sex)
         any_cancer = any_genotype_cancer(sim)
         cond = cond & (any_cancer if self.treat_cancer else ~any_cancer)
         if self.eligibility_user is not None:
@@ -417,8 +479,7 @@ class treat_delay(BaseTreatment):
     def step(self):
         self.add_to_schedule()
         treat_uids = super().step()
-        # Mirror treat_num's per-intervention bookkeeping (BaseTreatment.step
-        # is the upstream ss.BaseTreatment.step which only calls product.administer)
+        # super().step() only calls product.administer, so do the bookkeeping here.
         if len(treat_uids):
             if self.treat_cancer:
                 new = treat_uids[~self.cancer_treated[treat_uids]]
@@ -447,9 +508,9 @@ class BaseTxVx(BaseTreatment):
     small memory + introspection cost in exchange for keeping the
     BaseTreatment state-definition path single-sourced.
 
-    On each delivery the agent's txvx_imm is bumped per genotype (via
-    hpv.txvx.administer). The intervention's own dose counters track
-    program-level uptake.
+    Delivery clears infection/lesions and confers severity immunity via
+    hpv.txvx.administer (a treatment product). The intervention's own dose
+    counters track program-level uptake.
     """
 
     def __init__(self, *args, **kwargs):
@@ -472,7 +533,7 @@ class BaseTxVx(BaseTreatment):
         )
 
     def check_eligibility(self):
-        """TxVx eligibility — female + alive + cancer-free + age range.
+        """TxVx eligibility — alive + sex + age range ``[lo, hi)`` + cancer-free.
 
         Overrides BaseTreatment.check_eligibility to hard-gate on the
         cancer-free arm regardless of the inherited treat_cancer flag.
@@ -481,12 +542,12 @@ class BaseTxVx(BaseTreatment):
         would still set treat_cancer=False through the BaseTreatment init,
         but pinning the cancer-free condition here makes the semantics
         explicit and resilient to product-type confusion.
+
+        Sex follows ``sex=`` (default ``'f'``) rather than being hardcoded to
+        female, so ``sex=['f','m']`` really does include men.
         """
         sim = self.sim
-        cond = sim.people.alive & sim.people.female
-        if self.age_range is not None:
-            lo, hi = self.age_range
-            cond = cond & (sim.people.age >= lo) & (sim.people.age <= hi)
+        cond = _apply_age_sex(sim.people.alive, sim.people, self.age_range, self.sex)
         # Never treat cancer agents
         any_cancer = any_genotype_cancer(sim)
         cond = cond & ~any_cancer
@@ -498,7 +559,7 @@ class BaseTxVx(BaseTreatment):
         """One-step delivery — finds accepters, administers, bumps counters."""
         accept_uids = self.get_accept_inds()
         if len(accept_uids):
-            self.product.administer(self.sim.people, accept_uids)
+            self.product.administer(accept_uids)
             new = accept_uids[~self.tx_vaccinated[accept_uids]]
             self.tx_vaccinated[accept_uids] = True
             self.txvx_doses[accept_uids] += 1
@@ -543,9 +604,7 @@ class linked_txvx(BaseTxVx):
                 "(typically a screen.outcomes['positive'] callback)"
             )
         super().__init__(*args, eligibility=eligibility, **kwargs)
-        # No own schedule. self.step() overrides BaseTxVx.step entirely, so
-        # this assignment is decorative — but it makes the "no timeline"
-        # contract explicit for anyone tracing inheritance.
+        # No own schedule: self.step() overrides BaseTxVx.step entirely.
         self.timepoints = None
 
     def step(self):
@@ -623,8 +682,7 @@ class dynamic_pars(ss.Intervention):
             setattr(target, tail[-1], value)
             return
 
-        # Fall back to sim.pars. Single segment: set directly. Multi-segment:
-        # walk through head + tail[:-1] and set the last segment.
+        # Fall back to sim.pars.
         if not hasattr(sim.pars, head):
             raise KeyError(
                 f'Cannot resolve dotted path {dotted_path!r}: head segment '

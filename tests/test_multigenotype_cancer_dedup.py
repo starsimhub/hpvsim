@@ -1,8 +1,8 @@
-"""Regression test for multi-genotype cancer dedup.
+"""Multi-genotype cancer dedup.
 
-When an agent has CIN with multiple HPV genotypes simultaneously, exactly
-ONE genotype must fire cancer for that agent — not one per genotype.
-``HPV.step_state`` enforces this via cross-genotype cancellation.
+When an agent has CIN with several HPV genotypes at once, exactly one genotype
+fires cancer for that agent — not one per genotype. ``HPV.step_state`` enforces
+this via cross-genotype cancellation.
 """
 import numpy as np
 import pytest
@@ -60,20 +60,10 @@ def test_no_double_counting_of_multigenotype_cancers(multigenotype_sim):
 
 
 def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
-    """hpvtotal.new_cancers is consistent with per-module new_cancers sums.
+    """hpvtotal.new_cancers equals the sum of the per-module new_cancers.
 
-    The hpvtotal aggregator accumulates each HPV module's new_cancers at
-    each timestep. This test verifies:
-      1. The total equals the sum of per-module totals (aggregation
-         invariant — holds by construction).
-      2. No single module records more new cancer events than the total
-         (which would only be possible if the hpvtotal counter were not
-         being incremented correctly — catches aggregation regressions).
-      3. Each module's new_cancers count is non-negative everywhere
-         (no negative correction steps).
-
-    Together with test_no_double_counting_of_multigenotype_cancers, these
-    confirm that each cancer event is counted at most once in hpvtotal.
+    Also asserts no single module exceeds the total and no module records a
+    negative count at any timestep.
     """
     sim = multigenotype_sim
 
@@ -87,10 +77,7 @@ def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
 
     assert total_hpvtotal > 0, 'no cancers recorded — aggregation is untested here'
 
-    # 1. Aggregation invariant. Use isclose rather than exact equality: under
-    # pop_scale != 1, floats can drift in the last bit from different
-    # summation orders. rtol=1e-9 catches real aggregation bugs while
-    # tolerating pop-scale-multiplication FP noise.
+    # rtol=1e-9, not exact: pop_scale multiplication reorders the summation.
     assert np.isclose(total_from_modules, total_hpvtotal, rtol=1e-9), (
         f'Sum of per-module new_cancers ({total_from_modules}) != '
         f'hpvtotal.new_cancers ({total_hpvtotal}). '
@@ -110,3 +97,38 @@ def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
         assert neg_count == 0, (
             f'{mod.genotype}.new_cancers has {neg_count} negative timestep(s).'
         )
+
+
+def test_hpvtotal_n_latent_is_a_union_not_a_sum():
+    """all_hpv.n_latent must count each agent once even if latent for
+    multiple genotypes simultaneously -- it is a _UNION_STATES entry (boolean
+    OR across modules), not an element-wise sum of per-module n_latent.
+
+    hpv_control_prob=1.0 forces latency on every clearance, so with 2
+    genotypes co-infection is common and a naive sum would double-count.
+    """
+    sim = hpv.Sim(
+        location='nigeria',
+        start=1970, stop=2000, dt=0.5,
+        n_agents=1000,
+        genotypes=['hpv16', 'hpv18'],
+        pars=dict(hpv_control_prob=1.0),
+        rand_seed=0,
+    )
+    sim.run()
+
+    genotypes = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
+    naive_sum = sum(mod.results.n_latent[:] for mod in genotypes)
+    union = sim.results.all_hpv.n_latent[:]
+
+    assert union.max() > 0, 'no agent ever latent — the union logic is untested here'
+    assert naive_sum.max() > union.max(), (
+        'expected co-latency (naive sum > union) at hpv_control_prob=1.0 with '
+        '2 genotypes -- if this no longer holds, either latency stopped '
+        'firing or co-infection became too rare for this test to discriminate '
+        'union-vs-sum; investigate before weakening the assertion below.'
+    )
+    assert (union <= naive_sum + 1e-6).all(), (
+        'all_hpv.n_latent exceeds the naive per-module sum at some timestep -- '
+        'a union count can never exceed a sum of its parts.'
+    )

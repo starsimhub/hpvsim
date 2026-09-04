@@ -1,0 +1,61 @@
+---
+title: "Natural history"
+---
+
+HPVsim carries up to four genotypes: `hpv16`, `hpv18`, `hi5` (a pool of five other high-risk types) and `ohr` (the remaining high-risk types). Each one is a separate disease module with its own transmissibility, its own progression speed and its own record for every agent. A bare `hpv.Sim()` runs HPV16 alone; pass `genotypes=[16, 18, 'hi5', 'ohr']` for all four.
+
+Within a genotype, a woman moves through: infection, a precancerous phase (`precin`), CIN, invasive cancer, cancer death. She can leave the pathway by clearing at either of the first two stages. Men are infected and clear; they never enter CIN or cancer, so they matter only as a reservoir.
+
+## Duration drives progression
+
+The order of decisions is the thing to understand. On infection, HPVsim first **draws how long the infection will last** — `dur_precin`, lognormal, mean 3 years for HPV16 and 2.5 for the others, standard deviation 9 years. It then asks how likely that duration is to produce precancer: `cin_fn` is a logistic curve of the drawn duration, rising from zero at infection to one at 50 years (`ttc=50`), with `k` setting its steepness (0.3 for HPV16, 0.25 for HPV18, 0.2 for the pools).
+
+Persistence is therefore the risk factor, not a separate roll. A woman who clears in eight months almost never progresses; one whose infection would run for a decade very probably does.
+
+Cancer works the same way. A woman who reaches CIN draws `dur_cin` (mean 5 years for HPV16 and HPV18, 4.5 for the pools). `cancer_fn` integrates the CIN curve over that duration to get accumulated lesion-severity-time, and converts it with its own `transform_prob` key: `cancer_fn['transform_prob']` is 2e-3 for HPV16 and HPV18, 1.5e-3 for `hi5` and `ohr`. Women aged 30 or older at CIN onset have `dur_cin` multiplied by `age_risk['risk']` (2), which pushes cancer into the ages where it is observed.
+
+Two per-woman factors stretch the whole timeline. `sev_imm`, built up by clearing past infections, shortens `dur_precin` by `1 - sev_imm`. `rel_sev` is an intrinsic severity multiplier, one draw per woman shared across every genotype she carries; it lives on the cross-immunity module rather than on any one genotype — see [Immunity](immunity.qmd).
+
+Invasive cancer ends transmission and cancels every other genotype's pending progression, so a woman with two high-grade infections is one cancer case.
+
+Durations must carry units — `ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))`. A unit-less duration is read as timesteps, making infections four times too short at `dt=0.25`; HPVsim raises a `ValueError` rather than run it.
+
+## Latency
+
+Some infections neither clear nor progress: the virus persists undetectably and can reactivate years later. This is an opt-in branch, off by default (`hpv_control_prob=0`), and female-only.
+
+Set `hpv_control_prob` above zero and that fraction of the women who would have cleared enter a `latent` state instead. Latent women neither transmit nor can be reinfected with that genotype. Each timestep they face the reactivation hazard `hpv_reactivation` — an `ss.probperyear(0.025)`, scaled by `1 - sev_imm` (strong cell-mediated immunity means less reactivation) and by HIV's `rel_reactivation`. On reactivation a woman draws a fresh trajectory, counted under `new_reactivations` rather than `new_infections`.
+
+One interaction to watch: the latency roll happens when the clearance date is set, not when clearance arrives. If ablation or excision brings a woman's clearance forward and she had rolled into the latency branch, she becomes latent rather than susceptible. At the default of 0 this never arises.
+
+## How to make one genotype progress faster
+
+The most common natural-history task is changing progression speed for a single genotype — either to test a hypothesis or to move a calibration. Genotype-scoped parameters merge into the existing defaults, so you change one number and leave the rest of the curve alone.
+
+```{python}
+import hpvsim as hpv
+
+pars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,
+            start=2000, stop=2020, verbose=0)
+
+base = hpv.Sim(**pars, label='default HPV16')
+fast = hpv.Sim(**pars, hpv16=dict(cin_fn=dict(k=0.5)), label='steeper HPV16')
+
+for sim in (base, fast):
+    sim.run()
+    print(f'{sim.label:>15}: {float(sim.results.all_hpv.cum_cancers[-1]):,.0f} cancers by 2020')
+
+# Only k changed; the rest of the curve is intact
+print('HPV16 cin_fn:', dict(fast.diseases.hpv16.pars.cin_fn))
+print('HPV18 cin_fn:', dict(fast.diseases.hpv18.pars.cin_fn))
+```
+
+To change progression for every genotype at once, pass the parameter bare (`hpv.Sim(hpv_control_prob=0.15)`); to change one genotype, scope it by name. See [Parameters](parameters.qmd) for the full routing rules.
+
+Cancer counts from a 2,000-agent run rest on a handful of simulated cases, and each case is worth `pop_scale` real people. Treat the comparison above as a direction, not an estimate — see [Demographics](demographics.qmd) for how to sharpen rare-event estimates without a bigger population.
+
+## See also
+
+- [T1 - Getting started](../tutorials/tut_intro.qmd) and [T9 - HPV latency](../tutorials/tut_latency.qmd)
+- [Immunity](immunity.qmd) for what happens after clearance
+- [`hpv.HPV` API reference](../api/hpv.qmd) and the progression functions in [`hpv.utils`](../api/utils.qmd)

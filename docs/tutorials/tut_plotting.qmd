@@ -3,127 +3,172 @@ title: T2 - Plotting, printing, and saving
 jupyter: python3
 ---
 
+In this tutorial we take one finished run and get four things out of it: a
+single-panel figure, an HPV summary figure, a table you can hand to a
+spreadsheet, and a saved file you can reopen next week.
 
-This tutorial provides a brief overview of options for plotting results, printing objects, and saving results.
-
-
-<div class="alert alert-info">
-
-Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_plotting.ipynb) to open an interactive version of this notebook.
-
-</div>
-
-## Global plotting configuration
-
-HPVsim allows the user to set various options that apply to all plots. You can change the font size, default DPI, whether plots should be shown by default, etc. (for the full list, see `hpv.options.help()`). For example, we might want higher resolution, to turn off automatic figure display, close figures after they're rendered, and to turn off the messages that print when a simulation is running. We can do this using built-in defaults for Jupyter notebooks (and then run a sim) with:
+## The run we will use
 
 ```{python}
+import numpy as np
+import pandas as pd
+import starsim as ss
 import hpvsim as hpv
 
-hpv.options(jupyter=True, verbose=0) # Standard options for Jupyter notebook
-
-sim = hpv.Sim()
+sim = hpv.Sim(
+    location       = 'nigeria',
+    genotypes      = [16, 18, 'hi5', 'ohr'],
+    n_agents       = 2000,
+    start          = 1990,
+    stop           = 2040,
+    ms_agent_ratio = 25,
+    verbose        = 0,                                     # No progress messages
+    analyzers      = [hpv.by_age(['cancers', 'hpv_prevalence'])],
+    label          = 'Nigeria baseline',
+)
 sim.run()
 ```
 
-## Printing objects
+`verbose=0` keeps the run silent, and `verbose=-1` silences the setup messages
+too. Setting `verbose=0.25` prints an update once a simulated year, which is
+what you want when a run is long enough that you start wondering whether it is
+stuck.
 
-You can get a summary of a sim with `summarize()`:
+## One result at a time
+
+Name any result and you get one panel:
+
+```{python}
+fig = sim.plot('asr_cancer_incidence')
+```
+
+Pass a list of fully-qualified names for several panels. Names are the module
+name and the result name joined by an underscore:
+
+```{python}
+fig = sim.plot(['all_hpv_prevalence', 'all_hpv_cum_cancers',
+                'all_hpv_asr_cancer_mortality'])
+```
+
+Calling `sim.plot()` with no argument plots every result from every module,
+which for a four-genotype run is over sixty panels. Useful when you are hunting
+a problem, unreadable otherwise. `sim.plot('all_hpv')` narrows it to the pooled
+HPV results.
+
+## The HPV summary figure
+
+`hpv.plot_sim` draws the four panels an HPV modeller usually wants first:
+cumulative cancers, HPV prevalence by age, cancers by age, and which genotypes
+are causing the cancers. It needs a `hpv.by_age` analyzer recording `cancers`
+and a prevalence, which is why we attached one above:
+
+```{python}
+fig = hpv.plot_sim(sim)
+```
+
+Read the bottom-right panel against genotyping studies for your country. If
+your run puts almost everything in the pooled `hi5` and `ohr` groups while your
+data puts it in HPV16 and HPV18, the per-genotype transmission parameters need
+attention before you trust anything downstream.
+
+## Genotypes over time
+
+```{python}
+fig = hpv.plot_by_genotype(sim, key='cum_cancers')
+```
+
+The same numbers as a table, with one column per genotype:
+
+```{python}
+hpv.results_by_genotype(sim, key='cum_cancers', normalize=True).tail(3).round(3)
+```
+
+## A table you can share
+
+Every result shares the time axis in `sim.results.timevec`, so assembling a
+tidy table is a few lines. Slicing a result with `[:]` gives you the underlying
+array:
+
+```{python}
+df = pd.DataFrame({
+    'year':           sim.results.timevec.years,
+    'hpv_prevalence': sim.results.all_hpv.prevalence[:],
+    'new_cancers':    sim.results.all_hpv.new_cancers[:],
+    'incidence':      sim.results.all_hpv.asr_cancer_incidence[:],
+})
+df.to_csv('my-nigeria-results.csv', index=False)
+df.tail(4).round(3)
+```
+
+Counts like `new_cancers` are per timestep, not per year. At the default
+quarter-year timestep there are four rows per calendar year, so a yearly total
+is the sum of all four. `annualize()` does that for you and returns one row per
+year:
+
+```{python}
+annual = sim.results.all_hpv.new_cancers.annualize()
+annual_years = np.floor(annual.timevec.years).astype(int)
+print('Cancers in 2035:', round(float(annual.values[annual_years == 2035][0])))
+```
+
+An annualized timestamp sits in the middle of its year, so match on `np.floor`
+of the year rather than on equality.
+
+## Printing a run
+
+`summarize()` prints the last value of every result — a quick check that
+nothing came out as zero or a NaN:
 
 ```{python}
 sim.summarize()
 ```
 
-To show the full object, including all methods and attributes, use `disp()`:
+To see what a genotype's natural-history parameters are set to:
 
 ```{python}
-sim.disp()
+print(sim.diseases.hpv16.pars)
 ```
 
-## Plotting options
+## Saving
 
-While a sim can be plotted using default settings simply by `sim.plot()`, this is just a small fraction of what's available. First, note that results can be plotted directly using e.g. Matplotlib. Results are organized by module: you can see the top-level keys with `sim.results.keys()`, and each disease genotype (e.g. `hpv16`) and the aggregate `hpv` view has its own set of results. The shared time axis is `sim.results.timevec`. A simple example of plotting using Matplotlib is:
+Save a figure with Matplotlib:
 
 ```{python}
-import pylab as plt # Shortcut for import matplotlib.pyplot as plt
-plt.plot(sim.results.timevec, sim.results.all_hpv.cum_infections);
+fig = sim.plot('asr_cancer_incidence')
+fig.savefig('my-incidence.png', dpi=150)
 ```
 
-Each result is a `Result` object rather than a plain NumPy array; like a pandas column, you can get the underlying array via slicing (`sim.results.all_hpv.cum_infections[:]`) or the `.values` attribute.
-
-The built-in `sim.plot()` produces a multi-panel overview of the key results:
+Save a whole run with `sim.save()` and reopen it with `ss.load()`. Saving
+strips the random number generators and internal cross-references first, so the
+file stays around a megabyte. You can stop a run partway, save, reload, and
+carry on:
 
 ```{python}
-sim.plot();
+partial = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
+                  start=1990, stop=2030, verbose=0, label='Paused run')
+partial.run(until=2010)
+partial.save('my-paused-run.sim')
+
+resumed = ss.load('my-paused-run.sim')
+resumed.run()
+print('Resumed and finished in', float(resumed.results.timevec.years[-1]))
 ```
 
-We can save the resulting figure using Matplotlib's `savefig()`. `sim.plot()` returns the figure object, so:
+## Changing how figures look
+
+`hpv.options` sets defaults for every HPVsim figure — resolution, font size, and
+plot style. `hpv.options.help()` lists them all. The two built-in styles are
+`'hpvsim'` (the default) and `'simple'`, and any Matplotlib style name also
+works:
 
 ```{python}
-fig = sim.plot()
-fig.savefig('my-fig.png', dpi=150)
+fig = sim.plot('asr_cancer_incidence', style='simple')
 ```
 
-## Customizing plots
-
-We saw above how to set default plot configuration options for Jupyter. HPVsim provides a lot of flexibility in customizing the appearance of plots as well. There are three different levels at which you can set plotting options: global, just for HPVsim, or just for the current plot. To give an example with changing the figure DPI:
-- Change the setting globally (for both HPVsim and Matplotlib): `sc.options(dpi=150)` or `plt.rc('figure', dpi=150)` (where `sc` is `import sciris as sc`)
-- Change for HPVsim plots, but not for Matplotlib plots: `hpv.options(dpi=150)`
-- Change for the current HPVsim plot, but not other HPVsim plots: `sim.plot(dpi=150)`
-
-The easiest way to change the style of HPVsim plots is with the `style` argument. For example, to plot using a built-in Matplotlib style would simply be:
+To change a setting for one block of code only, use `with_style`:
 
 ```{python}
-sim.plot(style='ggplot');
-```
-
-In addition to the default style (`'hpvsim'`), there is also a "simple" style:
-
-```{python}
-sim.plot(style='simple');
-```
-
-Although most style handling is done automatically, you can also use it yourself in a with block, e.g.:
-
-```{python}
-import numpy as np
-with hpv.options.with_style(fontsize=6):
-    sim.plot() # This will have 6 point font
-    plt.figure(); plt.plot(np.random.rand(20), 'o') # So will this
-```
-
-## Saving options
-
-Saving sims is also pretty simple. The simplest way to save is simply
-
-```{python}
-sim.save('my-sim.sim')
-```
-
-Technically, this saves as a gzipped pickle file (via `sc.save()` from the Sciris library). Before writing, `save()` shrinks the sim — freeing the random-number generators and internal back-references — so the file stays small; the reloaded sim is ready to inspect. For example, here's what it would look like to create a sim, run it partway, save it, load it, and finish running it:
-
-```{python}
-import starsim as ss
-
-sim_orig = hpv.Sim(start=2000, stop=2030, label='Load & save example')
-sim_orig.run(until=2015)
-sim_orig.save('my-half-finished-sim.sim')
-
-sim = ss.load('my-half-finished-sim.sim')
-sim.run()
-sim.plot();
-```
-
-Aside from saving the entire simulation, you can also work with the results directly. The results arrays share the `sim.results.timevec` time axis, so it is straightforward to assemble them into a pandas DataFrame for storage or further processing:
-
-```{python}
-import pandas as pd
-
-df = pd.DataFrame({
-    'year': sim.results.timevec,
-    'cum_infections': sim.results.all_hpv.cum_infections[:],
-    'new_cancers': sim.results.all_hpv.new_cancers[:],
-})
-df.to_csv('my-sim.csv', index=False)
-print(df.head())
+import pylab as plt
+with hpv.options.with_style(fontsize=8):
+    fig = sim.plot('asr_cancer_incidence')
 ```

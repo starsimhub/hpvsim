@@ -1,5 +1,14 @@
 """Rwanda HPV–HIV calibration (M08).
 
+SLATED FOR DELETION IN v3.3 (test cleanup). This is a one-off script from the
+v2 -> v3 Rwanda migration, not a test: it is not collected by pytest, it has
+no assertions, and several of these run a full Optuna calibration or a
+multi-seed sim. They are kept for now because the v3 HIV-HPV parameterization
+was derived here and the derivation is worth being able to re-read. Anything
+here that should outlive 3.3 -- most likely the CalibProbe-style age-by-HIV
+probes, which localizations reimplement -- needs promoting into the package
+or into ``tests/`` first.
+
 The NETWORK / behavioural / HIV-input parameters are ported from the published
 v2.3 Rwanda calibration (debut, partners, layer_probs, init_hpv_dist, beta=0.12,
 rel_imm). The CANCER natural-history scalars (_TP_SCALE, _CIN_K_SCALE,
@@ -34,23 +43,28 @@ except ``hi5.cin_fn.k`` (0.2 vs 0.24) and ``ohr.cin_fn.k`` (0.2 vs 0.14); the
 directional scalars (``transf2m=1.0``, ``transm2f=3.69``) and base ``beta=0.25``
 also match v2's defaults.  So the genotype port is: set base ``beta=0.12`` and
 fix the two ``cin_fn.k`` (and the duplicate ``cancer_fn.k``).  The HIV effect
-strengths differ from the generic connector defaults and are supplied via
-``hpv_hiv_connector(effects=RWANDA_HIV_EFFECTS)``; the severity-scaler location
-via ``CrossImmunity(rel_sev_loc=0.87)``.
+strengths differ from the generic ``hpv.HIV`` defaults and are supplied via
+``pars=effects_to_hiv_pars(RWANDA_HIV_EFFECTS)`` on the HIV disease itself;
+the severity-scaler location via ``CrossImmunity(rel_sev_loc=0.87)``.
 """
+
+from pathlib import Path
 
 import numpy as np
 import starsim as ss
+import stisim as sti
 
 import hpvsim as hpv
 from hpvsim.cross_genotype import CrossImmunity
 from hpvsim.data.country import _network_pars
-from hpvsim.hiv import hpv_hiv_connector
 from hpvsim.parameters import get_genotype_pars
 
 GENOTYPES = [16, 18, 'hi5', 'ohr']
 _GENO_KEYS = ['hpv16', 'hpv18', 'hi5', 'ohr']
 _DT = 0.25  # calibration timestep used for the per-timestep -> annual conversion
+
+RWANDA_HIV_DATA_DIR = Path(__file__).parent / 'data' / 'hiv' / 'rwanda'
+RWANDA_HIV_DATA = hpv.data.load_hiv_data(RWANDA_HIV_DATA_DIR)
 
 # --- rwanda_pars.obj scalars ------------------------------------------------
 BASE_BETA = 0.12                  # overall HPV per-act transmissibility (calib)
@@ -102,6 +116,17 @@ RWANDA_HIV_EFFECTS = {
     'rel_sev': {'lt200': 5.23, 'gt200': 1.98},
     'rel_imm': {'lt200': 0.36, 'gt200': 0.76},
 }
+
+
+def effects_to_hiv_pars(effects):
+    """Convert the {effect: {'lt200':.., 'gt200':..}} shape above into the
+    flat {effect}_lo / {effect}_hi pars hpv.HIV's define_pars-based __init__
+    takes (v3.2 dropped the old effects= dict constructor arg)."""
+    out = {}
+    for eff, strata in effects.items():
+        out[f'{eff}_lo'] = strata['lt200']
+        out[f'{eff}_hi'] = strata['gt200']
+    return out
 
 # Initial genotype mix among seeded infections (run_sim.make_sim init_hpv_dist).
 RWANDA_INIT_HPV_DIST = dict(hpv16=0.4, hpv18=0.25, hi5=0.25, ohr=0.1)
@@ -220,7 +245,7 @@ def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,
 
     Args:
         incidence_driven: if True (default, v2-faithful), HIV transmission is
-            off and the epidemic is imposed by ``hpv.hiv_incidence_import``;
+            off and the epidemic is imposed by ``hpv.hiv_incidence``;
             otherwise HIV transmits at ``beta_m2f`` over the sexual network.
         ms_agent_ratio: grow-multiscale ratio. Defaults to 5 -- the ratio the
             HIV rel_sus/rel_sev effects were re-fit at, where fine agents
@@ -228,19 +253,17 @@ def build_rwanda_sim(seed=0, n_agents=10_000, start=1960, stop=2020, dt=_DT,
             ratio=1 is unbiased in expectation but leaves HIV+ by-age cancer
             very noisy (needs many seeds).
     """
-    connectors = [
-        CrossImmunity(rel_sev_loc=REL_SEV_LOC),
-        hpv_hiv_connector(effects=RWANDA_HIV_EFFECTS),
-    ]
+    connectors = [CrossImmunity(rel_sev_loc=REL_SEV_LOC)]
+    hiv_pars = effects_to_hiv_pars(RWANDA_HIV_EFFECTS)
+    art = sti.ART(coverage=hpv.data.reshape_art_coverage(RWANDA_HIV_DATA['art_coverage']))
     if incidence_driven:
-        hiv = hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)
-        interventions = [
-            hpv.hiv_incidence_import.from_location('rwanda'),
-            hpv.hiv_art.from_location('rwanda'),
-        ]
+        hiv = hpv.HIV_incidence(incidence=RWANDA_HIV_DATA['incidence'],
+                                init_prev_data=0.0, pars=hiv_pars)
+        interventions = [art]
     else:
-        hiv = hpv.HIV.from_location('rwanda', beta_m2f=beta_m2f)
-        interventions = [hpv.hiv_art.from_location('rwanda')]
+        hiv = hpv.HIV_transmit(beta_m2f=beta_m2f, init_prev_data=RWANDA_HIV_DATA['init_prev'],
+                               pars=hiv_pars)
+        interventions = [art]
 
     return hpv.Sim(
         location='rwanda',

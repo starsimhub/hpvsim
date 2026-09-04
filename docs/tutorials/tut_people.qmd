@@ -3,69 +3,160 @@ title: T4 - People, populations, and networks
 jupyter: python3
 ---
 
+HPV spreads through sexual partnerships, and cervical cancer appears decades
+later in women who are still alive to develop it. Both depend on getting the
+population right. In this tutorial we build a South Africa population, check its
+age structure against the real one, and look at the partnerships the model
+formed.
 
-This tutorial gives a brief introduction to people, populations, and contact layers.
+## What `location` gives you
 
+HPVsim ships UN World Population Prospects 2024 data for every country, covering
+1950 to 2100:
 
-<div class="alert alert-info">
+- the single-year age and sex distribution, used to create the starting
+  population;
+- the crude birth rate, used to add newborns each year;
+- age- and sex-specific mortality from the abridged life tables, used to remove
+  people.
 
-Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_people.ipynb) to open an interactive version of this notebook.
+Passing `location='south africa'` loads all three, and also sets the total
+population so results come out at real national scale rather than per 2,000
+simulated people. Country names are case-insensitive.
 
-</div>
+Sexual behavior is *not* loaded per country. Every location starts from the same
+default partnership parameters (`hpv.NetworkPars`), because HPVsim ships no
+per-country network calibration. If you are modeling a specific country, those
+parameters are among the first things you will want to calibrate.
 
-## Demographic data
-
-HPVsim includes pre-downloaded demographic data, including:
-
- * Population sizes from 1950-2100 from the UN's World Population Projections;
- * Birth rates from 1950-2100 from the World Bank;
- * Age- and sex-specific mortality rates from 1950-2100 from the UN's World Population Projections.
-
-As we saw in Tutorial 1, you load these data simply by using the `location` parameter. HPVsim ships demographic data (age structure, births, deaths) for any country in the UN World Population Prospects; just pass the country name (case-insensitive). Network calibration is location-agnostic by default — analysis scripts supply their own per-country network parameters.
-
-When a `location` is set, HPVsim uses these data to seed the initial age/sex pyramid and to drive births, deaths, and age-specific migration over the course of the run. The migration module pins the simulated age pyramid to the target population trajectory each year; the resulting immigrant/emigrant flows are reported under `sim.results.agemigration`.
-
-## People and contact network layers
-
-Agents in HPVsim are contained in an object called `People`, which holds all of the agents' properties (age, sex, disease state, ...), together with the machinery for moving them from one state to another (e.g., from susceptible to infected).
-
-HPV transmits via sexual contact, represented in HPVsim by a sexual network that lets agents interact. For the moment, HPVsim only models heterosexual partnerships. The default sexual network (`hpv.SexualNetwork`) has three contact layers — marital, casual, and one-off — each with its own properties characterizing sexual contact (partnership duration, age-mixing preferences, concurrency, and so on). The network is created automatically from the `location`'s network parameters when you build a `hpv.Sim`.
-
-## A worked example
-
-Below we build and run a sim, then inspect the population and network it produced. Because demographics evolve over the run, the number of alive agents changes over time:
+## Build the population
 
 ```{python}
-#| collapsed: false
 import numpy as np
+import pandas as pd
 import hpvsim as hpv
 
-hpv.options(jupyter=True, verbose=False)
+age_pyramid = hpv.age_pyramid(timepoints=[1990, 2020],
+                              edges=np.arange(0, 101, 5))
 
 sim = hpv.Sim(
-    n_agents=20_000,
-    start=1970,
-    stop=2020,
-    location='nigeria',
-    rand_seed=1,
+    location  = 'south africa',
+    genotypes = [16, 18, 'hi5', 'ohr'],
+    n_agents  = 2000,
+    start     = 1990,
+    stop      = 2020,
+    rand_seed = 1,
+    verbose   = 0,
+    analyzers = [age_pyramid],
 )
 sim.run()
-
-# Population size over time (driven by births, deaths, and migration)
-print('Alive at start:', int(sim.results.n_alive[0]))
-print('Alive at end:  ', int(sim.results.n_alive[-1]))
-
-sim.plot();
 ```
 
-To assess the effect of stochasticity, it is often useful to run several sims with different random seeds and combine them. Starsim's `MultiSim` does this — pass an `hpv.Sim` and a number of runs, then reduce with `mean()` (or `median()`):
+The population changes size over the run, driven by births, deaths, and the
+migration module that keeps the simulated age structure pinned to the WPP
+trajectory:
 
 ```{python}
-import starsim as ss
-
-msim = ss.MultiSim(hpv.Sim(n_agents=10_000, start=1970, stop=2020,
-                           location='nigeria'), n_runs=3)
-msim.run(parallel=False, verbose=False)
-msim.mean()
-msim.plot();
+print(f'Alive in 1990: {float(sim.results.n_alive[0]):>12,.0f}')
+print(f'Alive in 2020: {float(sim.results.n_alive[-1]):>12,.0f}')
+print(f'Net immigration over the run: '
+      f'{float(sim.results.agemigration.new_immigrants.sum() - sim.results.agemigration.new_emigrants.sum()):,.0f}')
 ```
+
+South Africa's recorded population over these thirty years grew from roughly 38
+million to roughly 59 million, so compare against that. If your run is an order
+of magnitude away, `location` did not take effect.
+
+## Check the age structure against the real one
+
+Never take the starting population on trust. The `age_pyramid` analyzer records
+the population by age and sex at the years you asked for:
+
+```{python}
+pyramid = sim.analyzers['age_pyramid']
+fig = pyramid.plot(date=1990)
+```
+
+To compare it against observed data, read the analyzer's own table and the
+observed pyramid side by side. `south_africa_age_pyramid.csv` holds the UN
+figures for 1990:
+
+```{python}
+modeled = pyramid.to_dataframe()
+modeled = modeled[modeled.date == modeled.date.min()]
+modeled = modeled.groupby('age_bin', sort=False)['count'].sum()
+
+observed = pd.read_csv('south_africa_age_pyramid.csv')
+observed = observed[observed.year == 1990].set_index('age')
+observed = observed['males'] + observed['females']
+
+comparison = pd.DataFrame({
+    'age':      np.arange(0, 100, 5),
+    'modeled': modeled.values.round(0),
+})
+comparison['observed'] = observed.reindex(comparison.age).values
+comparison['ratio'] = (comparison.modeled / comparison.observed).round(2)
+comparison.head(8)
+```
+
+A small systematic offset is expected here, because this CSV comes from an
+older population estimate than the bundled WPP 2024 data. What you are checking
+for is a bin off by a factor of two, or ratios that swing wildly between
+neighboring bins. Either means the starting population is wrong in a way that
+will distort everything downstream — most obviously cancer counts, which depend
+on how many women are alive at ages 40 to 60.
+
+## Look at the partnerships
+
+Transmission happens over a two-layer heterosexual network: `marital`
+partnerships, which are long and have many acts, and `casual` partnerships,
+which are shorter and fewer. Both layers are held by one
+`hpv.SexualNetwork` module:
+
+```{python}
+net = sim.networks.sexualnetwork
+layer_of_edge = np.asarray(net.edges.layer_id)
+print(f'Live partnerships at the end of the run: {len(net.edges.p1):,}')
+print(f'  marital: {(layer_of_edge == 0).sum():,}')
+print(f'  casual:  {(layer_of_edge == 1).sum():,}')
+print('Median partnership length in years '
+      '(sampled from the default parameters):')
+print('  marital:', round(float(np.median(net.pars.dur_pship_marital.rvs(1000))), 1))
+print('  casual: ', round(float(np.median(net.pars.dur_pship_casual.rvs(1000))), 1))
+print('Mean age at first sex, women:',
+      round(float(np.mean(net.pars.debut_f.rvs(1000))), 1))
+```
+
+Note what those default durations say: marital partnerships last decades, so in
+practice they are lifelong, while casual partnerships last about six months.
+Sex acts are drawn per year — 80 on average in a marital partnership, 50 in a
+casual one — and are scaled down with age.
+
+Those numbers are defaults, not evidence about your country. The full set —
+concurrent partner counts, acts per year, who pairs with whom by age, and the
+proportion of each age band that is partnered at all — is in `hpv.NetworkPars`.
+Print `sim.networks.sexualnetwork.pars` to see the values your run used, and
+expect to calibrate them.
+
+## Freeze the population and inspect it
+
+`hpv.snapshot` takes a deep copy of the whole population at a moment you choose,
+which you can then examine however you like. It is unaffected by anything that
+happens later in the run:
+
+```{python}
+snap = hpv.snapshot(timepoints=[2019])
+sim = hpv.Sim(location='south africa', genotypes=[16, 18], n_agents=2000,
+              start=2000, stop=2020, verbose=0, analyzers=[snap])
+sim.run()
+
+people = sim.analyzers['snapshot'].get(2019)
+alive = people.alive.values
+women = alive & people.female.values
+print(f'Women alive in 2019: {women.sum():,}')
+print(f'Median age of women: {np.median(people.age.values[women]):.1f}')
+print(f'Women aged 30-49:    {((people.age.values[women] >= 30) & (people.age.values[women] < 50)).sum():,}')
+```
+
+Those counts are simulated people, not national totals — the population scaling
+factor is applied to results, not to the agents themselves.

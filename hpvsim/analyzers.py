@@ -22,6 +22,8 @@ class by_age(ss.Analyzer):
 
       - count (``scale=True``, annualize mean):
         ``n_cancerous``, ``n_cin``, ``n_precin``, ``n_infected``, ``hpv``
+      - demographic denominators (``scale=True``, annualize mean):
+        ``n_alive``, ``n_females``, ``n_males``
       - annual event flows (``scale=True``, annualize sum):
         ``cancers``, ``cins``
       - prevalences (``scale=False``, annualize mean, ratio in [0, 1]):
@@ -50,8 +52,7 @@ class by_age(ss.Analyzer):
         sim.results.by_age.cancers_20_25         # 1D ss.Result
     """
 
-    # Result-name -> per-HPV-module BoolState attribute (union across genotypes).
-    # Prevalent stocks: alive-agent count in-state at each timestep.
+    # Result-name -> BoolState attr, unioned across genotypes. Prevalent stocks.
     _COUNT_KEYS = {
         'n_cancerous':   'cancerous',
         'n_cin':         'cin',
@@ -60,8 +61,7 @@ class by_age(ss.Analyzer):
         'hpv':           'infected',
     }
 
-    # Demographic counts read directly from ``people.<attr>`` (no HPV
-    # module lookup). Result-name -> people-attr, or None to count ``alive``.
+    # Result-name -> people attr, or None to count ``alive``.
     _DEMO_KEYS = {
         'n_alive':   None,
         'n_females': 'female',
@@ -76,9 +76,7 @@ class by_age(ss.Analyzer):
         'precin_prevalence':    ('precin',    True),
     }
 
-    # Result-name -> (event-time attr, in-state attr). New events at the current
-    # tick, alive filter applied. Annualize summarize_by='sum' gives annual
-    # event counts in population units (scale=True at Result level).
+    # Result-name -> (event-time attr, in-state attr); annualized by sum.
     _FLOW_KEYS = {
         'cancers':  ('ti_cancerous', 'cancerous'),
         'cins':     ('ti_cin',       'cin'),
@@ -90,7 +88,8 @@ class by_age(ss.Analyzer):
             raise ValueError(
                 "by_age: pass at least one result key, e.g. hpv.by_age('cancers')")
         self.keys = [keys] if isinstance(keys, str) else list(keys)
-        known = set(self._COUNT_KEYS) | set(self._PREV_KEYS) | set(self._FLOW_KEYS)
+        known = (set(self._COUNT_KEYS) | set(self._DEMO_KEYS)
+                 | set(self._PREV_KEYS) | set(self._FLOW_KEYS))
         unknown = [k for k in self.keys if k not in known]
         if unknown:
             raise ValueError(
@@ -107,7 +106,7 @@ class by_age(ss.Analyzer):
         return f'{key}_{int(lo)}_{int(hi)}'
 
     def _summarize_by(self, key):
-        # FLOW keys annualize by SUM (annual event count). COUNT/PREV by MEAN.
+        # FLOW keys annualize by sum (event counts); COUNT/PREV by mean.
         return 'sum' if key in self._FLOW_KEYS else 'mean'
 
     def init_pre(self, sim):
@@ -119,7 +118,8 @@ class by_age(ss.Analyzer):
         super().init_results()
         defs = []
         for key in self.keys:
-            scale = key in self._COUNT_KEYS or key in self._FLOW_KEYS
+            scale = (key in self._COUNT_KEYS or key in self._DEMO_KEYS
+                     or key in self._FLOW_KEYS)
             sby = self._summarize_by(key)
             for lo, hi, label in zip(self.edges[:-1], self.edges[1:], self.bin_labels):
                 defs.append(ss.Result(
@@ -144,6 +144,10 @@ class by_age(ss.Analyzer):
                 for mod in self.hpv_modules:
                     state_any |= getattr(mod, attr).values
                 self._write_bins(key, ti, ages, state_any & alive, weights)
+            elif key in self._DEMO_KEYS:
+                attr = self._DEMO_KEYS[key]
+                mask = alive if attr is None else alive & getattr(people, attr).values
+                self._write_bins(key, ti, ages, mask, weights)
             elif key in self._PREV_KEYS:
                 attr, female_only = self._PREV_KEYS[key]
                 state_any = np.zeros_like(alive)
@@ -177,8 +181,7 @@ class by_age(ss.Analyzer):
 
     def finalize_results(self):
         super().finalize_results()
-        # Convenience 2D arrays: self.<key> is (npts, n_bins), reading from the
-        # pop_scale-multiplied per-bin Results.
+        # self.<key> is (npts, n_bins), read from the pop_scale-multiplied Results.
         for key in self.keys:
             arrs = [self.results[self._result_name(key, lo, hi)].values
                     for lo, hi in zip(self.edges[:-1], self.edges[1:])]
@@ -366,9 +369,7 @@ class age_pyramid(ss.Analyzer):
             self.age_pyramids[date] = out
 
     def finalize_results(self):
-        # age_pyramids stores per-agent people.scale-weighted counts; multiply
-        # by sim.pars.pop_scale so the pyramid is in real-population units,
-        # matching sim.results.* and by_age FLOW/COUNT semantics.
+        # people.scale-weighted counts * pop_scale = real-population units.
         super().finalize_results()
         pop_scale = self.sim.pars.pop_scale
         if pop_scale != 1.0:
@@ -440,14 +441,8 @@ class age_causal_infection(ss.Analyzer):
         people = sim.people
         scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:
-            # Gate on cancerous, not just ti_cancerous==ti: a scheduled
-            # ti_cancerous persists on agents who die of other causes before
-            # onset, so the bare time-match overcounts vs realized incidence.
-            # BoolArr.uids returns active (alive) agents only, so the alive
-            # filter is implicit. On the grow engine, fine agents subject to
-            # independent competing mortality are correctly dropped here; this
-            # also drops the rare agent who reaches cancer and dies of a
-            # competing cause on the same tick (~1%).
+            # Gate on cancerous, not just ti_cancerous==ti: a schedule persists
+            # on agents who died of other causes first. BoolArr.uids is alive-only.
             new = ((m.ti_cancerous == ti) & m.cancerous).uids
             if not len(new):
                 continue
@@ -464,9 +459,7 @@ class age_causal_infection(ss.Analyzer):
         self.age_causal = np.array(self.age_causal)
         self.age_cin = np.array(self.age_cin)
         self.age_cancer = np.array(self.age_cancer)
-        # weights recorded via _record use per-agent people.scale; multiply by
-        # sim.pars.pop_scale so weight.sum() equals real-population cancer
-        # count, matching sim.results and by_age FLOW-key semantics.
+        # * pop_scale so weights.sum() is a real-population cancer count.
         pop_scale = self.sim.pars.pop_scale
         self.weights = np.array(self.weights) * pop_scale
         for k in self.dwelltime:
@@ -550,18 +543,11 @@ class dalys(ss.Analyzer):
         people = sim.people
         scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:
-            # See age_causal_infection.step for the cancerous gate rationale
-            # (drops scheduled-but-not-realized onsets and same-tick competing
-            # deaths; on grow, fine agents with competing mortality). BoolArr.uids
-            # returns active (alive) agents only, so the alive filter is implicit.
+            # Gate on cancerous so scheduled-but-unrealized onsets don't count.
             new = ((m.ti_cancerous == ti) & m.cancerous).uids
             if not len(new):
                 continue
-            # Defensive isfinite guard (symmetric with age_causal_infection):
-            # a gated agent always has finite ti_dead_cancer today, but a future
-            # non-fatal-cancer or reschedule path could leave it NaN — without
-            # this filter a single NaN death_age would poison the whole onset
-            # year's YLL/YLD sum.
+            # One NaN death_age would poison the whole year's YLL/YLD sum.
             ti_dead = m.ti_dead_cancer[new]
             ok = np.isfinite(ti_dead)
             new, ti_dead = new[ok], ti_dead[ok]
@@ -574,9 +560,7 @@ class dalys(ss.Analyzer):
 
     def finalize(self):
         super().finalize()
-        # yll/yld accumulated with per-agent people.scale weights; multiply
-        # by sim.pars.pop_scale so absolute population DALYs match
-        # sim.results.* magnitudes (removes the "callers multiply" caveat).
+        # * pop_scale so absolute DALYs match sim.results.* magnitudes.
         pop_scale = self.sim.pars.pop_scale
         self.yll *= pop_scale
         self.yld *= pop_scale

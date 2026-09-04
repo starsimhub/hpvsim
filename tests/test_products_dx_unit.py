@@ -22,8 +22,7 @@ def _attach_dx_and_init(sim, dx_instance):
     on the intervention after init may differ from the one passed in. Callers
     must use the returned product for all administer/result_dist calls.
     """
-    # ss.treat_num supports being constructed with prob=0 (no firing) — this is the
-    # cheapest way to get the dx attached to a sim that will run sim.init()
+    # prob=0 attaches the dx to a sim that will init without ever firing it.
     stub = ss.treat_num(product=dx_instance, prob=0.0)
     sim.pars['interventions'] = [stub]
     sim.init()
@@ -48,15 +47,49 @@ def test_dx_unknown_name_raises():
         hpv_dx(name='nope')
 
 
-def test_dx_both_name_and_df_raises():
+def test_dx_name_and_df_gives_custom_name_to_df_built_product():
+    """Passing both name= and df= keeps df as the row table and uses name
+    as the module name — so two df-built dx products can share a sim."""
     import pandas as pd
-    with pytest.raises(ValueError, match='exactly one'):
-        hpv_dx(name='via', df=pd.DataFrame())
+    df = pd.DataFrame([
+        {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'positive', 'probability': 0.0},
+        {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'negative', 'probability': 1.0},
+    ])
+    d = hpv_dx(name='my_dx', df=df)
+    assert d.name == 'my_dx'
+    assert list(d.df.result.unique()) == ['positive', 'negative']
 
 
 def test_dx_neither_name_nor_df_raises():
-    with pytest.raises(ValueError, match='exactly one'):
+    with pytest.raises(ValueError, match='at least one'):
         hpv_dx()
+
+
+def test_dx_module_name_separates_lookup_key_from_module_name():
+    """module_name= lets a shipped dx product be registered under a custom
+    module name (e.g. two 'via' screens in one sim)."""
+    d = hpv_dx(name='via', module_name='via_older')
+    assert d.name == 'via_older'
+    assert d.hierarchy == ['positive', 'inadequate', 'negative']
+
+
+def test_two_df_built_dx_products_coexist_in_a_sim():
+    """Regression: two df-built dx products with distinct names must both
+    init on the same sim without colliding on the class-default 'dx' name."""
+    import pandas as pd
+    def _mkdf(prob_pos):
+        return pd.DataFrame([
+            {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'positive', 'probability': prob_pos},
+            {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'negative', 'probability': 1 - prob_pos},
+        ])
+    d1 = hpv_dx(name='dx_screen', df=_mkdf(0.1))
+    d2 = hpv_dx(name='dx_triage', df=_mkdf(0.9))
+    sim = _four_genotype_sim()
+    sim.pars['interventions'] = [
+        ss.treat_num(name='stub_a', product=d1, prob=0.0),
+        ss.treat_num(name='stub_b', product=d2, prob=0.0),
+    ]
+    sim.init()  # would raise 'Module dx already added' before the fix
 
 
 def test_dx_all_genotype_mode_classifies_susceptibles():
@@ -99,3 +132,20 @@ def test_dx_empty_uids_returns_empty_dict():
     d_init = _attach_dx_and_init(sim, hpv_dx(name='via'))
     out = d_init.administer(ss.uids())
     assert all(len(v) == 0 for v in out.values())
+
+
+def test_dx_from_df_initializes_in_sim():
+    """A df-built product has no product name, so it must keep the class default.
+
+    A None module name breaks people.add_module() at sim.init().
+    """
+    import pandas as pd
+    df = pd.DataFrame(dict(
+        state=['susceptible', 'precin'],
+        genotype=['all', 'all'],
+        result=['negative', 'positive'],
+        probability=[1.0, 1.0],
+    ))
+    d = hpv_dx(df=df, hierarchy=['positive', 'negative'])
+    assert d.name == 'dx'
+    _attach_dx_and_init(_four_genotype_sim(), d)

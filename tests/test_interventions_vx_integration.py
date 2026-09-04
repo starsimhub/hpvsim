@@ -35,12 +35,9 @@ def test_routine_vx_fires_and_updates_state():
     sim.run()
     # Re-bind to the sim's deep-copied intervention
     intv = sim.interventions[0]
-    # At least some agents were vaccinated
     assert intv.vaccinated.sum() > 0
-    # Every vaccinated agent has received at least 1 dose
-    # (routine_vx fires each year agents remain eligible, so n_doses >= 1)
+    # routine_vx re-fires while agents stay eligible, so n_doses >= 1.
     assert np.all(intv.n_doses[intv.vaccinated.uids] >= 1)
-    # ti_vaccinated set for every vaccinated agent
     assert np.all(~np.isnan(intv.ti_vaccinated[intv.vaccinated.uids]))
 
 
@@ -74,7 +71,6 @@ def test_routine_vx_respects_sex():
     sim.run()
     intv = sim.interventions[0]
     vacc_uids = intv.vaccinated.uids
-    # All vaccinated agents must be female
     assert np.all(sim.people.female[vacc_uids])
 
 
@@ -94,9 +90,7 @@ def test_routine_vx_respects_age_range():
     vacc_uids = intv.vaccinated.uids
     if len(vacc_uids) == 0:
         pytest.skip('No agents vaccinated in this small-sim window (random)')
-    # At sim end, vaccinated agents must have been 9 <= age < 10 at the time
-    # of their first dose. Compute their age at vaccination given current
-    # age and how many timesteps ago they were vaccinated.
+    # Back out age at first dose from current age and ti_vaccinated.
     ages_now = sim.people.age[vacc_uids]
     ti_vacc = intv.ti_vaccinated[vacc_uids]
     # dt may be ss.dur — extract years
@@ -105,6 +99,30 @@ def test_routine_vx_respects_age_range():
     # Allow a small dt-rounding tolerance
     assert np.all(ages_at_vacc >= 9 - dt)
     assert np.all(ages_at_vacc < 10 + dt)
+
+
+def test_routine_vx_records_dose_results():
+    """Vaccination defines scaled dose/coverage time series, like screening does."""
+    intv = hpv.routine_vx(
+        product='bivalent',
+        prob=0.9,
+        age_range=[9, 14],
+        sex='f',
+        start_year=2020,
+        name='routine_results',
+    )
+    sim = hpv.Sim(**SMALL_PARS, interventions=[intv])
+    sim.run()
+    intv = sim.interventions[0]
+    res = intv.results
+    scale = sim.pars.pop_scale
+    assert res['new_doses'].sum() > 0
+    assert np.allclose(res['cum_doses'], np.cumsum(res['new_doses']))
+    assert np.allclose(res['cum_vaccinated'], np.cumsum(res['new_vaccinated']))
+    # Doses >= people vaccinated, and both are in real-population units.
+    assert res['cum_doses'][-1] >= res['cum_vaccinated'][-1] > 0
+    assert res['cum_vaccinated'][-1] >= intv.vaccinated.sum() * scale
+    assert res['cum_doses'][-1] >= intv.n_doses.sum() * scale
 
 
 def test_routine_vx_reduces_susceptibility_post_dose():
@@ -130,17 +148,14 @@ def test_routine_vx_reduces_susceptibility_post_dose():
     vacc_uids = intv.vaccinated.uids
     if len(vacc_uids) == 0:
         pytest.skip('No agents vaccinated in this small-sim window')
-    # 1. Immediate effect: vax_imm bumped for every vaccinated agent
     vax_imm = sim.diseases['hpv16'].vax_imm[vacc_uids]
     assert np.all(vax_imm > 0), \
         f'Vaccinated agents must have vax_imm[hpv16]>0; got min={float(vax_imm.min())}'
-    # nab_imm must be untouched (clearance-only; vaccine writes only to vax_imm)
+    # nab_imm is clearance-only; the vaccine writes to vax_imm.
     nab_imm = sim.diseases['hpv16'].nab_imm[vacc_uids]
     assert np.all(nab_imm == 0.0), \
         f'administer() must not touch nab_imm; got max={float(nab_imm.max())}'
-    # 2. Eventual effect: CrossImmunity reduces rel_sus for the bulk of
-    #    vaccinated agents (allow up to ~5% latency for agents vaccinated
-    #    on the very last few timesteps).
+    # 90%, not 100%: agents vaccinated on the last step haven't had CrossImmunity run.
     rel_sus = sim.diseases['hpv16'].rel_sus[vacc_uids]
     n_reduced = int((rel_sus < 1.0).sum())
     assert n_reduced >= 0.9 * len(vacc_uids), \

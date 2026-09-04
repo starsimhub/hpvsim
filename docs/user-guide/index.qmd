@@ -1,0 +1,81 @@
+---
+title: "How HPVsim fits together"
+---
+
+HPVsim follows individual women and men through sexual partnerships, infection with one or more HPV genotypes, and — in women — the path from infection to precancer to invasive cervical cancer. On top of that it delivers vaccination, screening and treatment, and can carry HIV infection alongside HPV.
+
+The scope is deliberately narrow: HPVsim models cervical cancer. HPV also causes anal, oropharyngeal, penile, vaginal and vulvar cancer, and the first three of those occur in men. None of them are in the model.
+
+Each agent stands for many real people. When you give a `location`, HPVsim looks up that country's population size and sets `pop_scale = total_pop / n_agents`, so results come out in real-population units. A run with 2,000 agents representing Nigeria in 1990 has each agent standing for about 48,000 people. This is what makes a country projection tractable on a laptop.
+
+## The layers
+
+A simulation is a set of modules that share one population. Each layer answers a different question.
+
+| Layer | What it does | Classes |
+|---|---|---|
+| Population | Holds age, sex and every per-agent state; adds births, removes deaths, pins the age pyramid to the country's trajectory | `ss.People`, `hpv.Births`, `ss.Deaths`, `hpv.AgeMigration` |
+| Sexual network | Forms and dissolves marital and casual partnerships, and sets how many sex acts each partnership has per year | `hpv.SexualNetwork` |
+| Disease | One module per genotype: transmission, clearance, latency, precancer, cancer, cancer death | `hpv.HPV` |
+| Cross-genotype | Turns immunity earned against one genotype into protection against the others; pools per-genotype results into totals | `hpv.CrossImmunity`, `hpv.HPVTotal` |
+| Interventions | Deliver a product (vaccine, screening test, treatment) to a chosen group of people | `hpv.routine_vx`, `hpv.routine_screening`, `hpv.treat_num`, … |
+| Analyzers | Watch the population and record things the disease modules do not; they never change the run | `hpv.by_age`, `hpv.dalys`, `hpv.age_pyramid`, … |
+| HIV (optional) | Raises HPV acquisition, speeds progression, and weakens immunity, by CD4 stratum | `hpv.HIV_transmit`, `hpv.HIV_incidence` |
+
+`hpv.Sim` assembles all of this from a location and a genotype list:
+
+```{python}
+import hpvsim as hpv
+
+sim = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
+              start=2000, stop=2002, verbose=0)
+sim.init()
+
+print('diseases:    ', list(sim.diseases.keys()))
+print('networks:    ', list(sim.networks.keys()))
+print('demographics:', list(sim.demographics.keys()))
+print('connectors:  ', list(sim.connectors.keys()))
+print('analyzers:   ', list(sim.analyzers.keys()))
+```
+
+One disease module per genotype is the central design choice. Genotypes differ in how well they transmit, how fast they progress, and how well vaccines cover them, and each of those needs its own per-agent record. Because the modules share one population, a woman can carry HPV16 and HPV18 at the same time — and when one genotype takes her to cancer, the other genotypes' pending progression is cancelled, so she is counted as one cancer case, not two.
+
+## What happens in a timestep
+
+The default timestep is three months (`dt=0.25`). Within each one, the order is fixed:
+
+1. **Demographics.** Births are added, deaths removed. Once a year, migration adds or removes people so the age and sex composition matches the country's projected pyramid.
+2. **Progression.** Each genotype moves its infected women along: infections clear (or turn latent), precancer becomes CIN, CIN becomes cancer, and women with cancer die.
+3. **Immunity.** The cross-immunity module reads the antibody and cell-mediated immunity each woman has accumulated and writes this timestep's susceptibility and severity factors for every genotype.
+4. **Partnerships.** The network dissolves the pairs whose duration has run out and forms new ones.
+5. **Interventions.** Vaccines, screening tests and treatments are delivered.
+6. **Transmission.** Each genotype passes along the partnerships formed in step 4.
+7. **Bookkeeping.** The dead are removed, results are recorded, analyzers run.
+
+Two consequences of that order are worth holding onto. Immunity is applied before interventions, so a woman vaccinated in one timestep is protected from the next one onwards — a three-month lag at the default `dt`. And transmission uses the partnerships formed in the same timestep, so partnership turnover and transmission are never more than one timestep out of step.
+
+Not every module runs on the sim's clock. Migration and `hpv.AnnualBirths` run once per calendar year; the HIV modules run quarterly whatever `dt` you choose.
+
+## Reading the results
+
+Results are grouped by the module that produced them: `sim.results.hpv16.new_cancers` for one genotype, `sim.results.all_hpv.cum_cancers` for the pooled total, `sim.results.agemigration.new_immigrants` for migration flows. Anything counted in people is multiplied by `pop_scale`; anything that is a proportion is not. See [Results and analyzers](results.qmd).
+
+## The rest of this guide
+
+| Page | Covers |
+|---|---|
+| [Natural history](natural-history.qmd) | Genotypes, the infection-to-cancer pathway, how duration drives progression, latency |
+| [Immunity](immunity.qmd) | Immunity earned by clearing an infection, cross-protection between genotypes, vaccine immunity |
+| [Sexual network](sexual-network.qmd) | Marital and casual partnerships, age mixing, acts, and how `beta` becomes a per-act risk |
+| [Demographics](demographics.qmd) | Births, deaths, migration, population scaling, and multiscale runs for rare cancers |
+| [Interventions](interventions.qmd) | Products versus delivery, vaccination, screening and treatment cascades |
+| [HIV co-infection](hiv.qmd) | The two ways to drive HIV, CD4-stratified effects on HPV, ART |
+| [Parameters](parameters.qmd) | Where each parameter lives, and how one dictionary reaches every module |
+| [Results and analyzers](results.qmd) | Result structure, age-standardized rates, results by age, DALYs |
+| [Calibration](calibration.qmd) | Fitting to sparse local data and checking whether the fit is real |
+
+## See also
+
+- [T1 - Getting started](../tutorials/tut_intro.qmd) for the shortest possible working example
+- [Migrating from v2](../migration.qmd) if you have HPVsim v2 scripts
+- [`hpv.Sim` API reference](../api/sim.qmd)

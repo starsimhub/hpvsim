@@ -1,5 +1,14 @@
 """Plot the CALIBRATED v3 Rwanda fit vs the registry data.
 
+SLATED FOR DELETION IN v3.3 (test cleanup). This is a one-off script from the
+v2 -> v3 Rwanda migration, not a test: it is not collected by pytest, it has
+no assertions, and several of these run a full Optuna calibration or a
+multi-seed sim. They are kept for now because the v3 HIV-HPV parameterization
+was derived here and the derivation is worth being able to re-read. Anything
+here that should outlive 3.3 -- most likely the CalibProbe-style age-by-HIV
+probes, which localizations reimplement -- needs promoting into the package
+or into ``tests/`` first.
+
 Unlike plot_rwanda_calib.py (which uses the ported v2 params), this builds the
 sim with the calibrated best-fit params from results/rwanda_calib/best_pars.json
 (calibrate_rwanda.build_sim) and overlays the empirical targets:
@@ -28,7 +37,6 @@ if str(_ROOT) not in sys.path:
 
 import starsim as ss  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
 from tests.regression import rwanda_calib as rc  # noqa: E402
 from tests.regression.calibrate_rwanda import build_sim, TARGETS  # noqa: E402
 
@@ -45,7 +53,7 @@ PRECIN_DIST = {'hpv16': 0.21, 'hpv18': 0.11, 'hi5': 0.37, 'ohr': 0.31}
 class _Probe(ss.Analyzer):
     def init_pre(self, sim):
         self.hpv = {d.name: d for d in sim.diseases.values() if isinstance(d, HPV)}
-        self.hiv = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        self.hiv = sim.diseases.hiv
         super().init_pre(sim)
         n = len(sim.t.timevec); nb = len(_AGE_LABELS)
         self.yr = np.floor(np.asarray(sim.t.timevec, float)).astype(int)[:n]

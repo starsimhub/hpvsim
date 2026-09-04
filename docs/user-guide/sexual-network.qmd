@@ -1,0 +1,64 @@
+---
+title: "Sexual network"
+---
+
+HPV moves through sexual partnerships, so the network carries most of the local realism in a country model. A partnership is a pair of agents that lasts a drawn duration and carries a number of sex acts per timestep. Partnerships are heterosexual: women are the first partner in a pair, men the second.
+
+One `hpv.SexualNetwork` holds both kinds of partnership in a single table, tagged by layer: **marital** (`'m'`) and **casual** (`'c'`). They differ in every quantity that matters. `dur_pship_marital` has a mean of 80 years, which makes most marriages lifelong — around two-thirds last 50 years or more — while `dur_pship_casual` averages a year, with a third ending inside three months. Marital partnerships have about 80 acts a year (`acts_marital`), casual ones about 50.
+
+## Who partners with whom
+
+Each timestep the network dissolves every pair whose duration has expired, then forms new ones layer by layer:
+
+1. **Debut.** Each agent has one age at first sex, shared across both layers: `debut_f` is normal(15.0, 2.1), `debut_m` normal(17.6, 1.8). Agents younger than their debut age never partner.
+2. **Participation.** `layer_probs_marital` and `layer_probs_casual` are (3, N) arrays: row 0 is the lower bound of each five-year age band, rows 1 and 2 the annual probability that a woman or a man in that band seeks a partner in that layer. These annual probabilities are converted to the timestep in use, so changing `dt` does not change behavior.
+3. **Concurrency.** Each agent has a per-layer target partner count, drawn from a Poisson and then **shifted up by one** — a participating agent wants at least one partner by definition, so `lam` (0.01 marital, 0.5 casual) governs only the tail of extra concurrent partners. Agents already partnered in the other layer must also pass an annual cross-layer roll: `m_cross_layer` 0.760, `f_cross_layer` 0.185.
+4. **Age mixing.** `mixing_marital` and `mixing_casual` say which men a woman of a given age partners with. Column 0 holds the age-band labels; each remaining column belongs to one band of women, and the values down that column weight male partners by their own band (the rows). Where a band has more women seeking partners than there are eligible men, a random subset of those women goes unpartnered this timestep — which is how a shortage of men in one band propagates.
+5. **Acts.** The drawn annual act count is scaled by the couple's average age: linearly from half (`debut_ratio` 0.5) at debut to full at `peak` (30 marital, 25 casual), then down to a tenth (`retirement_ratio` 0.1) by `retirement`. It is then converted to acts per timestep.
+
+## From `beta` to a per-act risk
+
+`HPV.pars.beta` is a plain scalar — the per-act transmission probability, 0.25 by default — not the per-partnership or per-timestep risk. Three per-genotype scalars expand it: `rel_beta` (1.0 for HPV16, 0.75 for HPV18, 0.9 for the pools), `transf2m` (1.0, female to male) and `transm2f` (2.0, male to female). `validate_beta()` returns the numbers actually used, as `[female-to-male, male-to-female]` per network. The network compounds across acts: a pair transmits in one timestep with probability `1 − (1 − per-act probability)^acts`.
+
+Values above 1 are clipped with a warning, since the compounding formula otherwise produces NaN silently. Watch for that warning if you raise `transm2f` or `rel_beta` during calibration.
+
+Condom use is not a network parameter in v3; any protective effect has to be absorbed into `beta`.
+
+HPVsim ships demographic data per country but not network parameters, so the defaults above are location-agnostic starting points. Supplying local behavioral data is the highest-value change you can make to a country model.
+
+## How to put local survey data into the network
+
+Behavioral surveys usually give you age at first sex, the proportion reporting a partner in the last year, and the number of partners. Those map onto `debut_*`, `layer_probs_*` and `*_partners_*`. Pass them with `nw_pars=`:
+
+```{python}
+import starsim as ss
+import hpvsim as hpv
+
+survey = dict(
+    debut_f = ss.normal(loc=17.0, scale=2.0),        # median age at first sex, women
+    debut_m = ss.normal(loc=18.5, scale=2.0),        # ... and men
+    f_partners_casual = ss.poisson(lam=0.2),         # extra concurrent casual partners
+    m_partners_casual = ss.poisson(lam=0.3),
+    acts_casual = ss.nbinom(n=5, p=5/(5+30)),        # mean 30 acts per year
+)
+
+sim = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
+              start=2000, stop=2020, nw_pars=survey, verbose=0)
+sim.run()
+
+net = sim.networks.sexualnetwork
+print('marital pairs in 2020:', net.n_pairs_in_layer('m'))
+print('casual pairs in 2020: ', net.n_pairs_in_layer('c'))
+print('per-act [f2m, m2f]:   ', sim.diseases.hpv16.validate_beta()['sexualnetwork'])
+print('HPV prevalence in 2020:', round(float(sim.results.all_hpv.prevalence[-1]), 3))
+```
+
+Every value in `hpv.NetworkPars` can be replaced this way. `nw_pars=` is a shortcut for the network HPVsim builds for you; if you construct your own `hpv.SexualNetwork(...)` and pass it as `networks=`, set its parameters there instead — passing both raises an error rather than silently ignoring one.
+
+Change the network and you change transmission, so `beta` will need recalibrating alongside it. Fit behavior to behavioral data first, then fit `beta` to prevalence.
+
+## See also
+
+- [T4 - People, populations, and networks](../tutorials/tut_people.qmd)
+- [Parameters](parameters.qmd) for the other ways to reach network parameters
+- [`hpv.SexualNetwork` API reference](../api/network.qmd) and [`hpv.NetworkPars`](../api/parameters.qmd)

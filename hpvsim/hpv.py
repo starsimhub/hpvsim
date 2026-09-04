@@ -24,8 +24,10 @@ identity matrix on the Connector.
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 
+from . import misc
 from .parameters import genotype_aliases, get_genotype_pars
 from .seeding import _make_init_prev_fn
 from .utils import compute_severity
@@ -33,13 +35,10 @@ from .utils import compute_severity
 
 _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
-# Per-agent Arrs that must NOT be cloned (identity, not biology).
+# Per-agent Arrs that must not be cloned (identity, not biology).
 _NO_CLONE_STATES = {'uid', 'slot'}
 
-# Per-agent lifecycle states that are cloned-then-reset: a clone is a fresh
-# agent (people.grow defaults), not a continuation of its source's death/removal
-# schedule. Mapped to the value a freshly grown agent should hold. Applied after
-# the copy loops so the caller never has to "clone then undo".
+# Lifecycle states reset after cloning, mapped to fresh-agent defaults.
 _RESET_ON_CLONE = {'ti_dead': np.nan, 'ti_removed': np.nan, 'alive': True}
 
 
@@ -134,22 +133,12 @@ class HPV(ss.Infection):
         if 'name' not in kwargs:
             kwargs['name'] = genotype
         super().__init__()
-        # Pull natural-history defaults from GenotypePars so there's a single
-        # source of truth per genotype.
+        # Natural-history defaults come from GenotypePars.
         gpars = get_genotype_pars(genotype)
         self.define_pars(
             init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
-            # Sex-directional beta: p1→p2 = female→male (transf2m); p2→p1 =
-            # male→female (transm2f). SexualNetwork places females in p1 and
-            # males in p2 (see hpvsim/network.py:185). validate_beta accepts
-            # this dict shape natively (ss.Infection.validate_beta).
-            beta={
-                'sexualnetwork': _clip_beta(
-                    gpars.beta * gpars.rel_beta * gpars.transf2m,
-                    gpars.beta * gpars.rel_beta * gpars.transm2f,
-                    genotype,
-                ),
-            },
+            # Scalar beta; validate_beta() expands it. A dict bypasses expansion.
+            beta=gpars.beta,
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
             dur_cancer=gpars.dur_cancer,
@@ -159,115 +148,69 @@ class HPV(ss.Infection):
             imm_init=gpars.imm_init,
             cell_imm_init=gpars.cell_imm_init,
             age_risk=gpars.age_risk,
-            # Per-genotype beta scaler and serology probability (multi-genotype).
+            # Per-genotype beta scaler, transmission asymmetry, serology prob.
             rel_beta=gpars.rel_beta,
+            transf2m=gpars.transf2m,
+            transm2f=gpars.transm2f,
             sero_prob=gpars.sero_prob,
-            # Multiscale: number of agents each cancer-capable agent represents.
-            # 1 = single scale (bit-identical no-op). >1 grows real fine cancer
-            # agents at scale 1/ms_agent_ratio.
+            # Agents each cancer-capable agent represents; >1 grows fine agents
+            # at scale 1/ms_agent_ratio, 1 is a bit-identical no-op.
             ms_agent_ratio=1,
+            # Probability a clearing female enters latency instead of clearing.
+            hpv_control_prob=0.0,
+            # Reactivation hazard for latents; only active when hpv_control_prob>0.
+            hpv_reactivation=ss.probperyear(0.025),
         )
         self.update_pars(pars=pars, **kwargs)
         self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
 
-        # The directional transmission `beta` dict above was built from the
-        # genotype DEFAULTS. Recompute it from the resolved pars so a `rel_beta`
-        # override (via genotype_pars= / pars=) actually changes transmission;
-        # without this it is silently ignored (the dict keeps the default
-        # rel_beta). Skip if the caller supplied an explicit `beta` — then they
-        # own the dict. With no override the recompute is byte-identical to the
-        # value set in define_pars.
-        _beta_overridden = ('beta' in kwargs) or (pars is not None and 'beta' in pars)
-        if not _beta_overridden:
-            self.pars.beta = {
-                'sexualnetwork': _clip_beta(
-                    gpars.beta * self.pars.rel_beta * gpars.transf2m,
-                    gpars.beta * self.pars.rel_beta * gpars.transm2f,
-                    genotype,
-                ),
-            }
-
-        # Guard against unit-less duration distributions: a duration given
-        # without ss.years(...) is read in timesteps, not years, so at dt<1 the
-        # infectious period is ~1/dt too short and the epidemic silently
-        # collapses. Fail loudly rather than run wrong science.
+        # A duration without ss.years() is read in timesteps, not years.
         self._validate_duration_units()
-        # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
-        # ti_infected. We add the natural-history states below.
+        # ss.Infection already provides susceptible/infected/rel_sus/rel_trans/ti_infected.
         self.define_states(
             ss.FloatArr('ti_clearance', label='Time of natural clearance'),
-            # Set on first infection only; preserves first-infection age
-            # across reinfection (ti_infected is overwritten each time).
+            # Set on first infection only; ti_infected is overwritten on reinfection.
             ss.FloatArr('ti_first_infection', label='Time of first infection'),
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
-            # No-op state hook to support products_dx.csv's `latent` rows. Real
-            # reactivation natural history (set_prognoses branch + step_state
-            # reactivation) is a post-M06 follow-on; for now nothing populates this.
             ss.BoolState('latent', label='Latent infection'),
+            # Set in set_prognoses, cleared by step_state once ti_latent is stamped.
+            # BoolArr, not BoolState: an internal scheduling flag, so it must not
+            # auto-generate a public n_to_latent result (which would also be
+            # summed into all_hpv, where it is meaningless).
+            ss.BoolArr('to_latent', label='Pending transition into latency'),
+            ss.FloatArr('ti_latent', label='Time latency began'),
+            ss.FloatArr('ti_reactivation', label='Time of reactivation from latency'),
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
-            # Severity immunity, accumulated as max-of-beta-samples on each
-            # clearance. Shortens future dur_precin via (1 - sev_imm) factor.
+            # Running max over clearances; shortens future dur_precin by (1 - sev_imm).
             ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
-            # Clearance-conferred humoral/cell-mediated immunity. Bumped on
-            # clearance; read by CrossImmunity to derive per-target rel_sus /
-            # sev_imm via the cross-protection matrix. Does NOT include vaccine
-            # immunity — that lives in vax_imm below so it bypasses the matrix.
+            # Per-source: immunity conferred by clearing this genotype, which
+            # CrossImmunity matrix-multiplies into per-target rel_sus/sev_imm.
             ss.FloatArr('nab_imm', label='Humoral immunity (clearance-conferred, source genotype)', default=0.0),
             ss.FloatArr('cell_imm', label='Cell-mediated immunity (source genotype)', default=0.0),
-            # Vaccine-conferred immunity per target genotype. Written by
-            # hpv.vx.administer(); applied directly per genotype in
-            # CrossImmunity.step() WITHOUT flowing through the cross-immunity
-            # matrix. The CSV's per-genotype rel_imm values are the complete
-            # vaccine cross-protection profile. Combining formula (independent
-            # protection paths):
-            #   rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm) * (1 - txvx_imm)
-            # See CrossImmunity.step() for the canonical implementation.
-            # "target genotype": vax_imm[g] is protection AGAINST genotype g,
-            # already resolved per target (the CSV's rel_imm[g] is applied
-            # directly). Contrast nab_imm/cell_imm above, which are "source"
-            # quantities — immunity conferred BY clearing this genotype, which
-            # CrossImmunity then matrix-multiplies to derive protection against
-            # OTHER (target) genotypes.
+            # Per-target: protection against this genotype, applied directly in
+            # CrossImmunity.step() and never through the cross-immunity matrix.
             ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (against this/target genotype)', default=0.0),
-            ss.FloatArr(
-                'txvx_imm',
-                label='Therapeutic-vaccine-conferred immunity (this genotype)',
-                default=0.0,
-            ),
+            ss.FloatArr('txvx_sev_imm', label='Therapeutic-conferred severity immunity (against this/target genotype)', default=0.0),
         )
-        # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
-        # use site (placeholder p values below).
+        # p is overwritten via .set(p=...) at each use site.
         self._cin_bern = ss.bernoulli(p=0.5)
         self._cancer_bern = ss.bernoulli(p=0.5)
         self._sero_bern = ss.bernoulli(p=0.5)
-        # Per-decision Bernoullis for CRN-safe stochastic rounding of
-        # event durations. Each ``ti_<event>`` schedule gets its own dist so
-        # the per-uid round-up draw is independent across decisions.
+        # One rounding dist per ti_<event> so the round-up draws stay independent.
         self._round_clear_precin_bern = ss.bernoulli(p=0.5)
         self._round_cin_bern = ss.bernoulli(p=0.5)
         self._round_clear_cin_bern = ss.bernoulli(p=0.5)
         self._round_cancer_bern = ss.bernoulli(p=0.5)
         self._round_dead_bern = ss.bernoulli(p=0.5)
-        # Multiscale grow: dedicated dists for the extra fine-agent trajectories
-        # (_grow_fine_agents). These are SEPARATE RNG streams from the live
-        # natural-history dists (dur_precin/dur_cin above), so growing fine
-        # agents never consumes randomness the REAL agents draw from — that
-        # isolation is what keeps ms_agent_ratio==1 bit-identical and cancer
-        # incidence flat across ratios (the base agents get identical draws
-        # regardless of how many fine agents are grown). They are drawn by size
-        # (non-CRN); cross-scenario CRN is out of scope for multiscale.
-        #
-        # The live dists' mean/std are ss.years TimePars. .years strips the
-        # TimePar so these dists stay UNITLESS and .rvs() returns plain YEARS —
-        # which is what compute_severity and the grow math expect. Without the
-        # cast, starsim's convert_timepars would divide by dt at init (a TimePar
-        # duration becomes a number of TIMESTEPS), so .rvs() would be 1/dt too
-        # large (4x at dt=0.25) and _grow_fine_agents does NOT re-multiply by
-        # dt_yr on this path (unlike the live dur_cin path in set_prognoses).
+        # Latency entry roll and reactivation hazard get their own streams.
+        self._latent_bern = ss.bernoulli(p=0.5)
+        self._reactivation_bern = ss.bernoulli(p=0.5)
+        # Separate RNG streams so growing fine agents doesn't perturb real agents' draws.
+        # .years keeps these unitless: .rvs() returns years, not timesteps.
         def _yr(v):
             return v.years if hasattr(v, 'years') else v
         pc = self.pars.dur_precin.pars
@@ -314,11 +257,7 @@ class HPV(ss.Infection):
         return
 
     def init_post(self):
-        # Ensure CrossImmunity has sampled rel_sev for the starting population
-        # BEFORE super().init_post() runs init_prev seeding (which triggers
-        # set_prognoses, which reads rel_sev). First HPV module to init_post
-        # triggers the sampling; subsequent modules are no-ops because
-        # rel_sev_sampled is already True for everyone.
+        # rel_sev must be sampled before super() seeds init_prev, which reads it.
         cross = self._cross_immunity_connector()
         if cross is not None:
             cross.ensure_rel_sev(self.sim.people.alive.uids)
@@ -340,19 +279,39 @@ class HPV(ss.Infection):
                 return c
         return None
 
-    # BoolState names whose auto n_* results must be promoted to float and
-    # scale-weighted (fine agents carry scale 1/ratio, not 1).
+    # Stocks whose auto n_* results are promoted to float and scale-weighted.
     _STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin',
                      'cancerous', 'latent')
 
-    def _hiv_connector(self):
-        """Locate the hpv_hiv_connector on the sim, if any (None when no HIV)."""
-        # Avoid circular import at module load (hiv.py imports HPV from this module).
-        from .hiv import hpv_hiv_connector
-        for c in self.sim.connectors.values():
-            if isinstance(c, hpv_hiv_connector):
-                return c
-        return None
+    def validate_beta(self):
+        """Expand a scalar pars.beta via rel_beta/transf2m/transm2f (mirrors
+        stisim's BaseSTI.validate_beta). An explicit dict pars.beta is passed
+        through unchanged. A bare (unattached) module has no self.sim to
+        validate networks against, so skip super() and expand/pass-through
+        directly."""
+        beta = self.pars.beta
+        if self.sim is None:
+            if sc.isnumber(beta):
+                base = beta * self.pars.rel_beta
+                return {'sexualnetwork': _clip_beta(
+                    base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
+                )}
+            return dict(beta)
+        betamap = super().validate_beta()
+        if sc.isnumber(beta):
+            base = beta * self.pars.rel_beta
+            for net in betamap:
+                if net == 'sexualnetwork':
+                    betamap[net] = _clip_beta(
+                        base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
+                    )
+                else:
+                    betamap[net] = [0.0, 0.0]
+        return betamap
+
+    def _hiv_module(self):
+        """Locate the hpv.HIV disease on the sim, if any (None when no HIV)."""
+        return misc.hiv_module(self.sim)
 
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
@@ -368,8 +327,7 @@ class HPV(ss.Infection):
         carry ``scale=1/ratio`` and must count as 1/ratio, not 1).
         """
         super().init_results()
-        # Promote auto n_* results to float64 so scale-weighted writes don't
-        # silently truncate. Must happen after super() creates them.
+        # Must run after super() creates them.
         for state_name in self._STOCK_STATES:
             key = f'n_{state_name}'
             if key in self.results:
@@ -390,6 +348,8 @@ class HPV(ss.Infection):
                       label='Sum of ages at cancer onset'),
             ss.Result('sum_age_at_cancer_death', dtype=float, scale=True,
                       label='Sum of ages at cancer death'),
+            ss.Result('new_reactivations', dtype=float, scale=True,
+                      label='New reactivations from latency'),
         )
         return
 
@@ -427,12 +387,8 @@ class HPV(ss.Infection):
                 ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
             )
 
-        # Re-derive per-genotype prevalence from the now-correct scale-weighted
-        # n_infected (super computed it from the stale plain-count n_infected).
-        # Denominator is the alive-masked scale-weighted count (consistent with
-        # HPVTotal); auids would include agents who died this step but aren't yet
-        # removed (remove_dead runs after update_results), inflating the
-        # denominator ~0.6%/step (~9% at t=0).
+        # Denominator must be alive-masked: auids still includes agents who died
+        # this step, since remove_dead runs after update_results.
         if 'prevalence' in self.results and 'n_infected' in self.results:
             n_alive_sw = ppl.scale_flows(ppl.alive.uids)
             self.results['prevalence'][ti] = (
@@ -470,6 +426,24 @@ class HPV(ss.Infection):
         bumps = dist.rvs(uids)
         return (floor + bumps).astype(int)
 
+    def _roll_latency(self, female_uids):
+        """Roll hpv_control_prob for female agents about to clear.
+
+        Called from both clearance-scheduling branches in set_prognoses (precin-
+        only clearance, and post-CIN clearance) so the roll applies to any
+        clearance event, matching v2.2.6 semantics. Agents who hit are flagged
+        to_latent=True; step_state redirects their scheduled clearance into
+        latency instead of susceptibility. No-op when hpv_control_prob==0 (the
+        default), keeping the feature a true no-op unless calibrated on.
+        """
+        if len(female_uids) == 0 or self.pars.hpv_control_prob == 0:
+            return
+        p = np.full(len(female_uids), self.pars.hpv_control_prob)
+        self._latent_bern.set(p=p)
+        latent_uids = self._latent_bern.filter(female_uids)
+        if len(latent_uids):
+            self.to_latent[latent_uids] = True
+
     def set_prognoses(self, uids, sources=None):
         """Sample full natural-history trajectory for newly-infected agents.
 
@@ -489,7 +463,6 @@ class HPV(ss.Infection):
         ti = self.ti
         p = self.pars
 
-        # Record ti_first_infection only for agents seeing their first infection.
         first_uids = uids[self.ti_first_infection.isnan[uids]]
         self.ti_first_infection[first_uids] = ti
 
@@ -498,16 +471,16 @@ class HPV(ss.Infection):
         self.ti_infected[uids] = ti
         self.precin[uids] = True
 
-        # Defensive reset so stale schedules from a prior infection don't
-        # fire spuriously in step_state.
+        # Clear stale schedules from a prior infection.
         self.ti_clearance[uids] = np.nan
         self.ti_cin[uids] = np.nan
         self.ti_cancerous[uids] = np.nan
         self.ti_dead_cancer[uids] = np.nan
+        self.to_latent[uids] = False
+        self.latent[uids] = False
 
         female_all = self.sim.people.female[uids]
-        # rel_sev is shared across HPV modules via the CrossImmunity connector;
-        # ensure it's sampled for these uids (lazy first-touch sampling).
+        # rel_sev is shared across genotypes via CrossImmunity, sampled on first touch.
         cross = self._cross_immunity_connector()
         if cross is not None:
             cross.ensure_rel_sev(uids)
@@ -515,24 +488,20 @@ class HPV(ss.Infection):
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
         # HIV co-infection scales progression severity (gated no-op when no HIV).
-        hivc = self._hiv_connector()
+        hivc = self._hiv_module()
         if hivc is not None:
             rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
         sev_imm_uids = self.sev_imm[uids]
 
-        # 1. Sample precin durations.
-        #    Females: sample * (1 - sev_imm); rel_sev passes separately to
-        #    compute_severity below so the model forms the two-factor product.
-        #    Males: dur_inf_male sample with no immunity reductions; they then
-        #    clear from precin without progression.
+        # 1. Precin durations: females get sample * (1 - sev_imm), males get
+        #    dur_inf_male with no immunity reduction. rel_sev applies separately.
         dur_precin = p.dur_precin.rvs(uids) * (1.0 - sev_imm_uids)
         if (~female_all).any():
             male_uids = uids[~female_all]
             dur_inf_male = p.dur_inf_male.rvs(male_uids)
             dur_precin[~female_all] = dur_inf_male
 
-        # 2. P(CIN) per female. Distributions return durations in starsim
-        #    timesteps; convert to years before passing (cin_fn's ttc=50 is years).
+        # 2. P(CIN) per female. Dists return timesteps; cin_fn expects years.
         dt_yr = self.t.dt_year
         p_cin = compute_severity(dur_precin * dt_yr,
                                    rel_sev=rel_sev_uids, pars=p.cin_fn)
@@ -542,15 +511,8 @@ class HPV(ss.Infection):
         cin_uids = uids[cin_mask]
         nocin_uids = uids[~cin_mask]
 
-        # Schedule events with CRN-safe stochastic rounding (``_randround``)
-        # for FEMALE events and ``np.ceil`` for MALE clearance.
-        # Without rounding, fractional ti_<event> behaves like np.ceil at the
-        # ``<= ti`` check — fine for males, but biases female timings.
-        # Bias direction: np.ceil pushes male clearance to the next integer
-        # step, so males clear up to one dt later than the fractional duration.
-
-        # 3. Branch A: clearance from precin. Split male / female paths so
-        #    males get np.ceil and females get the CRN-safe stochastic round.
+        # 3. Branch A: clearance from precin. Females get the CRN-safe stochastic
+        #    round (_randround), males np.ceil (which biases them a dt late).
         nocin_dur = dur_precin[~cin_mask]
         nocin_female = female_all[~cin_mask]
         rounded_dur = np.empty(len(nocin_dur), dtype=int)
@@ -565,6 +527,7 @@ class HPV(ss.Infection):
                 nocin_dur[~nocin_female]
             ).astype(int)
         self.ti_clearance[nocin_uids] = ti + rounded_dur
+        self._roll_latency(nocin_uids[nocin_female])
 
         if len(cin_uids) == 0:
             return
@@ -574,16 +537,13 @@ class HPV(ss.Infection):
             dur_precin[cin_mask], cin_uids, self._round_cin_bern,
         )
         dur_cin = p.dur_cin.rvs(cin_uids)
-        # age_risk multiplier: women aged >= age_risk['age'] get dur_cin
-        # scaled by age_risk['risk'].
+        # age_risk multiplier on dur_cin above the threshold age.
         ages_at_cin = self.sim.people.age[cin_uids]
         age_mod = np.ones(len(cin_uids))
         age_mod[ages_at_cin >= p.age_risk['age']] = p.age_risk['risk']
         dur_cin = dur_cin * age_mod
 
-        # 5. P(cancer) given dur_cin. sev_imm is NOT applied to dur_cin —
-        #    only rel_sev (passed separately to compute_severity). Same
-        #    timestep -> years conversion as step 2.
+        # 5. P(cancer) given dur_cin. sev_imm is not applied here, only rel_sev.
         rel_sev_cin = rel_sev_uids[cin_mask]
         p_cancer = compute_severity(dur_cin * dt_yr,
                                       rel_sev=rel_sev_cin, pars=p.cancer_fn)
@@ -598,10 +558,10 @@ class HPV(ss.Infection):
                 dur_cin[~cancer_draw], nocancer_uids, self._round_clear_cin_bern,
             )
         )
+        self._roll_latency(nocancer_uids)  # already all-female (CIN branch is female-only)
 
-        # 5b. Progression to cancer. Guard is local to the base scheduling only;
-        # the grow in step 6 must still run over all cin_uids even when no base
-        # agent drew cancer this call.
+        # 5b. Progression to cancer. Guard is local: step 6 must still run over
+        #     all cin_uids even when no base agent drew cancer.
         if len(cancer_uids):
             self.ti_cancerous[cancer_uids] = (
                 self.ti_cin[cancer_uids] + self._randround(
@@ -694,10 +654,7 @@ class HPV(ss.Infection):
         new_dur_cin = extra_dur_cin[extra_cancer]         # years
         new_uids = ppl.grow(n_new)
 
-        # Full cross-genotype clone of the source individuals. _clone_agents
-        # also resets the lifecycle states in _RESET_ON_CLONE (ti_dead/
-        # ti_removed/alive) so the fine agent never inherits the source's
-        # death/removal schedule.
+        # Full cross-genotype clone; _clone_agents also resets lifecycle states.
         _clone_agents(self.sim, src_uids, new_uids)
 
         # Fine-agent identity.
@@ -713,7 +670,7 @@ class HPV(ss.Infection):
         self.ti_infected[new_uids] = ti
         self.ti_first_infection[new_uids] = ti
         self.ti_clearance[new_uids] = np.nan
-        # durations are in YEARS; convert to steps via /dt_yr before rounding.
+        # Durations are in years; convert to steps via /dt_yr before rounding.
         ti_cin = ti + self._randround(new_dur_precin / dt_yr, new_uids,
                                       self._round_cin_bern)
         self.ti_cin[new_uids] = ti_cin
@@ -739,19 +696,14 @@ class HPV(ss.Infection):
         for module in self.sim.diseases.values():
             if not isinstance(module, HPV) or module is self:
                 continue
-            # Cancel pending cancer progression in this other genotype
             module.ti_cancerous[uids] = np.nan
             module.ti_dead_cancer[uids] = np.nan
-            # Clear all dysplasia state: CIN is split into precin + cin, so
-            # clear both (and their scheduled transition times) to keep these
-            # agents from re-promoting precin -> cin on the now-cancerous body.
+            # Clear both precin and cin so nothing re-promotes on a cancerous body.
             module.precin[uids] = False
             module.cin[uids] = False
             module.ti_cin[uids] = np.nan
-            # Clear pending clearance (these infections won't clear naturally;
-            # the agent is dying of cancer instead)
+            # These infections won't clear naturally; the agent is dying of cancer.
             module.ti_clearance[uids] = np.nan
-            # Agent is no longer susceptible / infected with this genotype either
             module.susceptible[uids] = False
             module.infected[uids] = False
 
@@ -766,31 +718,33 @@ class HPV(ss.Infection):
           3. CIN -> cancerous (stops transmitting)
           4. Cancer death (via people.request_death)
         """
-        # rel_sev for births/immigrants is sampled lazily by the
-        # CrossImmunity connector's step() before any HPV step_infect runs,
-        # and again on first-touch in set_prognoses; no per-module work needed.
+        self.rel_sus[:] = 1.0  # reset so CrossImmunity/HIV multiply, not overwrite
         ti = self.ti
 
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
-        # Returns agent to susceptible=True. nab_imm and cell_imm accumulate
-        # the running max of per-agent beta samples; the CrossImmunity connector
-        # reads them next step to derive rel_sus and sev_imm. ``infected`` is
-        # mutually exclusive with ``cancerous`` (step 3 toggles them), so it
-        # implies precin|cin.
+        # infected is mutually exclusive with cancerous, so it implies precin|cin.
         cleared = (self.infected & (self.ti_clearance <= ti)).uids
         if len(cleared):
             self.infected[cleared] = False
-            self.susceptible[cleared] = True
             self.precin[cleared] = False
             self.cin[cleared] = False
 
-            # Only update post-clearance immunity for females; males clear
-            # without seroconverting. First-clearance immunity is gated on
-            # sero_prob; non-seroconverters keep nab_imm/cell_imm = 0 and are
-            # fully reinfectible on next exposure. Repeat clearances always
-            # update via running max (sero_prob only gates the first event).
+            # Agents redirected into latency leave precin/cin/infected but do not
+            # become susceptible and gain no clearance-conferred immunity.
+            to_latent_uids = cleared[self.to_latent[cleared]]
+            to_susceptible_uids = cleared[~self.to_latent[cleared]]
+
+            self.susceptible[to_susceptible_uids] = True
+
+            if len(to_latent_uids):
+                self.latent[to_latent_uids] = True
+                self.ti_latent[to_latent_uids] = ti
+                self.to_latent[to_latent_uids] = False
+
+            # Females only. sero_prob gates the first clearance; repeats always
+            # take the running max.
             female = self.sim.people.female
-            f_cleared = cleared[female[cleared]]
+            f_cleared = to_susceptible_uids[female[to_susceptible_uids]]
             if len(f_cleared):
                 has_prior_imm = self.nab_imm[f_cleared] > 0
                 first_mask  = ~has_prior_imm
@@ -802,12 +756,8 @@ class HPV(ss.Infection):
                 cell_all = p.cell_imm_init.rvs(f_cleared)
 
                 # HIV co-infection reduces conferred immunity (gated no-op).
-                # Note: step_state runs before the connector's step(), so this
-                # reads hiv_rel_imm from the PREVIOUS timestep (a one-dt lag,
-                # immaterial since CD4 moves slowly). Contrast set_prognoses,
-                # which reads hiv_rel_sev fresh because step_infect runs after
-                # the connector.
-                hivc = self._hiv_connector()
+                # hiv_rel_imm is one dt stale: step_state runs before the connector.
+                hivc = self._hiv_module()
                 if hivc is not None:
                     imm_factor = hivc.hiv_rel_imm[f_cleared]
                     nab_all = nab_all * imm_factor
@@ -816,25 +766,45 @@ class HPV(ss.Infection):
                 if len(first_uids):
                     self._sero_bern.set(p=float(p.sero_prob))
                     seroconvert = self._sero_bern.rvs(first_uids)
-                    # nab_imm (humoral) is gated on seroconversion: non-
-                    # seroconverters keep 0 nab and remain fully reinfectible.
-                    # cell_imm (cell-mediated severity) is NOT gated — all
-                    # first-clearance females get severity protection,
-                    # regardless of whether they seroconverted. Without this,
-                    # non-seroconverters get no dur_precin reduction on
-                    # reinfection, inflating transmission for low-sero_prob
-                    # genotypes (hpv18=0.56, hi5/ohr=0.60).
+                    # nab_imm is gated on seroconversion; cell_imm is not, so all
+                    # first-clearance females get severity protection.
                     self.nab_imm[first_uids]  = seroconvert * nab_all[first_mask]
                     self.cell_imm[first_uids] = cell_all[first_mask]
 
-                # For repeat clearances the running max may retain a higher value
-                # from a prior clearance; the HIV-reduced increment only fails to
-                # boost immunity, it never erases existing antibodies.
+                # Running max: an HIV-reduced increment can fail to boost immunity
+                # but never erases what a prior clearance conferred.
                 if len(repeat_uids):
                     self.nab_imm[repeat_uids] = np.maximum(
                         self.nab_imm[repeat_uids], nab_all[has_prior_imm])
                     self.cell_imm[repeat_uids] = np.maximum(
                         self.cell_imm[repeat_uids], cell_all[has_prior_imm])
+
+        # --- 1b. Reactivation from latent (per-timestep hazard) ---
+        # ti_latent < ti, not <=: no same-step clear-into-latent-then-reactivate.
+        latent_uids = (self.latent & (self.ti_latent < ti)).uids
+        if len(latent_uids):
+            sev_imm_uids = self.sev_imm[latent_uids]
+            hivc = self._hiv_module()
+            if hivc is not None:
+                rel_reactivation_uids = hivc.hiv_rel_reactivation[latent_uids]
+            else:
+                rel_reactivation_uids = np.ones(len(latent_uids))
+            # Relative factors scale the rate via scale=, never the probability:
+            # the rate -> probability conversion happens once, in .to_prob().
+            combined_rel = (1.0 - sev_imm_uids) * rel_reactivation_uids
+            p_react = self.pars.hpv_reactivation.to_prob(self.t.dt, scale=combined_rel)
+            self._reactivation_bern.set(p=p_react)
+            reactivated = self._reactivation_bern.filter(latent_uids)
+            if len(reactivated):
+                self.latent[reactivated] = False
+                self.ti_reactivation[reactivated] = ti
+                # Fresh trajectory; immunity carries over. set_prognoses bumps
+                # new_infections unconditionally, so back it out here.
+                ppl = self.sim.people
+                n_react = ppl.scale_flows(reactivated)
+                self.set_prognoses(reactivated)
+                self.results.new_infections[ti] -= n_react
+                self.results.new_reactivations[ti] = n_react
 
         # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
@@ -861,11 +831,7 @@ class HPV(ss.Infection):
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
-            # +dt_yr records age as of the end of the step. step_state fires
-            # BEFORE finish_step advances agent age, so reading sim.people.age
-            # here gives the age at step start (initial + T*dt); adding dt_yr
-            # records the age the agent has after this step's increment
-            # (initial + (T+1)*dt), the intended age at cancer death.
+            # +dt_yr: step_state runs before ages advance, so this is age at step end.
             dt_yr = self.t.dt_year
             ppl = self.sim.people
             ages_at_death = ppl.age[to_dead] + dt_yr
@@ -875,10 +841,8 @@ class HPV(ss.Infection):
             self.sim.people.request_death(to_dead)
 
     def step_die(self, uids):
-        """Reset transient compartment flags for dying agents.
-
-        Without this, dead agents would keep their compartment flags and
-        corrupt n_precin / n_cin / n_cancerous counts.
+        """ Set states to False for the newly-dead. 
+        IMPORTANT: if you add any new states, remember to add them here!
         """
         super().step_die(uids)
         self.precin[uids] = False
@@ -886,3 +850,5 @@ class HPV(ss.Infection):
         self.cancerous[uids] = False
         self.infected[uids] = False
         self.susceptible[uids] = False
+        self.latent[uids] = False
+        self.to_latent[uids] = False

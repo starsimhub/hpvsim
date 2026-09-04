@@ -2,9 +2,17 @@
 
 import warnings
 
+import pytest
+import starsim as ss
+
+import hpvsim as hpv
 from hpvsim.sim import Sim
 from hpvsim.hpv import HPV
 from hpvsim.network import SexualNetwork
+
+
+def _tiny(**kw):
+    return dict(n_agents=200, start=2000, stop=2002, dt=0.25, location='nigeria', **kw)
 
 
 def test_sim_constructs_with_defaults():
@@ -156,9 +164,7 @@ def test_datafolder_override_uses_user_csv(tmp_path):
     (tmp_path / 'age_data.csv').write_text(df.to_csv(index=False))
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')  # missing birth/death/pop_total CSVs will warn
-        # location is still required (used for bundled fallbacks on other
-        # indicators + for network defaults); user CSV overrides the age
-        # distribution.
+        # location is still required for network defaults and other indicators.
         sim = hpv.Sim(location='nigeria', datafolder=str(tmp_path),
                       n_agents=200, start=2000, stop=2001, dt=1.0, rand_seed=0)
         sim.init()
@@ -169,14 +175,12 @@ def test_datafolder_override_uses_user_csv(tmp_path):
 def test_datafolder_missing_indicator_warns(tmp_path):
     """When a datafolder is given but an indicator CSV is missing, warn."""
     import hpvsim as hpv
-    # Empty datafolder: every indicator triggers a warning (and falls back
-    # to bundled UN WPP for the caller-specified location).
+    # Empty datafolder: every indicator warns and falls back to bundled UN WPP.
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
         hpv.Sim(location='nigeria', datafolder=str(tmp_path),
                 n_agents=100, start=2000, stop=2001, dt=1.0, rand_seed=0)
     msgs = [str(w.message) for w in caught]
-    # At least one indicator file should be reported missing.
     assert any('not found in datafolder' in m for m in msgs), (
         f'expected a missing-indicator warning; got {msgs}'
     )
@@ -204,3 +208,27 @@ def test_stop_without_end_does_not_warn():
         warnings.simplefilter('always')
         Sim(n_agents=200, start=2000, stop=2005, dt=1.0)
     assert not any('deprecated alias' in str(w.message) for w in caught)
+
+
+def test_genotypes_plus_other_disease_merges():
+    """A non-HPV disease passed via diseases= merges with genotype-built HPV."""
+    other = ss.SIS()  # any non-HPV ss.Disease as a stand-in
+    sim = hpv.Sim(**_tiny(genotypes=[16, 18], diseases=[other]))
+    sim.init()
+    hpv_mods = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)]
+    assert len(hpv_mods) == 2                      # genotypes still built
+    assert any(isinstance(d, ss.SIS) for d in sim.diseases.values())  # other merged in
+
+
+def test_hpv_instance_override_still_works():
+    """diseases=[HPV,...] override path is unchanged (no genotypes=)."""
+    sim = hpv.Sim(**_tiny(diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')]))
+    sim.init()
+    hpv_mods = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)]
+    assert len(hpv_mods) == 2
+
+
+def test_hpv_instances_plus_genotypes_raises():
+    """Specifying the HPV set two ways still raises."""
+    with pytest.raises(ValueError, match='genotypes='):
+        hpv.Sim(**_tiny(genotypes=[16], diseases=[hpv.HPV(genotype='hpv16')]))

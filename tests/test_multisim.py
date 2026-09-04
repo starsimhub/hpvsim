@@ -48,8 +48,7 @@ def test_multisim_median_reduce_shape_and_nonneg():
     msim = ss.MultiSim(sim, n_runs=5).run(verbose=0)
     pre_len = len(msim.sims[0].results.hpv16.cum_infections)
     msim.median()
-    # After reduce, msim exposes a single aggregate result with the same
-    # time-axis length as each underlying sim. Results are flattened to top-level keys.
+    # Reduced results are flattened to top-level keys (hpv16_cum_infections).
     reduced = np.asarray(msim.results.hpv16_cum_infections)
     assert reduced.shape == (pre_len,)
     assert np.all(reduced >= 0), 'cum_infections must be non-negative post-median'

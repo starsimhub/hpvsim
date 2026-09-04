@@ -84,8 +84,7 @@ def test_genotypes_sugar_matches_explicit_diseases():
     """
     pars = dict(n_agents=500, location='nigeria',
                 start=1990, stop=1995, dt=1.0, rand_seed=0)
-    # Use init_seeding='independent' so both sides draw from the same per-HPV
-    # init_prev curves and are directly comparable.
+    # 'independent' makes both sides draw from the same per-HPV init_prev curves.
     sim_a = hpv.Sim(genotypes=[16, 18], init_seeding='independent', **pars)
     sim_a.run()
     sim_b = hpv.Sim(
@@ -175,9 +174,7 @@ def test_hpvtotal_cum_infections_unique_bounded_by_sum_of_flows_end_of_sim():
     don't fire through the per-step new_infections counter, so unique can
     briefly exceed sum-of-flows before transmission catches up.
     """
-    # Longer sim (stop=2005) so transmission decisively catches up to the
-    # ~init_prev-sized initial seed cohort — with a 5-year window the bound
-    # can still be violated at some RNG streams.
+    # stop=2005: a 5-year window is too short for transmission to overtake seeding.
     sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=2005,
                   dt=1.0, rand_seed=0)
     sim.run()

@@ -7,24 +7,20 @@ import sciris as sc
 import starsim as ss
 import hpvsim as hpv
 
-# Age-bin edges shared by the by_age recorders and the by-age assertions
-# (5 edges -> 4 bins -> 4 age ticks).
+# 5 edges -> 4 bins -> 4 age ticks, as asserted below.
 EDGES = np.array([0., 15., 30., 50., 100.])
 
 
 @pytest.fixture(scope='module')
 def rich_sim():
-    """One 2-genotype, single-scale sim with a rich analyzer stack, run once and
-    shared (read-only) across the structure-only plotting tests.
+    """One 2-genotype, single-scale sim with a rich analyzer stack, shared
+    read-only across the structure-only plotting tests.
 
-    Recording ``cancers`` / ``hpv_prevalence`` / ``cancerous_genotype_dist`` in
-    by_age plus ``age_pyramid`` / ``age_causal_infection`` / ``dalys`` covers
-    every plot_* entry point except the intervention-impact pair (needs a
-    scenario arm) and the two ``plot_sim`` negative cases (need a sim that lacks
-    the required by_age keys). 6000 agents at dt=0.5 keeps enough cancer
-    signal for cancerous_genotype_dist and the dalys/age_causal panels — a wide,
-    coarse run is cheaper than a narrow, fine one for the same signal, since
-    cost is dominated by a fixed per-timestep overhead.
+    The by_age keys plus age_pyramid / age_causal_infection / dalys cover every
+    plot_* entry point except the intervention-impact pair (needs a scenario
+    arm) and the two ``plot_sim`` negative cases (need missing by_age keys).
+    6000 agents at dt=0.5 keeps enough cancer signal for the genotype-dist and
+    dalys/age_causal panels.
     """
     ar = hpv.by_age(['cancers', 'hpv_prevalence'],
                     years=[2015, 2025], edges=EDGES)
@@ -72,11 +68,6 @@ def test_plot_type_distribution_bars_sum_to_one(rich_sim):
     assert np.isclose(sum(heights), 1.0)              # normalized shares
 
 
-# test_plot_type_distribution_age_results_source removed:
-# by_age no longer supports type-distribution keys; plot_type_distribution
-# takes only an hpv.Sim source now (delegates to results_by_genotype).
-
-
 def test_plot_sim_default_four_panels_and_requires_age_results(rich_sim):
     fig = hpv.plot_sim(rich_sim, which='default')
     assert len(fig.axes) == 4
@@ -102,8 +93,7 @@ def test_plot_sim_default_raises_when_age_results_lacks_keys():
 
 
 def test_plot_intervention_impact_averted_identity():
-    # Asserts an algebraic identity (averted == baseline - scenario) + panel
-    # count, so it holds for any values — a small/short annual-step sim suffices.
+    # averted == baseline - scenario holds for any values, so a tiny sim suffices.
     base = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
                    stop=2015, dt=1.0, n_agents=300, rand_seed=1)
     base.run()

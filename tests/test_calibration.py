@@ -26,12 +26,10 @@ def test_build_sim_routes_top_level_pars():
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
                   genotypes=[16, 18])
     sim.init()
-    out = hpv.calibration.build_sim(sim, calib_pars={'rand_seed': 7, 'beta': 0.25})
+    out = hpv.calibration.build_sim(sim, calib_pars={'rand_seed': 7, 'ms_agent_ratio': 3})
     assert out.pars.rand_seed == 7
-    # beta is per-network directional; 'beta' scalar rescales preserving F/M
     for d in (out.diseases.hpv16, out.diseases.hpv18):
-        f2m = d.pars.beta['sexualnetwork'][0]
-        assert f2m == pytest.approx(0.25)
+        assert d.pars.ms_agent_ratio == 3
 
 
 def test_build_sim_routes_per_genotype_pars():
@@ -43,19 +41,6 @@ def test_build_sim_routes_per_genotype_pars():
     assert out.diseases.hpv16.pars.cin_fn['k'] == 0.77
 
 
-def test_build_sim_routes_cross_immunity():
-    """A 'cross_immunity.<matrix>.<tgt>.<src>' key writes into the connector matrix."""
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
-                  genotypes=[16, 18, 'hi5', 'ohr'])
-    sim.init()
-    out = hpv.calibration.build_sim(
-        sim, calib_pars={'cross_immunity.cross_imm_sus.hpv16.hpv18': 0.42})
-    conn = [c for c in out.connectors.values()
-            if isinstance(c, hpv.CrossImmunity)][0]
-    idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
-    assert conn.cross_imm_sus[idx['hpv16'], idx['hpv18']] == 0.42
-
-
 def test_build_sim_raises_on_unknown_key():
     """An unrecognized calib_pars key raises ValueError."""
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
@@ -65,10 +50,8 @@ def test_build_sim_raises_on_unknown_key():
 
 
 def test_build_sim_does_not_mutate_base():
-    """build_sim mutates the passed sim — ss.Calibration's dcp is the
-    no-mutate guarantee. This test confirms we mutate the *passed* sim, not
-    something else, and that the test verifies the contract by passing dcp'd
-    copies."""
+    """build_sim mutates only the sim handed to it, leaving the original the
+    copy was taken from untouched — the basis of ss.Calibration's dcp-per-trial."""
     sim_base = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     sim_base.init()
     original_seed = sim_base.pars.rand_seed
@@ -167,13 +150,9 @@ def test_default_eval_fn_weighted_sum_across_targets():
     prev_off = prev + 0.05
     data = _as_standardized({'cancers': cancers_off, 'hpv_prevalence': prev_off})
 
-    # Per-column gofs (sum-scalar by default).
-    # For each age-bin column, per-cell error = 1.0 (cancers) or 0.05 (prev).
-    # Normalization by max(|actual|) inside compute_gof matters -- easier to
-    # just call default_eval_fn twice (unweighted + weighted) and check
-    # linearity in the weights.
+    # compute_gof normalizes internally, so test linearity in the weights rather
+    # than hand-computing the per-column gofs.
     fit_unweighted = hpv.calibration.default_eval_fn(sim, data=data)
-    # Weight scaling: weighting ALL cancers columns by 2, all prev by 0.5.
     weights = {}
     for col in data.columns:
         if 'cancers' in col:

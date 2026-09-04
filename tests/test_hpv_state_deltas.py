@@ -1,4 +1,4 @@
-"""Test that HPV carries a `latent` BoolState and a `txvx_imm` FloatArr."""
+"""Test that HPV carries a `latent` BoolState."""
 import numpy as np
 import starsim as ss
 import hpvsim as hpv
@@ -21,16 +21,6 @@ def test_hpv_has_latent_boolstate():
     # No-op default: nobody should be latent right after init.
     assert mod.latent.uids.size == 0
     assert isinstance(mod.latent, ss.BoolState)
-
-
-def test_hpv_has_txvx_imm_floatarr():
-    sim = _tiny_sim()
-    sim.init()
-    mod = sim.diseases['hpv16']
-    assert hasattr(mod, 'txvx_imm'), "HPV module should have `txvx_imm` FloatArr"
-    assert isinstance(mod.txvx_imm, ss.FloatArr)
-    # All defaults to zero — no agents have been txvx-vaccinated.
-    assert np.all(mod.txvx_imm.values == 0.0)
 
 
 def test_latent_state_stays_zero_through_short_run():

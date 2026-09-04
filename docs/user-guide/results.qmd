@@ -1,0 +1,81 @@
+---
+title: "Results and analyzers"
+---
+
+Results are grouped by the module that produced them, because each module records what it can see. `sim.results.hpv16` holds HPV16's own time series; `sim.results.agemigration` holds migration flows; `sim.results.all_hpv` holds the pooled HPV totals. A named intervention appears under its own name.
+
+Every genotype module records the same set: the stocks `n_susceptible`, `n_infected`, `n_precin`, `n_cin`, `n_cancerous`, `n_latent`; the flows `new_infections`, `new_cancers`, `new_cancer_deaths`, `new_reactivations`; their cumulative counterparts; and `prevalence`. Two accumulators, `sum_age_at_cancer` and `sum_age_at_cancer_death`, let you recover mean age at diagnosis or death: divide by `new_cancers` or `new_cancer_deaths` over the period you care about.
+
+## Pooling across genotypes
+
+`sim.results.all_hpv` comes from the `HPVTotal` analyzer, which HPVsim attaches automatically. It mirrors the per-genotype schema but pools three different ways, and the difference matters when you report numbers:
+
+- **Stocks are counted per person.** A woman with HPV16 and HPV18 counts once in `all_hpv.n_infected`. `prevalence` and `n_susceptible` follow from that, and `cum_infections_unique` counts women ever infected with anything.
+- **Cancer flows are exact sums.** Each cancer is attributed to a single genotype, so `all_hpv.new_cancers` is the true total.
+- **Infection flows are plain sums, and overcount.** `all_hpv.new_infections` adds the genotypes together, so a woman who acquires two genotypes in one timestep contributes two. Use `cum_infections_unique` when you mean people.
+
+`all_hpv` also carries `asr_cancer_incidence` and `asr_cancer_mortality`: age-standardized rates per 100,000 person-years against the WHO 2000 world standard population. These are the figures comparable to a cancer registry or to GLOBOCAN, and no analyzer is needed to get them. They are computed once per calendar year, and every timestep in that year carries the same value.
+
+## What is scaled and what is not
+
+Anything counted in people is multiplied by `pop_scale` when the run finishes, so cancers, deaths and screens come out in real-population units. Proportions — `prevalence`, the age-standardized rates, the HIV-stratified prevalences — are not. The `age_pyramid`, `dalys` and `age_causal_infection` analyzers scale their own outputs, so their totals are comparable with `sim.results`.
+
+Interventions record their own time series, already scaled: `new_doses` and `cum_doses` for vaccination, `n_screened` and `n_dx` for screening, `new_cin_treated` for treatment. Vaccination also records `new_vaccinated` and `cum_vaccinated`, which count women reached rather than doses given — the two differ whenever a schedule gives more than one dose per girl.
+
+## Analyzers
+
+Analyzers watch the population and record what the disease modules do not. They never change a run, so adding one cannot alter your results.
+
+| Analyzer | Gives you |
+|---|---|
+| `hpv.by_age` | Any of a fixed set of HPV outputs, binned by age bands you choose |
+| `hpv.age_pyramid` | Male and female counts by age band at chosen dates |
+| `hpv.dalys` | YLL and YLD from cervical cancer per year, attributed at cancer onset |
+| `hpv.age_causal_infection` | Age at the causal infection, at CIN and at cancer, plus dwell times |
+| `hpv.snapshot` | A frozen copy of the population at chosen dates |
+
+`hpv.by_age` replaced `AgeResults` in v3.1 and its interface is different: keys come first and positionally, `hpv.by_age(['cancers', 'hpv_prevalence'], edges=..., years=...)`. It accepts the flows `cancers` and `cins`, the stocks `n_infected`, `n_precin`, `n_cin`, `n_cancerous`, the population denominators `n_alive`, `n_females`, `n_males`, and the proportions `hpv_prevalence`, `precin_prevalence`, `cin_prevalence`, `cancer_prevalence`. Each (key, age band) pair becomes its own result — `sim.results.by_age.cancers_30_40` — and `to_dataframe(key)` returns a year-by-age-band table, summing flows across each calendar year and averaging stocks and proportions.
+
+Because `by_age` supplies its own denominators, you can build crude age-specific rates from one analyzer: ask for `cancers` and `n_females` over the same bins and divide. The age-standardized `asr_cancer_incidence` remains the better choice for anything you intend to compare against a registry or across countries, since it removes the effect of differing age structures.
+
+One caveat if you cross-check against sim-level results: `by_age`'s `n_females` counts living women only, while starsim's own `sim.results.n_female` includes agents pending removal and so runs a few percent higher. Use `by_age`'s denominators with `by_age`'s numerators.
+
+## How to produce cancer outputs you can compare with a registry
+
+Registries report cases by five- or ten-year age band for a given year, and often an age-standardized rate. This assembles both, plus the genotype distribution used to check that the right types are driving cancer, and the DALYs a cost-effectiveness analysis needs.
+
+```{python}
+import numpy as np
+import hpvsim as hpv
+
+registry_bins = np.array([0, 30, 40, 50, 60, 70, 100])
+ages = hpv.by_age('cancers', edges=registry_bins)
+burden = hpv.dalys(start=2010)
+
+sim = hpv.Sim(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'],
+              n_agents=3000, start=1990, stop=2020, ms_agent_ratio=10,
+              analyzers=[ages, burden], verbose=0)
+sim.run()
+
+print('Cancers by age band:')
+print(sim.analyzers.by_age.to_dataframe('cancers').loc[[2015.0, 2019.0]].round(0))
+
+years = np.floor(sim.timevec.years).astype(int)
+i = np.where(years == 2019)[0][0]
+print('\nAge-standardized incidence in 2019, per 100k:',
+      round(float(sim.results.all_hpv.asr_cancer_incidence[i]), 1))
+
+print('DALYs in 2019:', f'{float(sim.analyzers.dalys.dalys[sim.analyzers.dalys.years == 2019][0]):,.0f}')
+print('\nGenotype share of cumulative cancers:')
+print(hpv.results_by_genotype(sim, 'cum_cancers', normalize=True).tail(1).round(2))
+```
+
+The age-standardized rate this run produces is several times Nigeria's observed rate, which is the expected result: these are default parameters, not a calibrated Nigeria model. Getting from here to a defensible national estimate is what [Calibration](calibration.qmd) is for.
+
+Two habits worth keeping. Run with `ms_agent_ratio` above 1 whenever cancer is the outcome, or the age table will be mostly zeros with occasional spikes. And plot rather than tabulate first: `hpv.plot_by_age(sim.analyzers.by_age, 'cancers')`, `hpv.plot_by_genotype(sim)` and `analyzer.plot()` exist for exactly this, and a lumpy age curve is obvious in a figure and invisible in a summary statistic.
+
+## See also
+
+- [T6 - Using analyzers](../tutorials/tut_analyzers.qmd) and [T2 - Plotting, printing, and saving](../tutorials/tut_plotting.qmd)
+- [Demographics](demographics.qmd) for `pop_scale` and `ms_agent_ratio`
+- [`hpv.analyzers`](../api/analyzers.qmd) and [`hpv.plotting`](../api/plotting.qmd) API reference

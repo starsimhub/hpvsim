@@ -28,11 +28,8 @@ def test_radiation_extends_ti_dead_cancer_on_cancerous_agents():
     sim.diseases['hpv16'].ti_dead_cancer[uids] = initial
     r.administer(uids)
     extension = sim.diseases['hpv16'].ti_dead_cancer[uids] - initial
-    # Default duration: normal(mean=1.5 years, sd=0.167 years); at dt=0.25
-    # the per-agent extension is ceil(years_drawn / dt_year) integer steps.
-    # 99.99% of draws fall in (~1.0, ~2.0) yr → ceil/0.25 lies in [4, 8].
-    # Guard against the dt-units bug (using freq-object dt would give ~2 steps,
-    # i.e. extension ~2 instead of ~6 at the default config).
+    # normal(1.5, 0.167) yr at dt=0.25 gives ceil(draw/dt_year) in [4, 8] steps;
+    # using the dt freq object instead of dt_year would give ~2.
     assert np.all(extension >= 3), (
         f'radiation extension too small: {extension!r} — '
         'check dt_year vs dt freq-object arithmetic'
@@ -64,24 +61,20 @@ def test_radiation_default_duration():
 
 
 def test_radiation_extension_is_positive_for_non_sorted_input():
-    """Regression guard: radiation must extend ti_dead_cancer for every
-    cancerous agent regardless of input uids ordering.
+    """radiation extends ti_dead_cancer for every cancerous agent regardless of
+    input uid ordering.
 
-    Earlier implementation pre-drew durations indexed by uids-order, then
-    wrote them via `cancer_uids` (sorted by intersect()). When the two
-    orderings disagreed (non-sorted input), each agent received the wrong
-    agent's duration. With non-sorted input, some agents could even pick
-    up zero or near-zero durations from the wrong slot.
+    administer() must pair each drawn duration with its own agent: intersect()
+    sorts the uids, so a duration array indexed by input order would be
+    misaligned when the input is unsorted.
     """
     sim = _four_genotype_sim()
     r = _attach_and_init(sim, hpv_radiation())
-    # Pick three cancer agents and pass them in REVERSE order
     cancer_uids = sim.people.alive.uids[:3]
     sim.diseases['hpv16'].cancerous[cancer_uids] = True
     initial = 100.0
     sim.diseases['hpv16'].ti_dead_cancer[cancer_uids] = initial
     reversed_input = ss.uids(cancer_uids[::-1])
     r.administer(reversed_input)
-    # All three must have ti_dead_cancer strictly greater than initial
-    # (radiation duration sample is always positive; ceil makes it >= 1 step).
+    # Durations are always positive, and ceil makes the extension >= 1 step.
     assert np.all(sim.diseases['hpv16'].ti_dead_cancer[cancer_uids] > initial)
