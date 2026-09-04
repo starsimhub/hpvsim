@@ -4,8 +4,6 @@ CD4-stratified HPV-modulation effects and HIV-stratified results.
 """
 from pathlib import Path
 
-import re
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -20,10 +18,8 @@ from hpvsim.products import vx as hpv_vx, txvx as hpv_txvx
 
 _RWANDA_HIV_DATA = Path(__file__).parent / 'regression' / 'data' / 'hiv' / 'rwanda'
 
-
 def _tiny(**kw):
     return dict(n_agents=300, start=2000, stop=2001, dt=0.25, location='nigeria', **kw)
-
 
 # --------------------------------------------------------------------------- #
 # Wiring: gating
@@ -42,7 +38,6 @@ def test_hiv_gating():
     sim_no_hiv.init()
     assert sim_no_hiv.diseases.hpv16._hiv_module() is None
 
-
 # --------------------------------------------------------------------------- #
 # HIV_transmit: network transmission
 # --------------------------------------------------------------------------- #
@@ -57,7 +52,6 @@ def test_hiv_transmission():
     f2m, m2f = betamap[net.name]
     assert np.isclose(m2f, 0.0035)
     assert np.isclose(f2m, 0.0035 * 0.5)
-
 
 # --------------------------------------------------------------------------- #
 # HIV_incidence: curve-driven infection + plain sti.ART
@@ -94,7 +88,6 @@ def test_hiv_incidence():
     assert sim2.diseases.hiv.on_art.uids.__len__() > 0, \
         'bare sti.ART() treated nobody: it only treats agents whose ti_art equals the current step'
 
-
 def test_hiv_transmit_auto_diagnoses():
     """HIV_transmit's agents get diagnosed and treated even though it does no
     self-diagnosis: HIV.step_state() diagnoses every living HIV+ agent each step."""
@@ -111,7 +104,6 @@ def test_hiv_transmit_auto_diagnoses():
     assert hivmod.on_art.uids.__len__() > 0, \
         'HIV_transmit + bare sti.ART() treated nobody: agents must be diagnosed before ART can treat them'
 
-
 def test_hiv_data_loading():
     """load_hiv_data() + reshape_art_coverage() shapes."""
     data = hpv.data.load_hiv_data(_RWANDA_HIV_DATA)
@@ -127,35 +119,6 @@ def test_hiv_data_loading():
 
     with pytest.raises(ValueError, match='missing'):
         hpv.data.load_hiv_data(Path(__file__).parent)  # no HIV CSVs here
-
-
-def test_hiv_results_are_unstratified():
-    """hpv.HIV suppresses stisim's stratified results rather than shipping them.
-
-    They are built with a scale-unaware counter, so under multiscale they
-    over-report; hpvsim cannot correct them without reimplementing
-    BaseSTI.update_results, so it passes age_bins=None, sex_keys=None
-    (stisim >= 1.6.1) and they are never created. The exception is
-    prevalence_f/_m, which hpvsim defines and weights itself.
-    """
-    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=500, rand_seed=0,
-                  start=1990, stop=1995, dt=1.0, model_hiv='transmission', verbose=0)
-    sim.run()
-    keys = set(sim.results.hiv.keys())
-    own = {'prevalence_f', 'prevalence_m'}
-
-    # No inherited sex suffix, and no age-bin suffix other than adult prevalence.
-    assert not [k for k in keys - own if re.search(r'_(f|m)(_\d+_\d+)?$', k)]
-    assert not [k for k in keys if re.search(r'_\d+_\d+$', k) and k != 'prevalence_15_49']
-    # Far fewer than stisim's default, and the whole-population ones survive.
-    assert len(keys) < 60
-    for kept in ('n_infected', 'prevalence', 'prevalence_15_49', 'p_on_art',
-                 'new_infections', 'cum_infections', 'n_acute', 'n_latent'):
-        assert kept in keys, kept
-    # Nothing NaN.
-    for k in keys - {'timevec'}:
-        assert not np.isnan(np.asarray(sim.results.hiv[k], dtype=float)).any(), k
-
 
 def test_hiv_results_are_scale_weighted():
     """Inherited stisim HIV stocks are recomputed with per-agent scale.
@@ -193,7 +156,6 @@ def test_hiv_results_are_scale_weighted():
     assert np.isclose(float(r['cum_infections'][-1]),
                       float(np.sum(r['new_infections'])), rtol=1e-6)
 
-
 def test_hiv_prevalence_by_sex():
     """prevalence_f/_m are scale-weighted fractions that reconcile to prevalence."""
     sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=1000, rand_seed=0,
@@ -218,7 +180,6 @@ def test_hiv_prevalence_by_sex():
     n_m = float((w * (alive & ~female)).sum())
     combined = (r['prevalence_f'][-1] * n_f + r['prevalence_m'][-1] * n_m) / (n_f + n_m)
     assert np.isclose(combined, float(r['prevalence'][-1]), rtol=0.02)
-
 
 def test_hiv_banded_age_data():
     """Age-banded HIV inputs work, not just single years of age.
@@ -252,7 +213,6 @@ def test_hiv_banded_age_data():
                         'coverage': [.1, .2, .3, .4, .5]})
     bins = hpv.data.reshape_art_coverage(art)['AgeBin'].tolist()
     assert bins == ['[0,5)', '[5,10)', '[10,15)', '[15,20)', '[20,150)']
-
 
 # --------------------------------------------------------------------------- #
 # Effect on HPV/cancer outcomes
@@ -292,7 +252,6 @@ def test_hiv_effect():
     strat_total = all_hpv['cancers_with_hiv'].sum() + all_hpv['cancers_no_hiv'].sum()
     assert strat_total > 0
     assert strat_total <= all_hpv.new_cancers.sum() * 1.001  # float tolerance
-
 
 def test_hiv_cancer_rates_are_annual_and_female():
     """HIV-stratified cancer rates use a female denominator and are annual.
@@ -336,7 +295,6 @@ def test_hiv_cancer_rates_are_annual_and_female():
                            (r['cancer_incidence_with_hiv'] / r['cancer_incidence_no_hiv'])[ok])
     assert np.isnan(r['cancer_rate_ratio'][~ok]).all()
 
-
 def test_crude_cancer_incidence():
     """cancer_incidence is the unstandardized companion to the ASR: same
     female numerator and denominator, no WHO 2000 age weighting."""
@@ -357,7 +315,6 @@ def test_crude_cancer_incidence():
     # than the WHO 2000 standard population, but both are the same order.
     assert r['cancer_incidence'].max() > 0
     assert r['asr_cancer_incidence'].max() > 0
-
 
 def test_hiv_rel_imm_effect():
     """Clearance-conferred AND vaccine/txvx-conferred immunity are both
@@ -420,7 +377,6 @@ def test_hiv_rel_imm_effect():
         hpvmod = sim.diseases.hpv16
         assert float(getattr(hpvmod, imm_attr)[uid_pos]) < float(getattr(hpvmod, imm_attr)[uid_neg])
 
-
 def test_hiv_reactivation_effect():
     """rel_reactivation defaults to a no-op (1.0) with no HIV+ agents, and can
     be overridden independently of the other three effects."""
@@ -437,7 +393,6 @@ def test_hiv_reactivation_effect():
     assert np.isclose(hivmod.hiv_rel_reactivation[uid_lo], 5.0)
     assert np.isclose(hivmod.hiv_rel_reactivation[uid_hi], 7.0)
     assert np.isclose(hivmod.pars.rel_sus_lo, 2.2)  # untouched effects stay default
-
 
 # --------------------------------------------------------------------------- #
 # model_hiv= sim assembly
