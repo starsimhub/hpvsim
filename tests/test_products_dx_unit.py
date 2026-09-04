@@ -65,6 +65,14 @@ def test_dx_neither_name_nor_df_raises():
         hpv_dx()
 
 
+def test_dx_module_name_separates_lookup_key_from_module_name():
+    """module_name= lets a shipped dx product be registered under a custom
+    module name (e.g. two 'via' screens in one sim)."""
+    d = hpv_dx(name='via', module_name='via_older')
+    assert d.name == 'via_older'
+    assert d.hierarchy == ['positive', 'inadequate', 'negative']
+
+
 def test_two_df_built_dx_products_coexist_in_a_sim():
     """Regression: two df-built dx products with distinct names must both
     init on the same sim without colliding on the class-default 'dx' name."""

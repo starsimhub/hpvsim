@@ -224,7 +224,8 @@ class vx(ss.Vx):
     non-target genotypes.
     """
 
-    def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95, **kwargs):
+    def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95,
+                 module_name=None, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
             name=name,
@@ -234,6 +235,13 @@ class vx(ss.Vx):
         self.rel_imm = _resolve_vx_pars(name, rel_imm)
         # CRN-safe Bernoulli; p set per administer call.
         self._sterilizing_dist = ss.bernoulli(p=0.0)
+        # Module name: explicit module_name= wins; otherwise fall back to the
+        # lookup name so two `hpv.vx(name='bivalent')` / `name='nonavalent'`
+        # products don't collide on the class default 'vx'.
+        if module_name is not None:
+            self.name = module_name
+        elif name is not None:
+            self.name = name
 
     def administer(self, people, uids):
         """Apply the vaccine: per-agent all-or-nothing sterilizing draw,
@@ -315,7 +323,7 @@ class dx(ss.Dx):
     genotypes, the lowest-index (most severe) result wins.
     """
 
-    def __init__(self, name=None, df=None, hierarchy=None, **kwargs):
+    def __init__(self, name=None, df=None, hierarchy=None, module_name=None, **kwargs):
         resolved_df, resolved_hierarchy = _resolve_dx_pars(name, df, hierarchy)
         # ss.Dx.__init__ needs df.disease, which HPV CSVs lack; stub it out.
         df_for_base = resolved_df.copy()
@@ -326,10 +334,14 @@ class dx(ss.Dx):
         self.diseases = None
         # Store the original (no-stub) df for our own administer logic
         self.df = resolved_df
-        # Module name = product name; a df-only build keeps the class default
-        # ('dx'). Pass name= alongside df= to give a df-built product a unique
-        # name (required when two df-built dx products live in the same sim).
-        if name is not None:
+        # Module name: explicit module_name= wins; otherwise fall back to
+        # name= (either the CSV lookup key or the caller-supplied identifier
+        # for a df-built product). A df-only build keeps the class default
+        # ('dx'), which collides if two such products share a sim -- pass
+        # name= or module_name= to disambiguate.
+        if module_name is not None:
+            self.name = module_name
+        elif name is not None:
             self.name = name
         self._genotypes_in_df = list(resolved_df['genotype'].unique())
         self._all_genotype = (len(self._genotypes_in_df) == 1
@@ -396,7 +408,7 @@ class tx(ss.Tx):
         module.to_latent[uids]    = False           # clears to susceptible
     """
 
-    def __init__(self, name=None, df=None, **kwargs):
+    def __init__(self, name=None, df=None, module_name=None, **kwargs):
         df = _resolve_tx_pars(name, df)
         # ss.Tx.__init__ needs df.disease, which HPV CSVs lack; stub it out.
         df_for_base = df.copy()
@@ -407,10 +419,13 @@ class tx(ss.Tx):
         self.diseases = None
         # Restore the original (no-stub) df for our own administer logic.
         self.df = df
-        # Module name = product name; a df-only build keeps the class default
-        # ('tx'). Pass name= alongside df= to give a df-built product a unique
-        # name (required when two df-built tx products live in the same sim).
-        if name is not None:
+        # Module name: explicit module_name= wins; otherwise fall back to
+        # name= (either the CSV lookup key or the caller-supplied identifier
+        # for a df-built product). Two `hpv.tx(name='ablation')` products in
+        # the same sim collide -- use module_name= to disambiguate.
+        if module_name is not None:
+            self.name = module_name
+        elif name is not None:
             self.name = name
 
     def administer(self, uids, return_format='dict'):
@@ -480,14 +495,14 @@ class txvx(tx):
     }
 
     def __init__(self, name=None, df=None, rel_imm=None, imm_init=None,
-                 imm_boost=None, **kwargs):
+                 imm_boost=None, module_name=None, **kwargs):
         if name is None and df is None:
             name = 'txvx1'
         if imm_init is None and imm_boost is None and name in self._DEFAULTS:
             imm_init, imm_boost = self._DEFAULTS[name]
         if imm_init is not None and imm_boost is not None:
             raise ValueError('hpv.txvx takes at most one of `imm_init` or `imm_boost`.')
-        super().__init__(name=name, df=df, **kwargs)
+        super().__init__(name=name, df=df, module_name=module_name, **kwargs)
         self.imm_init = imm_init
         self.imm_boost = imm_boost
         # Per-target-genotype scaling of the conferred immunity. Defaults to the

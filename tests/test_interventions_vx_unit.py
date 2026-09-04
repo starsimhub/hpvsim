@@ -343,10 +343,12 @@ def test_campaign_vx_passes_years_through():
 
 def test_intervention_name_colliding_with_product_raises():
     """A name matching the product's module name raises at construction."""
+    # vx/tx/txvx now adopt the lookup name as the module name, so the
+    # collision surface is the specific product name, not the class default.
     with pytest.raises(ValueError, match='reserved'):
-        hpv.routine_vx(product='bivalent', prob=0.5, name='vx', start_year=2020)
+        hpv.routine_vx(product='bivalent', prob=0.5, name='bivalent', start_year=2020)
     with pytest.raises(ValueError, match='reserved'):
-        hpv.campaign_vx(product='bivalent', prob=0.5, name='vx', years=[2020])
+        hpv.campaign_vx(product='nonavalent', prob=0.5, name='nonavalent', years=[2020])
     with pytest.raises(ValueError, match='reserved'):
         hpv.routine_screening(product='via', prob=0.5, name='via', start_year=2020)
     with pytest.raises(ValueError, match='reserved'):

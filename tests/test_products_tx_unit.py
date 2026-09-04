@@ -157,3 +157,23 @@ def test_tx_name_and_df_gives_custom_name_to_df_built_product():
     t = hpv_tx(name='my_tx', df=df)
     assert t.name == 'my_tx'
     assert list(t.df.state.unique()) == ['cin']
+
+
+def test_tx_module_name_separates_lookup_key_from_module_name():
+    """module_name= lets a shipped product be registered under a custom
+    module name — required to layer two 'ablation' programs in one sim."""
+    t = hpv_tx(name='ablation', module_name='ablation_older')
+    assert t.name == 'ablation_older'
+    # Row table still comes from the 'ablation' CSV lookup.
+    assert (t.df.name == 'ablation').all()
+
+
+def test_two_ablation_programs_coexist_via_module_name():
+    """Regression: two shipped-ablation treat_num interventions in one sim
+    must not collide on the class-default product name."""
+    sim = _four_genotype_sim()
+    sim.pars['interventions'] = [
+        hpv.treat_num(name='abl_a', product=hpv_tx(name='ablation'), prob=0.0),
+        hpv.treat_num(name='abl_b', product=hpv_tx(name='ablation', module_name='ablation_older'), prob=0.0),
+    ]
+    sim.init()  # would raise 'Module ablation already added' without module_name=
