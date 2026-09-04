@@ -24,7 +24,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 *Regression information*: the HIV-stratified cancer rates above change value substantially (annual and female-denominated, where they were per-timestep and all-sex), and `cancer_rate_ratio` is now `nan` rather than `0.0` in a year with no HIV-negative cancers. Any parameter set fitted against these results should be refitted.
 
-**Fixes.** Treatment and therapeutic vaccination now respect the `sex` argument, which was previously ignored in places. Age ranges are applied the same way across every intervention. Treating a woman with a latent infection now clears it. Building a test or treatment product from a data file no longer fails when the simulation starts. The documentation build works again, having been broken since v3.1.0.
+**Fixes.** Treatment and therapeutic vaccination now respect the `sex` argument, which was previously ignored in places. Age ranges are applied the same way across every intervention. Treating a woman with a latent infection now clears it. Building a test or treatment product from a data file no longer fails when the simulation starts. `hpv.dx` and `hpv.tx` now accept `name=` alongside `df=`, so a sim can hold more than one product built from a custom data file without them colliding on the class-default module name. The documentation build works again, having been broken since v3.1.0.
 
 ## Version 3.1.0 (2026-08-20)
 Adds flat parameter routing, a redesigned calibration workflow, and real-population scaling by default; requires `starsim>=3.6`.

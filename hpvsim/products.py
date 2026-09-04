@@ -124,8 +124,10 @@ def _load_txvx_products():
 def _resolve_dx_pars(name, df, hierarchy):
     """Resolve (name, df, hierarchy) for hpv.dx construction.
 
-    Exactly one of name or df must be provided. Default hierarchies are
-    defined per product below.
+    At least one of ``name`` or ``df`` must be provided. When both are
+    supplied, ``df`` wins for the row table and ``name`` is kept as the
+    module name — this is how multiple df-built dx products coexist in a
+    single sim without colliding on the class-default name.
     """
     _DEFAULT_DX_HIERARCHY = {
         'via':            ['positive', 'inadequate', 'negative'],
@@ -138,11 +140,11 @@ def _resolve_dx_pars(name, df, hierarchy):
         'txvx_assigner':  ['triage', 'txvx', 'none'],
         'tx_assigner':    ['radiation', 'excision', 'ablation', 'none'],
     }
-    if (name is None) == (df is None):
-        raise ValueError('hpv.dx requires exactly one of `name` or `df`, not both/neither.')
+    if name is None and df is None:
+        raise ValueError('hpv.dx requires at least one of `name` or `df`.')
     if df is not None:
         if hierarchy is None:
-            hierarchy = list(df['result'].unique())
+            hierarchy = _DEFAULT_DX_HIERARCHY.get(name, list(df['result'].unique()))
         return df, hierarchy
     products = _load_dx_products()
     if name not in products:
@@ -154,9 +156,15 @@ def _resolve_dx_pars(name, df, hierarchy):
 
 
 def _resolve_tx_pars(name, df):
-    """Resolve (name, df) for hpv.tx construction."""
-    if (name is None) == (df is None):
-        raise ValueError('hpv.tx requires exactly one of `name` or `df`, not both/neither.')
+    """Resolve (name, df) for hpv.tx construction.
+
+    At least one of ``name`` or ``df`` must be provided. When both are
+    supplied, ``df`` wins for the row table and ``name`` is kept as the
+    module name — this is how multiple df-built tx products coexist in a
+    single sim without colliding on the class-default name.
+    """
+    if name is None and df is None:
+        raise ValueError('hpv.tx requires at least one of `name` or `df`.')
     if df is not None:
         return df
     products = _load_tx_products()
@@ -318,8 +326,9 @@ class dx(ss.Dx):
         self.diseases = None
         # Store the original (no-stub) df for our own administer logic
         self.df = resolved_df
-        # Module name = product name; a df-built product keeps the class default
-        # ('dx'), since a None name breaks people.add_module() at sim.init().
+        # Module name = product name; a df-only build keeps the class default
+        # ('dx'). Pass name= alongside df= to give a df-built product a unique
+        # name (required when two df-built dx products live in the same sim).
         if name is not None:
             self.name = name
         self._genotypes_in_df = list(resolved_df['genotype'].unique())
@@ -398,8 +407,9 @@ class tx(ss.Tx):
         self.diseases = None
         # Restore the original (no-stub) df for our own administer logic.
         self.df = df
-        # Module name = product name; a df-built product keeps the class default
-        # ('tx'), since a None name breaks people.add_module() at sim.init().
+        # Module name = product name; a df-only build keeps the class default
+        # ('tx'). Pass name= alongside df= to give a df-built product a unique
+        # name (required when two df-built tx products live in the same sim).
         if name is not None:
             self.name = name
 

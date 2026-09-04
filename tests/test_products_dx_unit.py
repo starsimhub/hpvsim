@@ -47,15 +47,41 @@ def test_dx_unknown_name_raises():
         hpv_dx(name='nope')
 
 
-def test_dx_both_name_and_df_raises():
+def test_dx_name_and_df_gives_custom_name_to_df_built_product():
+    """Passing both name= and df= keeps df as the row table and uses name
+    as the module name — so two df-built dx products can share a sim."""
     import pandas as pd
-    with pytest.raises(ValueError, match='exactly one'):
-        hpv_dx(name='via', df=pd.DataFrame())
+    df = pd.DataFrame([
+        {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'positive', 'probability': 0.0},
+        {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'negative', 'probability': 1.0},
+    ])
+    d = hpv_dx(name='my_dx', df=df)
+    assert d.name == 'my_dx'
+    assert list(d.df.result.unique()) == ['positive', 'negative']
 
 
 def test_dx_neither_name_nor_df_raises():
-    with pytest.raises(ValueError, match='exactly one'):
+    with pytest.raises(ValueError, match='at least one'):
         hpv_dx()
+
+
+def test_two_df_built_dx_products_coexist_in_a_sim():
+    """Regression: two df-built dx products with distinct names must both
+    init on the same sim without colliding on the class-default 'dx' name."""
+    import pandas as pd
+    def _mkdf(prob_pos):
+        return pd.DataFrame([
+            {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'positive', 'probability': prob_pos},
+            {'name': 'x', 'state': 'susceptible', 'genotype': 'all', 'result': 'negative', 'probability': 1 - prob_pos},
+        ])
+    d1 = hpv_dx(name='dx_screen', df=_mkdf(0.1))
+    d2 = hpv_dx(name='dx_triage', df=_mkdf(0.9))
+    sim = _four_genotype_sim()
+    sim.pars['interventions'] = [
+        ss.treat_num(name='stub_a', product=d1, prob=0.0),
+        ss.treat_num(name='stub_b', product=d2, prob=0.0),
+    ]
+    sim.init()  # would raise 'Module dx already added' before the fix
 
 
 def test_dx_all_genotype_mode_classifies_susceptibles():

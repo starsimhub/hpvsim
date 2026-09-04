@@ -140,3 +140,20 @@ def test_tx_empty_uids_returns_empty_outcomes():
     out = t.administer(ss.uids())
     assert len(out['successful']) == 0
     assert len(out['unsuccessful']) == 0
+
+
+def test_tx_neither_name_nor_df_raises():
+    with pytest.raises(ValueError, match='at least one'):
+        hpv_tx()
+
+
+def test_tx_name_and_df_gives_custom_name_to_df_built_product():
+    """name= + df= keeps df as the row table and uses name as the module
+    name — enables multiple df-built tx products in a single sim."""
+    import pandas as pd
+    df = pd.DataFrame([
+        {'name': 'x', 'state': 'cin', 'genotype': 'all', 'efficacy': 0.0},
+    ])
+    t = hpv_tx(name='my_tx', df=df)
+    assert t.name == 'my_tx'
+    assert list(t.df.state.unique()) == ['cin']
