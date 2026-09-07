@@ -271,11 +271,11 @@ class HPVTotal(ss.Analyzer):
                 these bins from ``WHO2000_5YR_WEIGHTS``.
         """
         weights = cls.who2000_weights_for_edges(edges)
-        cancers = np.asarray(cancers_by_age, dtype=float)
-        n = np.asarray(n_female_by_age, dtype=float)
+        cancers = cancers_by_age
+        n = n_female_by_age
         with np.errstate(divide='ignore', invalid='ignore'):
             rates = np.where(n > 0, cancers / n * 1e5, 0.0)
-        return float(np.sum(rates * weights) / weights.sum())
+        return np.sum(rates * weights) / weights.sum()
 
     # HPV result keys we override with custom derivation, not naive sum/union.
     _DERIVED = ('n_susceptible', 'prevalence')
@@ -293,19 +293,6 @@ class HPVTotal(ss.Analyzer):
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
         self.hiv_module = misc.hiv_module(sim)
         super().init_pre(sim)
-        # Per-ti WHO2000-binned histograms: rows = ti, cols = 5-year bins.
-        n_pts = len(sim.timevec)
-        n_bins = len(self.WHO2000_5YR_EDGES) - 1
-        self._cancers_by_who_bin       = np.zeros((n_pts, n_bins), dtype=float)
-        self._cancer_deaths_by_who_bin = np.zeros((n_pts, n_bins), dtype=float)
-        self._females_by_who_bin       = np.zeros((n_pts, n_bins), dtype=float)
-        # Per-ti female cancers and female headcount by HIV status, aggregated
-        # to annual rates in finalize (same accumulate-then-derive pattern as
-        # the ASR histograms above).
-        self._cancers_with_hiv = np.zeros(n_pts, dtype=float)
-        self._cancers_no_hiv   = np.zeros(n_pts, dtype=float)
-        self._females_with_hiv = np.zeros(n_pts, dtype=float)
-        self._females_no_hiv   = np.zeros(n_pts, dtype=float)
 
     def init_results(self):
         """Mirror schema from per-genotype HPV results + add derived/extras.
@@ -340,26 +327,27 @@ class HPVTotal(ss.Analyzer):
         # Extra result with no per-genotype counterpart.
         defs.append(ss.Result('cum_infections_unique', dtype=int,
                               label='Cumulative agents ever infected with any genotype'))
-        # Annualized in finalize_results: every ti in a year holds that year's ASR.
-        defs.append(ss.Result('asr_cancer_incidence', dtype=float, scale=False,
+        # Rates: stored per-ti already annualized (event/dt/headcount * 1e5);
+        # summarize_by='mean' collapses sub-annual quarters to the annual rate.
+        defs.append(ss.Result('asr_cancer_incidence', dtype=float, scale=False, summarize_by='mean',
                               label='Age-standardized cervical cancer incidence '
                                     '(WHO 2000, per 100,000 person-years)'))
-        defs.append(ss.Result('asr_cancer_mortality', dtype=float, scale=False,
+        defs.append(ss.Result('asr_cancer_mortality', dtype=float, scale=False, summarize_by='mean',
                               label='Age-standardized cervical cancer mortality '
                                     '(WHO 2000, per 100,000 person-years)'))
-        defs.append(ss.Result('cancer_incidence', dtype=float, scale=False,
+        defs.append(ss.Result('cancer_incidence', dtype=float, scale=False, summarize_by='mean',
                               label='Crude cervical cancer incidence '
                                     '(per 100,000 women per year)'))
         if self.hiv_module is not None:
             defs.append(ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'))
             defs.append(ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'))
-            defs.append(ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False,
+            defs.append(ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False, summarize_by='mean',
                                   label='Cervical cancer incidence '
                                         '(per 100,000 women with HIV per year)'))
-            defs.append(ss.Result('cancer_incidence_no_hiv', dtype=float, scale=False,
+            defs.append(ss.Result('cancer_incidence_no_hiv', dtype=float, scale=False, summarize_by='mean',
                                   label='Cervical cancer incidence '
                                         '(per 100,000 women without HIV per year)'))
-            defs.append(ss.Result('cancer_rate_ratio', dtype=float, scale=False,
+            defs.append(ss.Result('cancer_rate_ratio', dtype=float, scale=False, summarize_by='mean',
                                   label='Cancer incidence rate ratio (HIV+/HIV-)'))
         self.define_results(*defs)
 
@@ -409,75 +397,84 @@ class HPVTotal(ss.Analyzer):
         for m in hpvs:
             ever_infected |= np.isfinite(m.ti_first_infection.values)
         ever_infected &= people.alive.values
-        self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
+        self.results['cum_infections_unique'][ti] = ever_infected.sum()
 
-        self._accumulate_asr_histograms(ti, people, hpvs)
+        self.accumulate_asr_histograms(ti, people, hpvs)
 
-    def _accumulate_asr_histograms(self, ti, people, hpvs):
-        """Fill per-ti WHO2000 5-year-bin histograms for alive-females,
-        new cancer events, and new cancer-death events. Aggregated to
-        per-year ASR in ``finalize_results`` via ``compute_asr``."""
-        ages = people.age.values
-        female_mask = people.female.values
-        alive_bool = people.alive.values
+    def accumulate_asr_histograms(self, ti, people, hpvs):
+        """Compute per-ti annualized cancer rates (crude, ASR, HIV-strat).
+
+        Each rate is stored as ``events_this_ti / dt / headcount * 1e5`` --
+        i.e. the annualized rate at this instant. The Results carry
+        ``summarize_by='mean'``, so a downstream ``annualize()`` averages
+        the sub-annual quarters back to the annual rate (exact at constant
+        population, ~0.03% error at realistic Rwanda-scale growth).
+        """
+        ages = people.age
+        female = people.female
         edges = self.WHO2000_5YR_EDGES
         w = getattr(people, 'scale', None)
-        # Denominator: currently alive females per bin (scale-weighted).
-        alive_female = alive_bool & female_mask
-        wts_af = w.values[alive_female] if w is not None else None
-        self._females_by_who_bin[ti, :] = np.histogram(
-            ages[alive_female], bins=edges, weights=wts_af)[0]
+        dt = self.t.dt_year
+
+        # Denominator: per-bin alive-female headcount.
+        wts_af = w[female] if w is not None else None
+        females_by_bin = np.histogram(ages[female], bins=edges, weights=wts_af)[0]
+
         # Numerator: cancers realized this step, across genotypes.
-        new_cancer = np.zeros_like(alive_bool)
+        new_cancer = np.zeros_like(people.alive)
         for m in hpvs:
-            new_cancer |= ((m.ti_cancerous.values == ti) & m.cancerous.values)
-        new_cancer &= alive_bool
-        wts_nc = w.values[new_cancer] if w is not None else None
-        self._cancers_by_who_bin[ti, :] = np.histogram(
-            ages[new_cancer], bins=edges, weights=wts_nc)[0]
-        if self.hiv_module is not None:
-            self._update_hiv_cancer_results(ti, people, new_cancer)
-        # Numerator: cancer deaths this step. The agent is still marked alive at
+            new_cancer |= ((m.ti_cancerous == ti) & m.cancerous)
+        new_cancer &= people.alive
+        wts_nc = w[new_cancer] if w is not None else None
+        cancers_by_bin = np.histogram(ages[new_cancer], bins=edges, weights=wts_nc)[0]
+
+        # Numerator: cancer deaths this step. Agents are still marked alive at
         # ti, since remove_dead runs after analyzers.
-        new_cd = np.zeros_like(alive_bool)
+        new_cd = np.zeros_like(people.alive)
         for m in hpvs:
-            new_cd |= (m.ti_dead_cancer.values == ti)
-        new_cd &= alive_bool
-        wts_cd = w.values[new_cd] if w is not None else None
-        self._cancer_deaths_by_who_bin[ti, :] = np.histogram(
-            ages[new_cd], bins=edges, weights=wts_cd)[0]
+            new_cd |= (m.ti_dead_cancer == ti)
+        new_cd &= people.alive
+        wts_cd = w[new_cd] if w is not None else None
+        cd_by_bin = np.histogram(ages[new_cd], bins=edges, weights=wts_cd)[0]
 
-    def _update_hiv_cancer_results(self, ti, people, new_cancer):
-        """Accumulate per-ti HIV-stratified cancer counts and female
-        person-time, from the same ``new_cancer`` mask used for the ASR
-        histogram. Runs at this module's own (sim-cadence) ti, so no risk of a
-        faster HIV clock double-counting the same event across multiple HIV
-        sub-ticks.
+        # ASR = weighted sum of per-bin rates; the 1/dt factor annualizes the
+        # per-quarter event count so mean-over-year recovers the annual rate.
+        self.results['asr_cancer_incidence'][ti] = self.compute_asr(
+            cancers_by_bin / dt, females_by_bin, edges)
+        self.results['asr_cancer_mortality'][ti] = self.compute_asr(
+            cd_by_bin / dt, females_by_bin, edges)
 
-        The counts are written straight to results (they are per-step flows);
-        the rates they feed are derived per calendar year in
-        ``_finalize_hiv_cancer_rates``, since a single step's count over a
-        headcount is not an annual rate.
+        # Crude annualized incidence.
+        n_f = females_by_bin.sum()
+        self.results['cancer_incidence'][ti] = (
+            cancers_by_bin.sum() / dt / n_f * 1e5 if n_f else 0.0)
 
-        Denominators are FEMALE headcount, matching a numerator that is
-        female by construction (only females develop cervical cancer). An
-        all-sex denominator both halves the rates and biases the rate ratio,
-        since HIV prevalence is sex-skewed.
-        """
-        alive = people.alive.values
-        scale = people.scale.values
-        female = people.female.values & alive
-        infected = self.hiv_module.infected.values
+        if self.hiv_module is not None:
+            self.update_hiv_cancer_results(ti, people, new_cancer, dt)
+
+    def update_hiv_cancer_results(self, ti, people, new_cancer, dt):
+        """Per-ti HIV-stratified cancer counts and annualized rates."""
+        scale = people.scale
+        female = people.female
+        infected = self.hiv_module.infected
         f_pos = female & infected
         f_neg = female & ~infected
-        cancers_with_hiv = float(((new_cancer & f_pos) * scale).sum())
-        cancers_no_hiv = float(((new_cancer & f_neg) * scale).sum())
+        cancers_with_hiv = ((new_cancer & f_pos) * scale).sum()
+        cancers_no_hiv = ((new_cancer & f_neg) * scale).sum()
+        females_with_hiv = (f_pos * scale).sum()
+        females_no_hiv = (f_neg * scale).sum()
+
         self.results['cancers_with_hiv'][ti] = cancers_with_hiv
         self.results['cancers_no_hiv'][ti] = cancers_no_hiv
-        self._cancers_with_hiv[ti] = cancers_with_hiv
-        self._cancers_no_hiv[ti] = cancers_no_hiv
-        self._females_with_hiv[ti] = float((f_pos * scale).sum())
-        self._females_no_hiv[ti] = float((f_neg * scale).sum())
+        inc_pos = (cancers_with_hiv / dt / females_with_hiv * 1e5
+                   if females_with_hiv else 0.0)
+        inc_neg = (cancers_no_hiv / dt / females_no_hiv * 1e5
+                   if females_no_hiv else 0.0)
+        self.results['cancer_incidence_with_hiv'][ti] = inc_pos
+        self.results['cancer_incidence_no_hiv'][ti] = inc_neg
+        # np.nan (not 0) where no HIV- cancers this step: a zero-denominator
+        # rate ratio is undefined, and 0 would drag any mean toward zero.
+        self.results['cancer_rate_ratio'][ti] = inc_pos / inc_neg if inc_neg else np.nan
 
     def finalize_results(self):
         """Sum across modules for all results not handled by step()."""
@@ -490,79 +487,12 @@ class HPVTotal(ss.Analyzer):
                            | {'cum_infections_unique',
                               'asr_cancer_incidence', 'asr_cancer_mortality',
                               'cancer_incidence', 'timevec'})
+        if self.hiv_module is not None:
+            handled_in_step |= {'cancers_with_hiv', 'cancers_no_hiv',
+                                'cancer_incidence_with_hiv', 'cancer_incidence_no_hiv',
+                                'cancer_rate_ratio'}
         template = hpvs[0].results
         for key in template.keys():
             if key in self._SKIP or key in handled_in_step:
                 continue
             self.results[key][:] = sum(m.results[key] for m in hpvs)
-        self._finalize_asr()
-        self._finalize_crude_incidence()
-        if self.hiv_module is not None:
-            self._finalize_hiv_cancer_rates()
-
-    def _finalize_asr(self):
-        """Aggregate per-ti WHO2000-binned cancer / cancer-death counts to
-        annual (sum) and alive-female counts to annual (mean), then write
-        annualized ``asr_cancer_incidence`` / ``asr_cancer_mortality`` to
-        every ti within each calendar year (all ti in year Y hold Y's ASR)."""
-        edges = self.WHO2000_5YR_EDGES
-        years = np.asarray(self.sim.timevec.years).astype(int)
-        inc = np.zeros(len(years), dtype=float)
-        mort = np.zeros(len(years), dtype=float)
-        for y in np.unique(years):
-            mask = years == y
-            n_female_year = self._females_by_who_bin[mask].mean(axis=0)
-            cancers_year = self._cancers_by_who_bin[mask].sum(axis=0)
-            cd_year = self._cancer_deaths_by_who_bin[mask].sum(axis=0)
-            inc[mask] = self.compute_asr(cancers_year, n_female_year, edges)
-            mort[mask] = self.compute_asr(cd_year, n_female_year, edges)
-        self.results['asr_cancer_incidence'][:] = inc
-        self.results['asr_cancer_mortality'][:] = mort
-
-    @staticmethod
-    def _annual_rate(counts, headcount, years):
-        """Per-calendar-year rate per 100,000, broadcast back over every ti.
-
-        counts are per-ti event flows (summed within the year); headcount is a
-        per-ti stock (averaged within the year, giving mean person-years). Both
-        are scale-weighted agent counts, so ``pop_scale`` cancels in the ratio.
-
-        NOTE: a year the sim only partly covers -- typically the final one --
-        sums a fraction of a year's events against a full-year denominator, so
-        its rate reads low. ``hpv.Calibration`` extends ``sim.pars.stop`` past
-        the last data year for exactly this reason; when plotting, run at least
-        one year beyond the last year you intend to read.
-        """
-        out = np.zeros(len(years), dtype=float)
-        for y in np.unique(years):
-            mask = years == y
-            pyrs = float(headcount[mask].mean())
-            out[mask] = float(counts[mask].sum()) / pyrs * 1e5 if pyrs else 0.0
-        return out
-
-    def _finalize_crude_incidence(self):
-        """Crude cervical cancer incidence per 100,000 women per year.
-
-        The unstandardized companion to ``asr_cancer_incidence``: same female
-        numerator and denominator, without the WHO 2000 age weighting. Use the
-        ASR to compare across populations, and this to describe the burden a
-        given population actually experiences.
-        """
-        years = np.asarray(self.sim.timevec.years).astype(int)
-        self.results['cancer_incidence'][:] = self._annual_rate(
-            self._cancers_by_who_bin.sum(axis=1),
-            self._females_by_who_bin.sum(axis=1), years)
-
-    def _finalize_hiv_cancer_rates(self):
-        """Annual cervical cancer incidence and rate ratio by HIV status."""
-        years = np.asarray(self.sim.timevec.years).astype(int)
-        inc_pos = self._annual_rate(self._cancers_with_hiv, self._females_with_hiv, years)
-        inc_neg = self._annual_rate(self._cancers_no_hiv, self._females_no_hiv, years)
-        self.results['cancer_incidence_with_hiv'][:] = inc_pos
-        self.results['cancer_incidence_no_hiv'][:] = inc_neg
-        # np.nan, not 0.0, where no HIV-negative cancers occurred: a zero
-        # denominator is missing information, and a 0.0 would drag down any
-        # mean or calibration mismatch computed over it.
-        with np.errstate(divide='ignore', invalid='ignore'):
-            self.results['cancer_rate_ratio'][:] = np.where(
-                inc_neg > 0, inc_pos / inc_neg, np.nan)
