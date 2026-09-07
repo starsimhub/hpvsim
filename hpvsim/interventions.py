@@ -282,18 +282,34 @@ class BaseTest(ss.BaseTest):
 class BaseScreening(BaseTest, ss.BaseScreening):
     """HPV-specific BaseScreening.
 
-    Mirrors ``ss.BaseScreening.step`` exactly, except it records ``n_dx``
-    through :meth:`_count_diagnosed` instead of hardcoding
-    ``self.outcomes['positive']``. Upstream assumes every screening product has
-    a ``'positive'`` outcome, which KeyErrors for products whose result
-    hierarchy uses other labels (cytology's ``ascus``/``abnormal``, or
-    ``hpv_type``'s ``positive_1618``/``positive_ohr``) when they are used as a
-    *primary* screen. Behaviour for ``via``/``hpv`` (which do define
-    ``'positive'``) is unchanged.
+    Two differences from ``ss.BaseScreening``:
+
+    - Records ``new_dx`` through :meth:`_count_diagnosed` instead of the
+      upstream hardcoded ``self.outcomes['positive']``, which KeyErrors
+      for products whose result hierarchy uses other labels (cytology's
+      ``ascus``/``abnormal``, or ``hpv_type``'s ``positive_1618`` /
+      ``positive_ohr``) when they are used as a *primary* screen. Behaviour
+      for ``via``/``hpv`` (which do define ``'positive'``) is unchanged.
+    - Renames the shipped ``n_screened`` / ``n_dx`` results to
+      ``new_screens`` / ``new_dx``. Both are per-step flows, and the
+      ``n_``-prefixed names collide with the ``ss.Result.annualize``
+      heuristic which reads ``n_*`` as a stock (averaged over sub-steps)
+      rather than a flow (summed). The ``new_*`` names sum correctly.
     """
 
     # Result labels that do not represent a positive diagnosis.
     _NEGATIVE_OUTCOMES = ('negative', 'normal', 'inadequate')
+
+    def init_results(self):
+        super().init_results()
+        # Drop the upstream stock-named results; replace with flow-named ones.
+        for stale in ('n_screened', 'n_dx'):
+            if stale in self.results:
+                del self.results[stale]
+        self.define_results(
+            ss.Result('new_screens', dtype=int, scale=True, label='Number screened'),
+            ss.Result('new_dx', dtype=int, scale=True, label='Number diagnosed'),
+        )
 
     def step(self):
         sim = self.sim
@@ -304,8 +320,8 @@ class BaseScreening(BaseTest, ss.BaseScreening):
                 self.screened[accept_uids] = True
                 self.screens[accept_uids] += 1
                 self.ti_screened[accept_uids] = sim.ti
-                self.results['n_screened'][sim.ti] = len(accept_uids)
-                self.results['n_dx'][sim.ti] = self._count_diagnosed()
+                self.results['new_screens'][sim.ti] = len(accept_uids)
+                self.results['new_dx'][sim.ti] = self._count_diagnosed()
         return accept_uids
 
     def _count_diagnosed(self):
