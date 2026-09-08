@@ -476,6 +476,10 @@ def _make_calib_sim_worker(pars, calib_pars, build_fn, build_kw, base_sim,
         if parname in pars:
             s['value'] = pars[parname]
     sim = sc.dcp(base_sim)
+    # With reseed=True the trial's rand_seed is part of the fit; restore it
+    # here so the rerun reproduces the trial's stochastic realization.
+    if 'rand_seed' in pars:
+        sim.pars.rand_seed = int(pars['rand_seed'])
     for k, v in (sim_kwargs or {}).items():
         setattr(sim.pars, k, v)
     if analyzers is not None:
@@ -532,8 +536,9 @@ def make_calib_sims(calib, n=50, sim_kwargs=None, analyzers=None,
     """
     n = min(n, len(calib.df))
     top = calib.df.nsmallest(n, 'mismatch')
-    # Optuna leaks 'rand_seed' when reseed=True; not a calibratable model par.
-    par_cols = [c for c in top.columns if c not in ('index', 'mismatch', 'rand_seed')]
+    # rand_seed rides along with the pars when reseed=True; the worker
+    # restores it so each rerun reproduces its trial's realization.
+    par_cols = [c for c in top.columns if c not in ('index', 'mismatch')]
     par_sets = [{c: row[c] for c in par_cols} for _, row in top.iterrows()]
     if n_workers is None:
         n_workers = min(len(par_sets), sc.cpu_count())
