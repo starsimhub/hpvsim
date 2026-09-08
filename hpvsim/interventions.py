@@ -431,6 +431,9 @@ class BaseTreatment(ss.BaseTreatment):
         self.define_results(
             ss.Result('new_cin_treated',    dtype=int, scale=True, label='Number first-CIN-treated'),
             ss.Result('new_cancer_treated', dtype=int, scale=True, label='Number first-cancer-treated'),
+            # Total procedures per step, including repeats -- program volume,
+            # vs new_cin_treated / new_cancer_treated which are unique-agent-first counts.
+            ss.Result('new_treatments',     dtype=int, scale=True, label='Number of treatments delivered'),
         )
 
     def check_eligibility(self):
@@ -450,6 +453,7 @@ class treat_num(BaseTreatment, ss.treat_num):
     def step(self):
         treat_uids = super().step()
         if len(treat_uids):
+            self.results['new_treatments'][self.ti] += len(treat_uids)
             if self.treat_cancer:
                 new = treat_uids[~self.cancer_treated[treat_uids]]
                 self.cancer_treated[treat_uids] = True
@@ -497,6 +501,7 @@ class treat_delay(BaseTreatment):
         treat_uids = super().step()
         # super().step() only calls product.administer, so do the bookkeeping here.
         if len(treat_uids):
+            self.results['new_treatments'][self.ti] += len(treat_uids)
             if self.treat_cancer:
                 new = treat_uids[~self.cancer_treated[treat_uids]]
                 self.cancer_treated[treat_uids] = True
