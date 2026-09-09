@@ -498,8 +498,13 @@ class txvx(tx):
                  imm_boost=None, module_name=None, **kwargs):
         if name is None and df is None:
             name = 'txvx1'
-        if imm_init is None and imm_boost is None and name in self._DEFAULTS:
-            imm_init, imm_boost = self._DEFAULTS[name]
+        # Unset imm_init/imm_boost/rel_imm fall back to txvx1 shipped defaults
+        # (v2 parity: default_tx('txvx1') resolved both from products_txvx.csv).
+        # A caller passing df=custom for state efficacy still gets the standard
+        # v2 immunity behaviour unless they explicitly override.
+        default_name = name if name in self._DEFAULTS else 'txvx1'
+        if imm_init is None and imm_boost is None:
+            imm_init, imm_boost = self._DEFAULTS[default_name]
         if imm_init is not None and imm_boost is not None:
             raise ValueError('hpv.txvx takes at most one of `imm_init` or `imm_boost`.')
         super().__init__(name=name, df=df, module_name=module_name, **kwargs)
@@ -507,8 +512,8 @@ class txvx(tx):
         self.imm_boost = imm_boost
         # Per-target-genotype scaling of the conferred immunity. Defaults to the
         # named product's row in products_txvx.csv; 1.0 for anything unlisted.
-        if rel_imm is None and name is not None:
-            rel_imm = _load_txvx_products().get(name)
+        if rel_imm is None:
+            rel_imm = _load_txvx_products().get(default_name)
         self.rel_imm = dict(rel_imm) if rel_imm is not None else {}
 
     def administer(self, uids, return_format='dict'):
