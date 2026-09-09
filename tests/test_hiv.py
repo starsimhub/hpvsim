@@ -235,7 +235,7 @@ def test_hiv_effect():
     all_hpv = sim.results.all_hpv
     for key in ('hpv_prevalence_with_hiv', 'hpv_prevalence_no_hiv'):
         assert key in res
-    for key in ('cancers_with_hiv', 'cancers_no_hiv', 'cancer_incidence_with_hiv',
+    for key in ('new_cancers_with_hiv', 'new_cancers_no_hiv', 'cancer_incidence_with_hiv',
                 'cancer_incidence_no_hiv', 'cancer_rate_ratio'):
         assert key in all_hpv
     assert np.all((res['hpv_prevalence_with_hiv'] >= 0) & (res['hpv_prevalence_with_hiv'] <= 1))
@@ -244,8 +244,8 @@ def test_hiv_effect():
 
     # Stratified cancers are a lower bound: stratification runs after step_die,
     # so an agent who turns cancerous and dies the same step is missed here.
-    assert np.issubdtype(all_hpv['cancers_with_hiv'].dtype, np.floating)
-    strat_total = all_hpv['cancers_with_hiv'].sum() + all_hpv['cancers_no_hiv'].sum()
+    assert np.issubdtype(all_hpv['new_cancers_with_hiv'].dtype, np.floating)
+    strat_total = all_hpv['new_cancers_with_hiv'].sum() + all_hpv['new_cancers_no_hiv'].sum()
     assert strat_total > 0
     assert strat_total <= all_hpv.new_cancers.sum() * 1.001  # float tolerance
 
@@ -260,7 +260,7 @@ def test_hiv_cancer_rates_are_annual_and_female():
     # Non-negative rates; some cancers must occur.
     for k in ('cancer_incidence_with_hiv', 'cancer_incidence_no_hiv'):
         assert (r[k] >= 0).all()
-    assert (r['cancers_with_hiv'] + r['cancers_no_hiv']).sum() > 0
+    assert (r['new_cancers_with_hiv'] + r['new_cancers_no_hiv']).sum() > 0
 
     # annualize() on the per-ti annualized rate collapses quarters to the
     # annual rate; a valid rate for a year with cancers should be > 0.

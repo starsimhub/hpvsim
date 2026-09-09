@@ -339,8 +339,10 @@ class HPVTotal(ss.Analyzer):
                               label='Crude cervical cancer incidence '
                                     '(per 100,000 women per year)'))
         if self.hiv_module is not None:
-            defs.append(ss.Result('cancers_with_hiv', dtype=float, label='New cancers (HIV+)'))
-            defs.append(ss.Result('cancers_no_hiv', dtype=float, label='New cancers (HIV-)'))
+            # Per-ti flow counts; the ``new_`` prefix triggers the sum-based
+            # annualize heuristic (matches ``new_cancers``).
+            defs.append(ss.Result('new_cancers_with_hiv', dtype=float, label='New cancers (HIV+)'))
+            defs.append(ss.Result('new_cancers_no_hiv', dtype=float, label='New cancers (HIV-)'))
             defs.append(ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False, summarize_by='mean',
                                   label='Cervical cancer incidence '
                                         '(per 100,000 women with HIV per year)'))
@@ -464,8 +466,8 @@ class HPVTotal(ss.Analyzer):
         females_with_hiv = (f_pos * scale).sum()
         females_no_hiv = (f_neg * scale).sum()
 
-        self.results['cancers_with_hiv'][ti] = cancers_with_hiv
-        self.results['cancers_no_hiv'][ti] = cancers_no_hiv
+        self.results['new_cancers_with_hiv'][ti] = cancers_with_hiv
+        self.results['new_cancers_no_hiv'][ti] = cancers_no_hiv
         inc_pos = (cancers_with_hiv / dt / females_with_hiv * 1e5
                    if females_with_hiv else 0.0)
         inc_neg = (cancers_no_hiv / dt / females_no_hiv * 1e5
@@ -488,7 +490,7 @@ class HPVTotal(ss.Analyzer):
                               'asr_cancer_incidence', 'asr_cancer_mortality',
                               'cancer_incidence', 'timevec'})
         if self.hiv_module is not None:
-            handled_in_step |= {'cancers_with_hiv', 'cancers_no_hiv',
+            handled_in_step |= {'new_cancers_with_hiv', 'new_cancers_no_hiv',
                                 'cancer_incidence_with_hiv', 'cancer_incidence_no_hiv',
                                 'cancer_rate_ratio'}
         template = hpvs[0].results
