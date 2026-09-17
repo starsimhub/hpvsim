@@ -50,11 +50,10 @@ def test_cascade_order_dependency_no_exception():
         name='wrong_order_rx', product='excision', prob=1.0,
         eligibility=lambda s: s.interventions['primary'].outcomes['positive'],
     )
-    # WRONG ORDER: treat registered before screen
+    # Wrong order: treat registered before screen
     sim = _cascade_sim([treat, screen])
     sim.run()
-    # No exception; cin_treated may be zero or non-zero depending on whether
-    # last-step outcomes leak forward — either is acceptable per the contract.
+    # Either cin_treated count is acceptable; only the absence of an error matters.
     live_treat = sim.interventions['wrong_order_rx']
     assert isinstance(live_treat.cin_treated.uids.size, (int, np.integer))
 

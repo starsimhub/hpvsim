@@ -53,12 +53,21 @@ def _prepare_calib_pars(calib_pars):
             f'(got {bad!r}). Use nested dict form, e.g. '
             f'hi5=dict(cin_fn=dict(k=[best, low, high, step])).'
         )
-    # Detect Optuna spec dicts at leaves before sc.flattendict over-descends
-    # into them and produces confusing "leaf 'x.low'" errors.
+    # Catch Optuna spec dicts at leaves before sc.flattendict descends into
+    # them. A spec dict has SCALAR values (best, low, high, step, guess);
+    # a legitimate nested-param dict has LIST-valued leaves. We only flag
+    # a mid-tree dict as a stray spec if every value is scalar AND at least
+    # one key is a spec keyword -- otherwise a Dist par named 'low' or 'high'
+    # (ss.uniform's pars) would false-positive.
+    _SPEC_KEYS = {'low', 'high', 'guess', 'value', 'step'}
     def _check(d, path=()):
         for k, v in d.items():
             if isinstance(v, dict):
-                if v.keys() & {'low', 'high', 'guess', 'value', 'step'}:
+                looks_like_spec = (
+                    v.keys() & _SPEC_KEYS
+                    and all(not isinstance(x, (list, tuple, dict)) for x in v.values())
+                )
+                if looks_like_spec:
                     raise ValueError(
                         f'hpv.Calibration: leaf {".".join((*path, k))!r} is a '
                         f'dict {v!r}; use the list form [best, low, high, step].'
@@ -129,19 +138,13 @@ class Calibration(ss.Calibration):
         if calib_pars is not None:
             calib_pars = _prepare_calib_pars(calib_pars)
 
-        # Give each calibration its own Optuna study database, in a temp dir, so
-        # multiple hpv.Calibration runs in one session (or the test suite) do not
-        # share or leak trials through a single database in the cwd. Callers can
-        # still pass study_name/db_name explicitly (e.g. continue_db resume).
+        # Own study DB per calibration, so concurrent runs don't share trials.
         if 'study_name' not in kwargs and 'db_name' not in kwargs:
             kwargs['study_name'] = 'hpvsim_calibration'
             kwargs['db_name'] = str(sc.path(tempfile.mkdtemp()) / 'hpvsim_calibration.db')
 
-        # Default storage: JournalStorage (Optuna 4.x). SQLite (ss.Calibration
-        # default) uses a global write lock that serializes every trial commit;
-        # under ~32+ concurrent workers this deadlocks. JournalStorage is
-        # Optuna's recommended backend for distributed / high-worker-count
-        # optimization -- append-only per-process journals.
+        # JournalStorage, not ss.Calibration's SQLite default: SQLite's global
+        # write lock deadlocks past ~32 concurrent workers.
         if 'storage' not in kwargs:
             from optuna.storages import JournalStorage
             from optuna.storages.journal import JournalFileBackend
@@ -149,14 +152,8 @@ class Calibration(ss.Calibration):
             journal_path = journal_dir / 'hpvsim_calibration.log'
             kwargs['storage'] = JournalStorage(JournalFileBackend(str(journal_path)))
 
-        # ss.Calibration defaults to reseed=True, which resamples rand_seed
-        # from [0, 1_000_000] on every trial as if it were a calibrated par.
-        # For HPV/cancer this is nearly always wrong: cancer is a rare event,
-        # per-agent stochastic variance is large, and the resulting mismatch
-        # surface is dominated by seed noise -- Optuna picks the luckiest
-        # seed rather than the best parameters (see
-        # https://github.com/starsimhub/hpvsim/pull/... for the pathology).
-        # Override to False; callers who want per-trial reseed pass explicitly.
+        # reseed=True (the ss.Calibration default) makes rand_seed a calibrated
+        # par; cancer is rare enough that Optuna then picks the luckiest seed.
         kwargs.setdefault('reseed', False)
 
         if data is not None:
@@ -278,8 +275,7 @@ def compute_gof(actual, predicted, normalize=True, use_frac=False,
 
     if use_frac:
         if (actual < 0).any() or (predicted < 0).any():
-            # Fractional error on negative quantities is ill-defined; fall
-            # back to absolute error rather than producing nonsense.
+            # Fractional error is ill-defined on negatives; keep absolute error.
             pass
         else:
             maxvals = np.maximum(actual, predicted) + eps
@@ -298,17 +294,14 @@ def compute_gof(actual, predicted, normalize=True, use_frac=False,
 
 
 # ---------------------------------------------------------------------------
-# Data-key scoping (standardized column-name conventions produced by
-# hpv.data.loaders.load_calib_data) + analyzer-attachment helpers.
+# Data-key scoping + analyzer-attachment helpers.
 # ---------------------------------------------------------------------------
 
 ALL_HPV = 'all_hpv'                # column prefix: pooled target
 BY_GENOTYPE = 'by_genotype'        # column prefix: per-genotype distribution
 ALL_HPV_BY_AGE = 'all_hpv_by_age'  # by_age analyzer name for pooled age-stratified targets
 
-# Genotype-stratified target name -> (per-HPV result key, normalize).
-# Stock-based (matches v2 `{state}_genotype_dist = n_{state}_by_genotype /
-# totals`; see v2.2.6 hpvsim/sim.py:1112).
+# Genotype-stratified target name -> (per-HPV stock result key, normalize).
 _GENOTYPE_DIST_MAP = {
     'precin_genotype_dist':    ('n_precin',    True),
     'cin_genotype_dist':       ('n_cin',       True),
@@ -397,10 +390,8 @@ def _setup_analyzers(sim, data):
         raise ValueError(f'hpv.Calibration: unrecognized data columns: {unknown}')
 
     if age_result_names:
-        # Group result names by their bin-label set. Targets that share bins
-        # go on the same by_age analyzer; distinct bin schemes each get their
-        # own (all_hpv_by_age, all_hpv_by_age_1, ...). Preserves the ordered
-        # appearance of names in the data columns.
+        # Targets sharing a bin-label set share a by_age analyzer; distinct
+        # schemes get all_hpv_by_age, all_hpv_by_age_1, ...
         groups = {}  # bin-set key -> list of result names in insertion order
         for name in age_result_names:
             key = frozenset(age_labels_by_result[name])
@@ -446,9 +437,7 @@ def _extract_columns(sim, data):
     """
     tv_years = np.asarray(sim.timevec.years).astype(int)
     all_hpv_results = sim.results['all_hpv'] if 'all_hpv' in sim.results else None
-    # Build a name -> analyzer map across all all_hpv_by_age* analyzers.
-    # A single scheme uses just 'all_hpv_by_age'; multi-scheme calibrations
-    # also have 'all_hpv_by_age_1', '_2', ... (one per distinct bin set).
+    # result name -> analyzer, across all all_hpv_by_age* analyzers.
     result_to_analyzer = {}
     for a in sim.analyzers.values():
         aname = getattr(a, 'name', None) or ''
@@ -497,6 +486,10 @@ def _make_calib_sim_worker(pars, calib_pars, build_fn, build_kw, base_sim,
         if parname in pars:
             s['value'] = pars[parname]
     sim = sc.dcp(base_sim)
+    # With reseed=True the trial's rand_seed is part of the fit; restore it
+    # here so the rerun reproduces the trial's stochastic realization.
+    if 'rand_seed' in pars:
+        sim.pars.rand_seed = int(pars['rand_seed'])
     for k, v in (sim_kwargs or {}).items():
         setattr(sim.pars, k, v)
     if analyzers is not None:
@@ -553,8 +546,9 @@ def make_calib_sims(calib, n=50, sim_kwargs=None, analyzers=None,
     """
     n = min(n, len(calib.df))
     top = calib.df.nsmallest(n, 'mismatch')
-    # Optuna leaks 'rand_seed' when reseed=True; not a calibratable model par.
-    par_cols = [c for c in top.columns if c not in ('index', 'mismatch', 'rand_seed')]
+    # rand_seed rides along with the pars when reseed=True; the worker
+    # restores it so each rerun reproduces its trial's realization.
+    par_cols = [c for c in top.columns if c not in ('index', 'mismatch')]
     par_sets = [{c: row[c] for c in par_cols} for _, row in top.iterrows()]
     if n_workers is None:
         n_workers = min(len(par_sets), sc.cpu_count())

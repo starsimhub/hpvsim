@@ -1,5 +1,11 @@
 # Developer tests
 
+> **Slated for deletion in v3.3 (test cleanup).** The whole folder costs ~15-20
+> minutes, and the mechanisms these gates cover are also checked cheaply in
+> `tests/`. The plan is to keep the unit coverage and drop these. If a gate here
+> is the only thing covering a behaviour you care about, move that coverage into
+> `tests/` before 3.3.
+
 Statistical acceptance gates and parameter-recovery checks that are too expensive for the `tests/` suite. Each one needs many seeds, many agents, or a real Optuna calibration, so together they take on the order of 15-20 minutes rather than the seconds the unit suite is budgeted for.
 
 They are *not* redundant with `tests/`: the unit suite checks each mechanism directly (and cheaply) on a single run, while these check the population-level statistical properties that only emerge over many seeds. Run them before opening a PR that touches multiscale, natural history, HIV, or calibration, and in the nightly job.
@@ -15,15 +21,12 @@ Dependencies are the same as the unit suite: `pip install -r ../tests/requiremen
 
 ## What lives here
 
+(Five further gates listed here previously were removed before 3.2.)
+
 | File | Gate |
 | --- | --- |
 | `test_multiscale_grow_gates.py` | Cancer incidence flat across `ms_agent_ratio`; intervention-averted fraction equal across ratios; mean-age-at-cancer variance shrinks as the ratio rises. |
 | `test_analyzers_multiscale_gates.py` | `age_causal_infection` mean age and `dalys` totals are unbiased across `ms_agent_ratio`, seed-averaged. |
-| `test_age_results_subannual.py` | `cancer_incidence` accumulates across every sub-step of a calendar year at `dt<1`. |
-| `test_hiv_incidence_import.py` | The Rwanda incidence importer builds a plausible HIV epidemic and wires CD4 trajectories. |
-| `test_hiv_coinfection_gate.py` | HIV+ agents carry higher HPV prevalence and more cancers than HIV- agents. |
-| `test_calibration_recovery.py` | Synthetic two-parameter recovery through the `data=` + `compute_gof` Optuna path. |
-| `test_plot_calibration.py` | `hpv.plot_calibration` renders age-axis and year-axis targets from a real `Calibration` run. |
 
 ## Adding a test here
 

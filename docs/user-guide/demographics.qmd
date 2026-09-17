@@ -1,0 +1,92 @@
+---
+title: "Demographics"
+---
+
+Cervical cancer happens decades after infection, so a useful HPVsim run spans 50 years or more and the population has to change realistically over that span. Three modules do that work: `hpv.Births`, `ss.Deaths` and `hpv.AgeMigration`.
+
+Give `hpv.Sim` a `location` and it loads that country's bundled UN World Population Prospects data: the age and sex pyramid for the start year, crude birth rates, age- and sex-specific mortality, and the total population trajectory. Any country name in the WPP is accepted, case-insensitive.
+
+## Scaling to a real population
+
+The number of agents and the size of the population are separate decisions. When `location` is set, `total_pop` is filled in from the country's population at the start year and `pop_scale = total_pop / n_agents`. Every result counted in people is multiplied by that factor at the end of the run, so 2,000 agents produce national-scale numbers. Pass `total_pop=n_agents` if you would rather see raw agent counts.
+
+Population size therefore buys resolution, not scale. A 2,000-agent Nigeria run reports a plausible number of cervical cancers, but that number rests on perhaps a dozen simulated cases, each standing for around 48,000 people.
+
+`hpv.Sim()` with no location is a different thing entirely: uniform ages 0 to 60, nobody born, nobody dying, no migration, `pop_scale=1`. Useful for looking at natural history in isolation, misleading for anything else. It warns you.
+
+## Migration pins the age pyramid
+
+Once a year, `AgeMigration` compares the simulated count in every (single-year age, sex) cell against that year's target pyramid, scaled to agent space. Where the simulation is short it adds immigrants at that age; where it is over it removes agents through `request_removal`, which takes them out of the run without recording a death. Immigrant ages are spread uniformly within the year so cohorts do not cross age bands in lockstep. Flows appear as `sim.results.agemigration.new_immigrants` and `new_emigrants`.
+
+Two things follow. The age structure is correct by construction, so you cannot get it wrong by mis-specifying fertility — but nor can you treat it as evidence that fertility is right, because errors there surface as large migration flows instead. And immigrants arrive HPV-naive, so where flows are large relative to the population they dilute prevalence; check prevalence against a run with migration removed.
+
+`v2_compat_demographics=True` switches on annual birth pulses, integer immigrant ages and floored starting ages. It exists to reproduce v2 runs and should not be the basis for new work.
+
+## Multiscale: more cancers for the same money
+
+Cancer is rare, so most agents contribute nothing to the outcome you care about. `ms_agent_ratio` spends the compute where the signal is. When a woman reaches CIN, her agent is shrunk to weight `1/ratio` and up to `ratio − 1` extra agents are grown from her — full clones, each with its own cancer-bound trajectory. These "fine" agents are excluded from the sexual network, from reproduction and from the migration target, but face the same emigration rate as everyone else in their age band, so they do not accumulate unrealistically.
+
+The default is 1, which is a no-op. At `ms_agent_ratio=10` the cancer estimate is built from roughly ten times as many simulated cancer trajectories, for essentially no extra run time.
+
+## How to run a national projection on a laptop
+
+```{python}
+import time
+import hpvsim as hpv
+
+pars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,
+            start=1990, stop=2020, verbose=0)
+
+for ratio in (1, 10):
+    t0 = time.time()
+    sim = hpv.Sim(**pars, ms_agent_ratio=ratio)
+    sim.run()
+    print(f'ms_agent_ratio={ratio:<3d} '
+          f'cancers to 2020: {float(sim.results.all_hpv.cum_cancers[-1]):>11,.0f}   '
+          f'cancer-bound agents alive: {int(sim.people.fine.sum()):>4d}   '
+          f'{time.time() - t0:.1f}s')
+
+print(f'\npop_scale:        {sim.pars.pop_scale:,.0f} people per agent')
+print(f'population 1990:  {float(sim.results.n_alive[0]):,.0f}')
+print(f'population 2020:  {float(sim.results.n_alive[-1]):,.0f}')
+```
+
+Both runs cost the same. The second builds its cancer estimate from hundreds of trajectories rather than a dozen, which is what you want before comparing scenarios that differ by a few percent.
+
+## Modeling a state, province, or district
+
+The bundled data covers countries, because that is what UN World Population Prospects publishes. Plenty of real questions are not national — a single state's screening program, one province's vaccination rollout, a district-level pilot. For those you supply your own demographic inputs.
+
+Put any of these four files in a folder and pass `datafolder=`:
+
+| File | Columns | Notes |
+|---|---|---|
+| `age_data.csv` | `AgeGrpStart`, `PopTotal` | The starting age distribution. `PopTotal` is read **in thousands**, matching the WPP convention |
+| `birth_rate.csv` | `Time`, `CBR` | Crude birth rate per 1,000 population, by year |
+| `death_rate.csv` | `Time`, `Sex`, `AgeGrpStart`, `mx` | Mortality rate by year, sex and age. `Sex` takes `Male` and `Female` |
+| `pop_total.csv` | `year`, `pop_size` | Total population by year, used to set `pop_scale` |
+
+You still pass `location=`, and it still matters. Any file you omit falls back to that country's bundled data, with a warning naming the file — so a state model with only its own age structure and total population will inherit national fertility and mortality. That is often a reasonable first approximation, and the warning is there so it is a choice rather than an accident.
+
+```python
+sim = hpv.Sim(
+    location   = 'nigeria',        # Fallback source, and network parameters
+    datafolder = './kano_data',    # age_data.csv, pop_total.csv, ...
+    genotypes  = [16, 18],
+    n_agents   = 5000,
+    start      = 2000,
+    stop       = 2040,
+)
+```
+
+Two limitations worth knowing before you start.
+
+**Migration targets are not read from `datafolder`.** The age-pyramid pinning described above needs a population-by-age trajectory, and that only comes from the bundled country tables. For a subnational run, either pass it yourself with `hpv.AgeMigration(pop_total=..., pop_by_age=...)` in `demographics=`, where `pop_by_age` has columns `year`, `age`, `male`, `female`; or leave migration out and accept that your age structure will drift from the observed one over a long run. If the area you are modeling has significant net migration — most cities do — the second option will bias the age distribution, and cervical cancer burden is sensitive to it.
+
+**Network parameters come from `location` and are not subnational.** Partnership formation rates are calibrated at country level, so a district model inherits national sexual behavior. If local survey data says otherwise, override the network parameters directly; see [Sexual network](sexual-network.qmd).
+
+## See also
+
+- [T4 - People, populations, and networks](../tutorials/tut_people.qmd)
+- [Results and analyzers](results.qmd) for which results are scaled and which are not
+- [`hpv.AgeMigration` API reference](../api/demographics.qmd)

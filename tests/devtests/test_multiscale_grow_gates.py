@@ -1,5 +1,12 @@
 """Statistical acceptance gates for the multiscale grow engine.
 
+SLATED FOR DELETION IN v3.3 (test cleanup). These gates cost ~15-20 min for
+the whole folder, which is why they sit outside ``tests/``. The mechanisms
+they cover are also checked cheaply in the unit suite, so the plan is to keep
+the unit coverage and drop these rather than keep paying for them on every
+release. If a gate here is the ONLY thing covering a behaviour you care
+about, move that coverage into ``tests/`` before 3.3.
+
 These three gates run ~72 full sims (many seeds x ratios) and take ~14 min.
 The mechanism-level checks — that fine agents are spawned, excluded from the
 network, subject to emigration, and reached by interventions — live in

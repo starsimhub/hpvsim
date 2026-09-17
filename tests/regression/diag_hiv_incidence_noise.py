@@ -44,9 +44,8 @@ class _DenomProbe(ss.Analyzer):
 
     def init_pre(self, sim):
         from hpvsim.hpv import HPV
-        from hpvsim.hiv import HIV
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv_module = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        self.hiv_module = sim.diseases.hiv
         super().init_pre(sim)
         n = len(sim.t.timevec)
         self.n_f_pos = np.zeros(n)

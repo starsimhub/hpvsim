@@ -3,84 +3,169 @@ title: T7 - Calibration
 jupyter: python3
 ---
 
+Tutorial 6 showed the uncalibrated model overstating cervical cancer counts in
+Nigeria, by an amount that varied across age bands. Calibration is how you fix
+that: you name the parameters you are willing to change, hand over your data,
+and let the model search for the values that reproduce it. In this tutorial we
+fit two parameters to Nigerian cancer data and look at the result.
 
-Tutorial 2 demonstrated how to run the model and plot the outputs. But it's entirely possible that the model outputs won't look like the data for the country that you wish to model. The default parameter values included in HPVsim are intended as points of departure to be iteratively refined via calibration. The process of model calibration involves finding the model parameters that are the most likely explanation for the observed data. This tutorial gives an introduction to the `Calibration` object and some recipes for optimization approaches.
+The parameters that ship with HPVsim are generic, not a fit to any country.
+Calibration is a required step.
 
+## What HPVsim can fit to
 
-<div class="alert alert-info">
+Three kinds of target, in the format cancer data usually arrives in:
 
-Click [here](https://mybinder.org/v2/gh/starsimhub/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_calibration.ipynb) to open an interactive version of this notebook.
+- **Cancer or lesion counts by age**, for one or more years. A long CSV with
+  columns `year, name, age, sex, genotype, value`.
+- **Population-level numbers over time**, such as age-standardized cancer
+  incidence. The same CSV shape without the `age` column.
+- **The genotype distribution of cancers**, from typing studies. The same shape
+  with a `genotype` column and no `age` column.
 
-</div>
-
-## Data types supported by HPVsim
-
-Data on HPV and cervical disease comes in many different formats. When using HPVsim, the goal is typically to produce population-level estimates of epidemic outputs like:
-
-- age-specific incidence of cancer or high-grade lesions in one or more years;
-- number of cases of cancer or high-grade lesions reported in one or more years;
-- HPV prevalence over time;
-- the distribution of genotypes in detected cases of cancer/high-grade lesions.
-
-The `AgeResults` analyzer (see the [analyzers tutorial](tut_analyzers.qmd)) records these quantities at the age bins and years you choose, and exposes them as a tidy dataframe via `AgeResults.to_dataframe(key=...)`. Calibration compares those dataframes against dataframes of the same shape holding your observed data.
-
-## The Calibration object
-
-In v3 the `Calibration` object is built on Starsim's calibration machinery, which is in turn built on [Optuna](https://optuna.org), an open-source hyperparameter-optimization framework. A calibration needs:
-
-- an `hpv.Sim()` instance carrying an `AgeResults` analyzer that records the quantities you have data on;
-- `calib_pars`: a flat dictionary of the parameters to vary. A bare key (e.g. `'beta'`) targets a sim-level parameter; a dotted key (e.g. `'hpv16.cin_fn.k'`) targets a per-genotype parameter, and a `'cross_immunity....'` key targets the cross-immunity matrix. Each entry is `dict(low=..., high=..., guess=...)`.
-- `data`: a dictionary mapping each `AgeResults` result key to a dataframe of observed values (indexed by snapshot year, index name `'t'`, one column per age bin).
-
-The example below illustrates the general idea. To keep it self-contained we synthesize a target dataset from a run with a known CIN-progression parameter, then ask the calibration to recover it; in practice you would load your observed data into the `data` dataframes instead.
+`nigeria_cancer_cases.csv` is the first kind and `nigeria_cancer_types.csv` is
+the third. Look at the second one before going further:
 
 ```{python}
-#| pycharm: {is_executing: true}
 import numpy as np
-import sciris as sc
+import pandas as pd
 import hpvsim as hpv
 
-# Age bins and years at which we have (or, here, synthesize) cancer data.
-edges = np.array([0., 30., 50., 70., 100.])
-years = [2015, 2020]
+pd.read_csv('nigeria_cancer_types.csv')
+```
 
+Its `genotype` column uses the names HPVsim knows: `16`, `18`, and `ohr` for the
+pooled other-high-risk group. Genotype labels in your own data will not
+necessarily match, and a label the model cannot resolve makes the whole
+calibration fail, so check them first. The names HPVsim accepts are in
+`hpv.GENOTYPE_KEYS`.
+
+Now load both targets. Pass a list of file paths, DataFrames, or a mix:
+
+```{python}
+targets = hpv.data.load_calib_data(['nigeria_cancer_cases.csv',
+                                    'nigeria_cancer_types.csv'])
+targets.T.head(6)
+```
+
+The loader reshapes everything into one table: rows are years, and each column
+is one target value. Column names tell you where the model will look for the
+matching number — `all_hpv.cancers.40-45` is pooled cancers in women aged 40 to
+44, and `by_genotype.cancerous_genotype_dist.hpv16` is HPV16's share of cancers.
+Missing combinations are `NaN` and are skipped.
+
+You do not need to add a `hpv.by_age` analyzer yourself. The calibration reads
+the age bands out of your data and attaches one that matches.
+
+## Choose the parameters to fit
+
+Group them by what they belong to, and give each one a list:
+`[starting value, lowest, highest, step]`.
+
+```{python}
+calib_pars = dict(
+    beta = [0.25, 0.15, 0.35, 0.05],                                # Overall transmissibility
+    hpv16 = dict(
+        cancer_fn = dict(transform_prob=[2e-3, 1e-3, 4e-3, 5e-4]),  # HPV16 lesion-to-cancer rate
+    ),
+)
+```
+
+A bare key is a whole-sim parameter. A key nested under a genotype name
+(`hpv16`, `hpv18`, `hi5`, `ohr`) is that genotype's parameter, nested as deeply
+as the parameter itself is. A key nested under `network` is a partnership
+parameter, and one under `cross_immunity` is a cross-protection parameter.
+
+Note that the sim runs the three genotype groups the data reports, so every
+observed share maps onto exactly one modeled group. If you run genotypes your
+data does not distinguish, you have to decide how to split the observed share
+between them — and there is usually no defensible way to do it.
+
+Two parameters is a small fit, chosen so this tutorial runs in seconds. `beta`
+sets how much cancer there is overall; `transform_prob` sets how readily HPV16
+lesions turn cancerous, which shifts the age pattern.
+
+## Run the fit
+
+```{python}
 def make_sim():
+    """The sim the calibration will vary and re-run."""
     return hpv.Sim(
-        n_agents=4e3, start=1990, stop=2021, dt=1.0, rand_seed=0,
-        genotypes=[16, 18], location='nigeria', verbose=0,
-        analyzers=[hpv.AgeResults(result_args=sc.objdict(
-            cancers=sc.objdict(years=years, edges=edges)))],
+        location       = 'nigeria',
+        genotypes      = [16, 18, 'ohr'],   # Exactly the groups the data reports
+        n_agents       = 2000,
+        start          = 1990,
+        stop           = 2021,
+        ms_agent_ratio = 25,
+        rand_seed      = 0,
+        verbose        = 0,
     )
 
-# Synthesize a target: run with a known parameter and take its AgeResults output.
-# (Replace this block with your own observed data as a {key: dataframe} dict.)
-target = make_sim()
-hpv.calibration.build_sim(target, calib_pars={'hpv16.cin_fn.k': 0.55})
-target.run()
-data = {'cancers': target.analyzers['ageresults'].to_dataframe(key='cancers')}
-
-# Parameters to calibrate, each given as dict(low, high, guess).
-calib_pars = {
-    'hpv16.cin_fn.k':                 dict(low=0.20, high=0.90, guess=0.50),
-    'hpv16.cancer_fn.transform_prob': dict(low=0.001, high=0.005, guess=0.002),
-}
-
-# Build the calibration, run a few trials, and report the best fit.
 calib = hpv.Calibration(
     make_sim(),
     calib_pars,
-    data=data,
-    total_trials=6,
-    n_workers=1,
+    data         = targets,
+    total_trials = 4,      # Far too few; see below
+    n_workers    = 2,
+    verbose      = 0,
 )
 calib.calibrate()
-print('Best parameters:', calib.best_pars)
+print('Best fit:', calib.best_pars)
 ```
 
-We can visualize how well the best-fit simulation matches the target data:
+Every trial runs the model once with a different combination of parameter
+values, scores how far the model is from your data, and reports the score as
+`mismatch` — smaller is better. The trials are ranked:
 
 ```{python}
-hpv.plot_calibration(calib)
+calib.df
 ```
 
-This is only 6 trials — a real calibration needs many more, and careful thought about which parameters to vary. In HPVsim any parameter can be adjusted; as we learn which parameters make the most sense to calibrate, we will expand the guidance here. We also encourage users to share their experiences with calibration and parameter searches.
+## Look at the fit, not just the number
+
+```{python}
+fig = hpv.plot_calibration(calib, top_n=4)
+```
+
+One panel per target. The age panel shows your data as points and the best
+trials as a band; the genotype panel shows the same as boxes against your
+observed shares.
+
+Read the shape, not the score. A run that lands on the right total but the wrong
+age pattern will score similarly to one that is uniformly too low, and only the
+first is useful. If the band misses your points in the same direction across
+every age band, the parameters you opened up cannot reach your data — open
+different ones rather than running more trials.
+
+## Four trials is not a calibration
+
+This fit is a demonstration of the mechanics. A real calibration needs:
+
+- **Hundreds to thousands of trials.** Set `total_trials` to at least a few
+  hundred and `n_workers` to the number of cores you have. That belongs on a
+  server, not a laptop.
+- **More agents.** At `n_agents=2000` the model's own noise is comparable to the
+  differences between parameter sets, so the search partly fits noise. Raise
+  `n_agents` until repeated runs of the same parameters agree closely.
+- **Thought about which parameters to open.** Every parameter you add makes the
+  search harder. Start with the ones your data can actually distinguish.
+
+The random seed stays fixed across trials, because `reseed=False` is the
+default. This matters for HPV: cancer is rare, so if each trial also drew a new
+seed, the search would find the luckiest seed rather than the best parameters.
+
+## Keep the result
+
+A finished calibration object is large. `shrink()` keeps only what you need to
+replot it or rebuild the best sims, which is small enough to commit alongside
+your analysis:
+
+```{python}
+compact = calib.shrink()
+compact.best_pars
+```
+
+The calibration stores each trial's score, not each trial's full results. To
+look at anything else — a projection past your data years, an extra analyzer —
+re-run the best trials with `hpv.make_calib_sims(calib, n=...)` and read the
+sims it returns.

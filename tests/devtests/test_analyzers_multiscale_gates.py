@@ -1,5 +1,12 @@
 """Seed-averaged multiscale-equivalence gates for the analyzers.
 
+SLATED FOR DELETION IN v3.3 (test cleanup). These gates cost ~15-20 min for
+the whole folder, which is why they sit outside ``tests/``. The mechanisms
+they cover are also checked cheaply in the unit suite, so the plan is to keep
+the unit coverage and drop these rather than keep paying for them on every
+release. If a gate here is the ONLY thing covering a behaviour you care
+about, move that coverage into ``tests/`` before 3.3.
+
 Both quantities below are means over rare events (age at cancer, DALYs from
 young-onset cancer), so a single seed is far too noisy to assert on — they need
 4-6 seeds per ratio, i.e. ~20 full sims. The cheap per-run invariants those

@@ -34,7 +34,6 @@ def test_demo_pipeline_runs_end_to_end():
     msim = ss.parallel(*sims, verbose=0)
     sub = ss.MultiSim(list(msim.sims))
     sub.median()
-    # Median-reduced result has the same shape as each underlying sim.
     # MultiSim results use flattened keys (hpv16_cum_infections), not nested.
     cum_inf = sub.results.hpv16_cum_infections
     assert len(cum_inf) > 0

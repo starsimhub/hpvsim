@@ -48,35 +48,23 @@ class AgeMigration(ss.Demographics):
 
     def __init__(self, pars=None, pop_total=None, pop_by_age=None,
                  v2_compat=False, **kwargs):
-        # dt=ss.year sets this module's Timeline to annual; ss.Loop only
-        # calls step() at times in mod.t.tvec, so it fires once per year
-        # regardless of sim.dt.
+        # dt=ss.year makes ss.Loop fire step() once per year, whatever sim.dt is.
         super().__init__(dt=ss.year)
         self.update_pars(pars, **kwargs)
         self._pop_total = pop_total                 # [year, pop_size] DataFrame; sets _scale and the data-year window.
-        self._pop_by_age = pop_by_age               # [year, age, male, female] DataFrame; source for _pop_by_year, released after init_pre builds it.
-        # Sim agents per real-world person at sim.start (n_agents / pop_total
-        # at start year). Used to scale target_counts each step so the pyramid
-        # is matched in agent-space, not person-space.
+        self._pop_by_age = pop_by_age               # [year, age, male, female] DataFrame; released once _pop_by_year is built.
+        # Sim agents per real person, so the pyramid is matched in agent-space.
         self._scale = None
         self._n_imm = 0                             # Immigrants added this step (for results.new_immigrants).
         self._n_emi = 0                             # Emigrants requested this step (for results.new_emigrants).
         self._pop_by_year = None                    # {year: per-year pyramid DataFrame}, built in init_pre.
         # CRN-safe emigrant selection — domain set per call.
         self._emi_select = ss.choice(replace=False)
-        # Per-band emigration hazard applied independently to fine multiscale
-        # agents (excluded from the pyramid target). p set per band per call.
+        # Per-band emigration hazard for fine agents; p set per band per call.
         self._fine_emi_bern = ss.bernoulli(p=0.0)
-        # Sub-year age jitter for incoming immigrants. Without this, every
-        # "year-N" immigrant arrives at exactly age N.0 and the cohort ages
-        # in lockstep through age bins, producing discrete pyramid steps
-        # rather than smooth transitions. Jittering by uniform(0, 1) means
-        # year-N immigrants are spread across [N, N+1) within the year.
-        # Skipped when v2_compat=True so immigrants land at exact integer ages.
+        # Spreads year-N immigrants across [N, N+1) so cohorts don't age in lockstep.
         self._age_jitter = ss.uniform(low=0.0, high=1.0)
-        # v2_compat: when True, skip age jitter so immigrants land at exact
-        # integer ages. Pair with AnnualBirths for fully discrete integer-age
-        # demographics.
+        # Skips the jitter, so immigrants land at exact integer ages.
         self._v2_compat = v2_compat
         return
 
@@ -87,10 +75,7 @@ class AgeMigration(ss.Demographics):
     def init_pre(self, sim):
         super().init_pre(sim)
 
-        # Resolve sim start year once. sim.pars.start/stop may be an ss.date
-        # (has .year), an ss.years TimePar (has .years), or a plain number.
-        # Used both for load_country (so age_data samples at the right year)
-        # and for _scale below.
+        # start/stop may be an ss.date, an ss.years TimePar, or a plain number.
         def _as_year(t):
             if hasattr(t, 'year'):
                 return float(t.year)
@@ -100,16 +85,12 @@ class AgeMigration(ss.Demographics):
         sim_start_year = _as_year(sim.pars.start)
         sim_stop_year = _as_year(sim.pars.stop)
 
-        # Pull from country data if not explicitly supplied, then build a
-        # {year: {age, male, female}} lookup of compact numpy arrays so step()
-        # can do an O(1) lookup instead of an O(rows) mask + sort every year.
-        # Guarding on _pop_by_year makes this idempotent: a second init_pre
-        # finds the lookup already built and the raw table already released.
+        # Build a {year: {age, male, female}} lookup so step() is O(1) per year.
+        # Guarding on _pop_by_year keeps a second init_pre a no-op.
         if self._pop_by_year is None:
             if self._pop_total is None or self._pop_by_age is None:
                 from .data.country import load_country
-                # hpv.Sim stores location on the sim; fall back to pars if a
-                # caller wired it there instead.
+                # hpv.Sim stores location on the sim; fall back to pars.
                 location = (
                     getattr(sim, 'location', None)
                     or getattr(sim.pars, 'location', None)
@@ -126,13 +107,8 @@ class AgeMigration(ss.Demographics):
                 if self._pop_by_age is None:
                     self._pop_by_age = cd['pop_by_age']
 
-            # The raw table spans ~1950-2101; step() only looks up years within
-            # the sim window, so trim to [start, stop] (+/-1yr pad). Store each
-            # year as plain numpy arrays rather than a DataFrame: the DataFrame
-            # carried redundant per-row 'year' (== the key) and 'age' (== the
-            # index) columns and heavy pandas overhead, inflating the lookup
-            # ~5x over its numeric payload. Counts stay float64 so the target
-            # values step() rounds are bit-identical to the DataFrame path.
+            # Trim the ~1950-2101 table to the sim window (+/-1yr pad). Counts
+            # stay float64 so the targets step() rounds are unchanged.
             lo = int(np.floor(sim_start_year)) - 1
             hi = int(np.ceil(sim_stop_year)) + 1
             pba = self._pop_by_age
@@ -145,11 +121,9 @@ class AgeMigration(ss.Demographics):
                     male=g['male'].to_numpy(dtype=np.float64),
                     female=g['female'].to_numpy(dtype=np.float64),
                 )
-            # Release the raw table: it is only needed to build the lookup above.
-            self._pop_by_age = None
+            self._pop_by_age = None  # only needed to build the lookup
 
-        # Scale factor: n_agents / data_population_at_sim_start. Recomputed
-        # each init_pre since n_agents / start may change.
+        # Recomputed each init_pre since n_agents or start may change.
         pt = self._pop_total
         data_pop_at_start = float(
             np.interp(sim_start_year, pt['year'].values, pt['pop_size'].values)
@@ -188,12 +162,8 @@ class AgeMigration(ss.Demographics):
         ages_data = pat_year['age']
 
         people = sim.people
-        # Snapshot alive UIDs at the start of the step, EXCLUDING fine
-        # multiscale agents: they are high-resolution cancer stand-ins, not
-        # real bodies, so they neither count toward the age x sex pyramid
-        # target nor are eligible to emigrate.
-        # This ensures the boolean masks remain aligned with the UID list even
-        # as immigrants are added during the loop.
+        # Snapshot alive UIDs so masks stay aligned as immigrants are added. Fine
+        # agents are excluded: not real bodies, so they don't count toward the target.
         all_alive = people.auids.copy()
         if 'fine' in people.states:
             snap_uids = all_alive[~people.fine[all_alive]]
@@ -203,14 +173,8 @@ class AgeMigration(ss.Demographics):
         ages = people.age[snap_uids].astype(int)
         female = people.female[snap_uids]
 
-        # Fine multiscale agents are excluded from the pyramid count/target
-        # above (counting them as whole bodies over-fills cancer-age bands and
-        # causes catastrophic over-emigration). But they must still face the
-        # SAME per-capita emigration rate as real bodies in their band, or they
-        # over-realize cancer relative to single scale (incidence inflates with
-        # ms_agent_ratio and horizon — the coarse source can emigrate before its
-        # cancer fires, but its fine peers otherwise cannot). Snapshot them
-        # separately and apply an independent per-band Bernoulli hazard below.
+        # Fine agents still need the same per-capita emigration rate as real
+        # bodies, or they over-realize cancer; applied below as a per-band hazard.
         has_fine = ('fine' in people.states) and bool(
             np.asarray(people.fine[all_alive], dtype=bool).any())
         if has_fine:
@@ -221,10 +185,7 @@ class AgeMigration(ss.Demographics):
         n_imm_total = 0
         n_emi_total = 0
 
-        # Accumulate per-(age, sex) immigrant attributes across the inner loop;
-        # concatenated and applied to People in one ``people.grow`` call below.
-        # Per-band arrays go in chunks instead of a single grow-per-band so we
-        # only pay the People-resize cost once per step.
+        # Chunked per band so People is resized once per step, not once per band.
         imm_age_chunks = []
         imm_female_chunks = []
 
@@ -250,8 +211,7 @@ class AgeMigration(ss.Demographics):
                     band_uids = snap_uids[in_band]
                     self._emigrate(band_uids, n=-diff)
                     n_emi_total += -diff
-                    # Apply the same per-capita emigration rate to fine agents in
-                    # this (age, sex) band, independently (not counted in target).
+                    # Same per-capita rate for fine agents in this band.
                     if has_fine and count_sim > 0:
                         p_band = min((-diff) / count_sim, 1.0)
                         fmask = ((fine_female if sex_is_female else ~fine_female)
@@ -259,16 +219,9 @@ class AgeMigration(ss.Demographics):
                         self._emigrate_fine(fine_uids[fmask], p_band)
 
         if n_imm_total > 0:
-            # Single People.grow + write per attribute, sized to the total
-            # immigration across all (age, sex) bands.
             new_uids = people.grow(n_imm_total)
+            # ages_at_arrival is the integer lower bound of each immigrant's band.
             ages_at_arrival = np.concatenate(imm_age_chunks)
-            # Spread each "year-N" immigrant uniformly across [N, N+1) so the
-            # cohort doesn't all transition age bins on the same tick. Uses
-            # the per-module CRN dist; ages_at_arrival is the integer
-            # lower-bound of each immigrant's year band.
-            # Skipped when v2_compat is on, placing immigrants at exact
-            # integer ages.
             if not self._v2_compat:
                 ages_at_arrival = ages_at_arrival + self._age_jitter.rvs(new_uids)
             people.age[new_uids] = ages_at_arrival
@@ -389,11 +342,8 @@ class AnnualBirths(Births):
     """
 
     def __init__(self, pars=None, **kwargs):
-        # Inject dt=ss.year into the pars dict so ss.Module.__init__ receives
-        # it via update_pars → Timeline. This sets the module's own Timeline
-        # to annual cadence: ss.Loop fires step() only at integer-year
-        # boundaries, and self.t.dt == ss.years(1) causes get_births() to
-        # compute the full annual birth probability in one pulse.
+        # An annual Timeline makes ss.Loop fire once per year, and self.t.dt ==
+        # ss.years(1) makes get_births() compute the full annual probability.
         import sciris as sc
         pars = sc.mergedicts({'dt': ss.year}, pars)
         super().__init__(pars=pars, **kwargs)
