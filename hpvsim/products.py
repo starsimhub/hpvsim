@@ -455,8 +455,10 @@ class tx(ss.Tx):
                 module.cin[eff] = False
                 module.precin[eff] = False
                 module.cancerous[eff] = False
+                module.undetected_cancerous[eff] = False
                 module.ti_cin[eff] = np.nan
                 module.ti_cancerous[eff] = np.nan
+                module.ti_cancer_detection[eff] = np.nan
                 # ti_clearance is read against the HPV module's own ti, not ours.
                 module.ti_clearance[eff] = module.ti + 1
                 # Cancel any pending latency roll: treatment-induced clearance

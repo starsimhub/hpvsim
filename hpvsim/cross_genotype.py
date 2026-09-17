@@ -231,11 +231,12 @@ class HPVTotal(ss.Analyzer):
 
     # HPV result key -> BoolState name, aggregated by boolean OR across modules.
     _UNION_STATES = {
-        'n_infected':  'infected',
-        'n_precin':    'precin',
-        'n_cin':       'cin',
-        'n_cancerous': 'cancerous',
-        'n_latent':    'latent',
+        'n_infected':               'infected',
+        'n_precin':                 'precin',
+        'n_cin':                    'cin',
+        'n_cancerous':              'cancerous',
+        'n_undetected_cancerous':   'undetected_cancerous',
+        'n_latent':                 'latent',
     }
 
     # WHO 2000 World Standard Population weights per 5-year band (0-4 to 100+).
@@ -422,10 +423,12 @@ class HPVTotal(ss.Analyzer):
         wts_af = w[female] if w is not None else None
         females_by_bin = np.histogram(ages[female], bins=edges, weights=wts_af)[0]
 
-        # Numerator: cancers realized this step, across genotypes.
+        # Numerator: cancers DETECTED this step, across genotypes. Matches
+        # HPV.results.new_cancers and real-world diagnosed counts; onset is
+        # available via ti_cancerous / new_undetected_cancers.
         new_cancer = np.zeros_like(people.alive)
         for m in hpvs:
-            new_cancer |= ((m.ti_cancerous == ti) & m.cancerous)
+            new_cancer |= ((m.ti_cancer_detection == ti) & m.cancerous)
         new_cancer &= people.alive
         wts_nc = w[new_cancer] if w is not None else None
         cancers_by_bin = np.histogram(ages[new_cancer], bins=edges, weights=wts_nc)[0]

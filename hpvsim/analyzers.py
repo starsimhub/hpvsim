@@ -77,9 +77,12 @@ class by_age(ss.Analyzer):
     }
 
     # Result-name -> (event-time attr, in-state attr); annualized by sum.
+    # 'cancers' fires at DETECTION (matches HPV.results.new_cancers and
+    # real-world diagnosed counts); onset is a separate biological event
+    # available via ti_cancerous / new_undetected_cancers.
     _FLOW_KEYS = {
-        'cancers':  ('ti_cancerous', 'cancerous'),
-        'cins':     ('ti_cin',       'cin'),
+        'cancers':  ('ti_cancer_detection', 'cancerous'),
+        'cins':     ('ti_cin',              'cin'),
     }
 
     def __init__(self, keys=None, years=None, edges=None, **kwargs):
@@ -394,13 +397,15 @@ class age_pyramid(ss.Analyzer):
 class age_causal_infection(ss.Analyzer):
     """Age at causal infection / CIN2+ / cancer, and dwell times, per cancer.
 
-    For each cervical-cancer onset, back-traces to the age at the causal
+    For each cervical-cancer DETECTION, back-traces to the age at the causal
     (current persistent) HPV infection and at CIN2+, and records the dwell
-    times precin (causal->CIN), cin (CIN->cancer), and total. Reads live agents
-    on the standard code path: on the grow multiscale engine, extra cancers are
-    real fine agents in ``sim.people`` (``fine=True``, ``scale=1/ratio``), so
-    every cancer is captured at any ``ms_agent_ratio`` and weighted by
-    ``people.scale``.
+    times precin (causal->CIN), cin (CIN->cancer detection), and total. This
+    matches the ``'cancers'`` fitting target — dwell times therefore include
+    the ``dur_undetected`` lag between biological cancer onset and clinical
+    recognition. Reads live agents on the standard code path: on the grow
+    multiscale engine, extra cancers are real fine agents in ``sim.people``
+    (``fine=True``, ``scale=1/ratio``), so every cancer is captured at any
+    ``ms_agent_ratio`` and weighted by ``people.scale``.
 
     Args:
         start: ss.date-coercible; only count cancers at/after this date.
@@ -441,9 +446,12 @@ class age_causal_infection(ss.Analyzer):
         people = sim.people
         scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:
-            # Gate on cancerous, not just ti_cancerous==ti: a schedule persists
-            # on agents who died of other causes first. BoolArr.uids is alive-only.
-            new = ((m.ti_cancerous == ti) & m.cancerous).uids
+            # Record at cancer DETECTION (ti_cancer_detection), matching the
+            # 'cancers' fitting target semantic — so dwell times include the
+            # dur_undetected lag between biological onset and clinical
+            # recognition. Gate on cancerous so scheduled-but-unrealized
+            # events (e.g. death from another cause first) don't count.
+            new = ((m.ti_cancer_detection == ti) & m.cancerous).uids
             if not len(new):
                 continue
             ti_inf = m.ti_infected[new]

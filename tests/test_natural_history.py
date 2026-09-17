@@ -2,6 +2,7 @@
 import numpy as np
 import pytest
 import sciris as sc
+import starsim as ss
 
 import hpvsim as hpv
 
@@ -326,7 +327,6 @@ def test_network_acts_age_modulated():
     if not len(net.edges):
         pytest.skip('No edges formed')
     # edges.p1/p2 are UIDs, so index age through ss.uids.
-    import starsim as ss
     p1_uids = ss.uids(np.asarray(net.edges.p1).astype(int))
     p2_uids = ss.uids(np.asarray(net.edges.p2).astype(int))
     age_p1 = np.asarray(sim.people.age[p1_uids])
@@ -373,3 +373,33 @@ def test_directional_beta_sets_per_network_pair():
     assert float(pair[0]) == pytest.approx(0.25, abs=1e-9)
     assert float(pair[1]) == pytest.approx(0.25 * 2.0, abs=1e-9)
 
+
+def test_cancer_detection_delay():
+    """dur_undetected shifts new_cancers relative to new_undetected_cancers.
+
+    Zero-lag branch: with dur_undetected=ss.constant(ss.years(0)), new_cancers
+    matches new_undetected_cancers per timestep (detection fires the same ti
+    as onset). Delayed branch: a 5-year constant lag makes cumulative onsets
+    lead cumulative detections mid-sim while total onsets over the run still
+    upper-bound total detections.
+    """
+    kw = dict(n_agents=5000, location='nigeria',
+              start=2000, stop=2030, dt=1.0, rand_seed=0)
+
+    zero = hpv.Sim(**kw, hpv16=dict(dur_undetected=ss.constant(ss.years(0))))
+    zero.run()
+    r = zero.results.hpv16
+    nc = np.asarray(r.new_cancers)
+    nu = np.asarray(r.new_undetected_cancers)
+    assert nu.sum() > 0, 'no cancers realized — test is vacuous'
+    assert np.allclose(nc, nu), 'zero-lag dur_undetected must keep new_cancers == new_undetected_cancers per ti'
+
+    delayed = hpv.Sim(**kw, hpv16=dict(dur_undetected=ss.constant(ss.years(5))))
+    delayed.run()
+    rd = delayed.results.hpv16
+    cnu = np.cumsum(np.asarray(rd.new_undetected_cancers))
+    cnc = np.cumsum(np.asarray(rd.new_cancers))
+    assert (cnu + 1e-9 >= cnc).all(), 'detections cannot outrun onsets'
+    mid = len(cnu) // 2
+    assert cnu[mid] > cnc[mid], 'onset must lead detection mid-sim under a 5-yr delay'
+    assert cnu[-1] >= cnc[-1], 'end-of-sim onsets should upper-bound detections'

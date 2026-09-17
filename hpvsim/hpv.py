@@ -102,6 +102,22 @@ def _clip_beta(f2m, m2f, genotype='?'):
     return [min(1.0, f2m), min(1.0, m2f)]
 
 
+def _age_risk_ramp(ages, age_risk):
+    """Age-dependent multiplier on dur_cin.
+
+    Returns 1 below ``age_risk['age']``, ``age_risk['risk']`` at/above
+    ``age_risk['age_end']``, and a linear interpolation in between. The
+    ramp replaces the previous hard step at ``age_risk['age']``, which
+    produced a visible artifact in the model's age-at-cancer distribution
+    (two modes on either side of the step).
+    """
+    start = age_risk['age']
+    end = age_risk['age_end']
+    risk = age_risk['risk']
+    frac = np.clip((np.asarray(ages) - start) / (end - start), 0.0, 1.0)
+    return 1.0 + (risk - 1.0) * frac
+
+
 def _normalize_genotype(key):
     """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
     s = str(key).lower().strip()
@@ -160,6 +176,7 @@ class HPV(ss.Infection):
             hpv_control_prob=0.0,
             # Reactivation hazard for latents; only active when hpv_control_prob>0.
             hpv_reactivation=ss.probperyear(0.025),
+            dur_undetected=ss.lognorm_ex(mean=ss.years(1), std=ss.years(1)),
         )
         self.update_pars(pars=pars, **kwargs)
         self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
@@ -174,6 +191,9 @@ class HPV(ss.Infection):
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
+            # Subset of cancerous: cancer onset has fired but detection has not.
+            # Flipped True at cin -> cancerous, False when ti >= ti_cancer_detection.
+            ss.BoolState('undetected_cancerous', label='Undetected invasive cancer'),
             ss.BoolState('latent', label='Latent infection'),
             # Set in set_prognoses, cleared by step_state once ti_latent is stamped.
             # BoolArr, not BoolState: an internal scheduling flag, so it must not
@@ -184,6 +204,7 @@ class HPV(ss.Infection):
             ss.FloatArr('ti_reactivation', label='Time of reactivation from latency'),
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
+            ss.FloatArr('ti_cancer_detection', label='Time of cancer detection'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
             # Running max over clearances; shortens future dur_precin by (1 - sev_imm).
             ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
@@ -205,6 +226,7 @@ class HPV(ss.Infection):
         self._round_cin_bern = ss.bernoulli(p=0.5)
         self._round_clear_cin_bern = ss.bernoulli(p=0.5)
         self._round_cancer_bern = ss.bernoulli(p=0.5)
+        self._round_detection_bern = ss.bernoulli(p=0.5)
         self._round_dead_bern = ss.bernoulli(p=0.5)
         # Latency entry roll and reactivation hazard get their own streams.
         self._latent_bern = ss.bernoulli(p=0.5)
@@ -232,7 +254,8 @@ class HPV(ss.Infection):
         pars are checked (the private ``_extra_dur_*`` dists are intentionally
         unit-less for the grow multiscale path).
         """
-        for key in ('dur_precin', 'dur_cin', 'dur_cancer', 'dur_inf_male'):
+        for key in ('dur_precin', 'dur_cin', 'dur_cancer', 'dur_undetected',
+                    'dur_inf_male'):
             dist = self.pars.get(key, None)
             if dist is None or isinstance(dist, ss.dur):
                 continue  # a bare ss.dur constant is fine
@@ -281,7 +304,7 @@ class HPV(ss.Infection):
 
     # Stocks whose auto n_* results are promoted to float and scale-weighted.
     _STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin',
-                     'cancerous', 'latent')
+                     'cancerous', 'undetected_cancerous', 'latent')
 
     def validate_beta(self):
         """Expand a scalar pars.beta via rel_beta/transf2m/transm2f (mirrors
@@ -316,8 +339,10 @@ class HPV(ss.Infection):
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
 
-        ``new_cancers`` / ``new_cancer_deaths`` are realized-event counters
-        (the cin -> cancerous and cancerous -> dead transitions);
+        ``new_cancers`` / ``new_undetected_cancers`` / ``new_cancer_deaths``
+        are realized-event counters (undetected -> detected, cin -> cancerous,
+        and cancerous -> dead respectively); at the default zero-duration
+        ``dur_undetected``, the two cancer counters match per ti.
         ``cum_*`` are populated as cumulative sums in ``finalize_results``.
         ``sum_age_at_*`` are per-step accumulators; mean age = ``sum / count``.
 
@@ -337,7 +362,9 @@ class HPV(ss.Infection):
                     res.values = res.values.astype(np.float64)
         self.define_results(
             ss.Result('new_cancers', dtype=float, scale=True,
-                      label='New cancers'),
+                      label='New detected cancers'),
+            ss.Result('new_undetected_cancers', dtype=float, scale=True,
+                      label='New cancer onsets (pre-detection)'),
             ss.Result('new_cancer_deaths', dtype=float, scale=True,
                       label='New cancer deaths'),
             ss.Result('cum_cancers', dtype=float, scale=True,
@@ -475,7 +502,9 @@ class HPV(ss.Infection):
         self.ti_clearance[uids] = np.nan
         self.ti_cin[uids] = np.nan
         self.ti_cancerous[uids] = np.nan
+        self.ti_cancer_detection[uids] = np.nan
         self.ti_dead_cancer[uids] = np.nan
+        self.undetected_cancerous[uids] = False
         self.to_latent[uids] = False
         self.latent[uids] = False
 
@@ -537,10 +566,12 @@ class HPV(ss.Infection):
             dur_precin[cin_mask], cin_uids, self._round_cin_bern,
         )
         dur_cin = p.dur_cin.rvs(cin_uids)
-        # age_risk multiplier on dur_cin above the threshold age.
+        # age_risk multiplier on dur_cin: smooth ramp from 1 at age_risk['age']
+        # to age_risk['risk'] at age_risk['age_end']. Below age, multiplier=1;
+        # above age_end, multiplier=risk. A hard step at 30 would carve the
+        # cancer-age distribution into two visible modes at ~25 and ~30.
         ages_at_cin = self.sim.people.age[cin_uids]
-        age_mod = np.ones(len(cin_uids))
-        age_mod[ages_at_cin >= p.age_risk['age']] = p.age_risk['risk']
+        age_mod = _age_risk_ramp(ages_at_cin, p.age_risk)
         dur_cin = dur_cin * age_mod
 
         # 5. P(cancer) given dur_cin. sev_imm is not applied here, only rel_sev.
@@ -566,6 +597,14 @@ class HPV(ss.Infection):
             self.ti_cancerous[cancer_uids] = (
                 self.ti_cin[cancer_uids] + self._randround(
                     dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+                )
+            )
+            # Detection lag from onset. At the default ss.constant(ss.years(0))
+            # this rounds to 0 steps, so detection fires the same step as onset.
+            dur_undetected = p.dur_undetected.rvs(cancer_uids)
+            self.ti_cancer_detection[cancer_uids] = (
+                self.ti_cancerous[cancer_uids] + self._randround(
+                    dur_undetected, cancer_uids, self._round_detection_bern,
                 )
             )
             dur_cancer = p.dur_cancer.rvs(cancer_uids)
@@ -667,6 +706,7 @@ class HPV(ss.Infection):
         self.precin[new_uids] = True
         self.cin[new_uids] = False
         self.cancerous[new_uids] = False
+        self.undetected_cancerous[new_uids] = False
         self.ti_infected[new_uids] = ti
         self.ti_first_infection[new_uids] = ti
         self.ti_clearance[new_uids] = np.nan
@@ -677,6 +717,9 @@ class HPV(ss.Infection):
         ti_canc = ti_cin + self._randround(new_dur_cin / dt_yr, new_uids,
                                            self._round_cancer_bern)
         self.ti_cancerous[new_uids] = ti_canc
+        dur_undetected = p.dur_undetected.rvs(new_uids)  # steps (module dist)
+        self.ti_cancer_detection[new_uids] = ti_canc + self._randround(
+            dur_undetected, new_uids, self._round_detection_bern)
         dur_cancer = p.dur_cancer.rvs(new_uids)  # steps (module dist)
         self.ti_dead_cancer[new_uids] = ti_canc + self._randround(
             dur_cancer, new_uids, self._round_dead_bern)
@@ -697,7 +740,9 @@ class HPV(ss.Infection):
             if not isinstance(module, HPV) or module is self:
                 continue
             module.ti_cancerous[uids] = np.nan
+            module.ti_cancer_detection[uids] = np.nan
             module.ti_dead_cancer[uids] = np.nan
+            module.undetected_cancerous[uids] = False
             # Clear both precin and cin so nothing re-promotes on a cancerous body.
             module.precin[uids] = False
             module.cin[uids] = False
@@ -715,8 +760,11 @@ class HPV(ss.Infection):
 
           1. Clearance from precin or CIN (partial-immunity path)
           2. precin -> CIN
-          3. CIN -> cancerous (stops transmitting)
-          4. Cancer death (via people.request_death)
+          3. CIN -> cancerous (stops transmitting; flagged undetected)
+          4. undetected_cancerous -> detected (registers new_cancers)
+          5. Cancer death (via people.request_death)
+
+        Steps 3 and 4 fire the same tick at the default ``dur_undetected=0``.
         """
         self.rel_sus[:] = 1.0  # reset so CrossImmunity/HIV multiply, not overwrite
         ti = self.ti
@@ -813,10 +861,15 @@ class HPV(ss.Infection):
             self.cin[to_cin] = True
 
         # --- 3. CIN -> cancerous (no longer infectious, no longer re-infectable) ---
+        # Cancer body flips at onset; detection is a separate transition in step 4,
+        # so a screening-lag scenario (dur_undetected>0) can defer new_cancers
+        # without changing biology (transmission, death schedule, cross-genotype
+        # cancellation, or the age-at-cancer aggregator).
         to_cancerous = (self.cin & ~self.cancerous & (self.ti_cancerous <= ti)).uids
         if len(to_cancerous):
             self.cin[to_cancerous] = False
             self.cancerous[to_cancerous] = True
+            self.undetected_cancerous[to_cancerous] = True
             self.infected[to_cancerous] = False
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
@@ -824,11 +877,20 @@ class HPV(ss.Infection):
             ppl = self.sim.people
             ages_at_cancer = ppl.age[to_cancerous]
             w = ppl.scale[to_cancerous]
-            self.results.new_cancers[ti] = ppl.scale_flows(to_cancerous)
+            self.results.new_undetected_cancers[ti] = ppl.scale_flows(to_cancerous)
             self.results.sum_age_at_cancer[ti] = float((ages_at_cancer * w).sum())
             self._cancel_other_genotype_progression_for(to_cancerous)
 
-        # --- 4. Cancer death (routed through starsim's people death pipeline) ---
+        # --- 4. Detected: undetected_cancerous -> detected ---
+        # Same-step at default dur_undetected=0 (constant), so new_cancers matches
+        # new_undetected_cancers per ti; a delay shifts new_cancers into the future.
+        to_detected = (self.undetected_cancerous
+                        & (self.ti_cancer_detection <= ti)).uids
+        if len(to_detected):
+            self.undetected_cancerous[to_detected] = False
+            self.results.new_cancers[ti] = self.sim.people.scale_flows(to_detected)
+
+        # --- 5. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
             # +dt_yr: step_state runs before ages advance, so this is age at step end.
@@ -848,6 +910,7 @@ class HPV(ss.Infection):
         self.precin[uids] = False
         self.cin[uids] = False
         self.cancerous[uids] = False
+        self.undetected_cancerous[uids] = False
         self.infected[uids] = False
         self.susceptible[uids] = False
         self.latent[uids] = False

@@ -18,6 +18,8 @@ Two per-woman factors stretch the whole timeline. `sev_imm`, built up by clearin
 
 Invasive cancer ends transmission and cancels every other genotype's pending progression, so a woman with two high-grade infections is one cancer case.
 
+An optional detection lag sits between onset and reporting. Each cancer case draws a delay from `dur_undetected` — an `ss.constant(ss.years(0))` by default, so detection fires the same timestep as onset and `new_cancers` matches `new_undetected_cancers`. Set `dur_undetected` to a non-zero constant or `ss.lognorm_ex` to defer detection: the woman still has invasive cancer (transmission and death schedule unchanged, `undetected_cancerous=True` in the interim), but `new_cancers` — the "reported" flow — only ticks once `ti >= ti_cancer_detection`.
+
 Durations must carry units — `ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))`. A unit-less duration is read as timesteps, making infections four times too short at `dt=0.25`; HPVsim raises a `ValueError` rather than run it.
 
 ## Latency

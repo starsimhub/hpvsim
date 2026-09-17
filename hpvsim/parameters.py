@@ -62,45 +62,6 @@ class SimPars(ss.SimPars):
         return
 
 
-def _beta_from_mean_var(mean, var):
-    """Build a beta ``ss.Dist`` from (mean, variance).
-
-    Converts to the beta distribution's shape parameters (a, b):
-        a = ((1 - mean) / var - 1 / mean) * mean ** 2
-        b = a * (1 / mean - 1)
-    Valid for mean in (0, 1) and var < mean * (1 - mean).
-
-    Uses the ``ss.beta_dist`` factory rather than a bare
-    ``ss.Dist(distname='beta', ...)``: starsim >=3.5 no longer resolves a
-    name-only Dist to its scipy object, leaving ``self.dist=None`` so ``.rvs()``
-    raises ``AttributeError: 'NoneType' ... 'ppf'``. ``ss.beta_dist`` wires the
-    scipy dist explicitly and exists on both 3.4 and 3.5.
-    """
-    a = ((1 - mean) / var - 1 / mean) * mean ** 2
-    b = a * (1 / mean - 1)
-    return ss.beta_dist(a=a, b=b)
-
-
-def _imm_init_dist(mean=0.35, var=0.025):
-    """Beta sample for per-clearance humoral-immunity boost.
-
-    Defaults are the calibrated values. Callers wanting a different
-    immunity-boost distribution can construct their own and assign it to
-    ``GenotypePars.imm_init`` (or pass via ``pars=``) on the per-genotype HPV
-    module.
-    """
-    return _beta_from_mean_var(mean, var)
-
-
-def _cell_imm_dist(mean=0.25, var=0.025):
-    """Beta sample for per-clearance severity-immunity boost (cell_imm_init).
-
-    Defaults are the calibrated values. See ``_imm_init_dist`` for
-    how to override per-genotype.
-    """
-    return _beta_from_mean_var(mean, var)
-
-
 # Per-genotype natural-history defaults; durations are (mean, std) in years.
 _GENOTYPE_DEFAULTS = {
     'hpv16': dict(
@@ -112,7 +73,7 @@ _GENOTYPE_DEFAULTS = {
         cin_fn=dict(form='logf2', k=0.3, x_infl=0, ttc=50),
         cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
                        form='logf2', k=0.3, x_infl=0, ttc=50),
-        age_risk=dict(age=30, risk=2),
+        age_risk=dict(age=30, age_end=50, risk=2),
         rel_beta=1.0,
         sero_prob=0.75,
         transf2m=1.0,
@@ -127,7 +88,7 @@ _GENOTYPE_DEFAULTS = {
         cin_fn=dict(form='logf2', k=0.25, x_infl=0, ttc=50),
         cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
                        form='logf2', k=0.25, x_infl=0, ttc=50),
-        age_risk=dict(age=30, risk=2),
+        age_risk=dict(age=30, age_end=50, risk=2),
         rel_beta=0.75,
         sero_prob=0.56,
         transf2m=1.0,
@@ -142,7 +103,7 @@ _GENOTYPE_DEFAULTS = {
         cin_fn=dict(form='logf2', k=0.2, x_infl=0, ttc=50),
         cancer_fn=dict(method='cin_integral', transform_prob=1.5e-3,
                        form='logf2', k=0.2, x_infl=0, ttc=50),
-        age_risk=dict(age=30, risk=2),
+        age_risk=dict(age=30, age_end=50, risk=2),
         rel_beta=0.9,
         sero_prob=0.60,
         transf2m=1.0,
@@ -157,7 +118,7 @@ _GENOTYPE_DEFAULTS = {
         cin_fn=dict(form='logf2', k=0.2, x_infl=0, ttc=50),
         cancer_fn=dict(method='cin_integral', transform_prob=1.5e-3,
                        form='logf2', k=0.2, x_infl=0, ttc=50),
-        age_risk=dict(age=30, risk=2),
+        age_risk=dict(age=30, age_end=50, risk=2),
         rel_beta=0.9,
         sero_prob=0.60,
         transf2m=1.0,
@@ -167,8 +128,15 @@ _GENOTYPE_DEFAULTS = {
 
 
 def _lognorm_yr(spec):
-    """Build an ``ss.lognorm_ex`` from a ``(mean, std)`` tuple in years."""
+    """Build a duration ``ss.Dist`` from a ``(mean, std)`` tuple in years.
+
+    ``std == 0`` returns ``ss.constant(ss.years(mean))`` because
+    ``lognorm_ex`` is undefined for zero variance; both branches carry
+    ``ss.years`` units so ``_validate_duration_units`` passes.
+    """
     mean, std = spec
+    if std == 0:
+        return ss.constant(ss.years(mean))
     return ss.lognorm_ex(mean=ss.years(mean), std=ss.years(std))
 
 
@@ -186,8 +154,10 @@ class GenotypePars(ss.Pars):
         clear via ``dur_inf_male`` without entering CIN/cancer.
       - ``cancer_fn`` carries ``cin_fn``'s keys so the ``cin_integral``
         branch can call ``compute_severity_integral`` on the same logf2.
-      - ``imm_init`` is sampled per-clearance and feeds ``nab_imm``
-        (read by the CrossImmunity Connector).
+      - ``imm_init`` / ``cell_imm_init`` are per-agent uniform draws
+        sampled each clearance and stored into ``nab_imm`` / ``cell_imm``
+        (read by the CrossImmunity Connector). ``sero_prob`` gates the
+        first-clearance ``nab_imm`` sample per genotype.
       - ``age_risk['age']``-and-older women get ``dur_cin`` scaled by
         ``age_risk['risk']``, shifting cancer onset to older ages.
       - ``transf2m`` / ``transm2f`` are sex-directional per-act scalars
@@ -209,8 +179,8 @@ class GenotypePars(ss.Pars):
         self.dur_inf_male = _lognorm_yr(d['dur_inf_male_yr'])
         self.cin_fn = ss.Pars(d['cin_fn'])
         self.cancer_fn = ss.Pars(d['cancer_fn'])
-        self.imm_init = _imm_init_dist()
-        self.cell_imm_init = _cell_imm_dist()
+        self.imm_init = ss.uniform(low=0.5, high=0.95)
+        self.cell_imm_init = ss.uniform(low=0.3, high=0.9)
         self.age_risk = ss.Pars(d['age_risk'])
         self.rel_beta = d['rel_beta']
         self.sero_prob = d['sero_prob']

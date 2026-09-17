@@ -1,5 +1,17 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
+## Unreleased
+
+**Optional cancer detection lag.** Each HPV genotype gets a `dur_undetected` distribution (per-genotype default `ss.constant(ss.years(0))`) and a new `undetected_cancerous` BoolState / `ti_cancer_detection` FloatArr. `new_cancers` now flows at detection; `new_undetected_cancers` flows at biological onset. Death schedule, transmission, and cross-genotype cancellation still fire at onset. At the default zero delay, `new_cancers == new_undetected_cancers` per timestep, so existing results are unchanged.
+
+**`age_risk` multiplier on `dur_cin` is now a smooth ramp instead of a hard step.** Previously `dur_cin` was multiplied by `age_risk['risk']` (default 2) for women whose CIN onset was `>=age_risk['age']` (default 30). This step at 30 produced two visible modes in the model's age-at-cancer distribution (a "fast-progressers" cohort just below 30, a "slow-progressers" cohort at/above). The ramp now interpolates from 1 at `age_risk['age']` to `risk` at a new `age_risk['age_end']` par (default 50), so the multiplier grows gradually across the 30–50 window. `age_risk` now defaults to `dict(age=30, age_end=50, risk=2)`.
+
+*Regression information*: cancer age distributions shift under the smoothed multiplier; recalibrate any parameter set that fit the pre-ramp step. Existing scripts that pass a custom `age_risk` dict without `age_end` will fail — add `age_end=<value>` or delete the override to inherit the new default.
+
+**Post-clearance immunity swaps from `Beta(mean, var)` to `ss.uniform(low, high)`.** `imm_init` is now `ss.uniform(0.5, 0.95)` and `cell_imm_init` is `ss.uniform(0.3, 0.9)` (was `Beta(mean=0.35, var=0.025)` and `Beta(mean=0.25, var=0.025)` respectively). Simpler parameterization — a single scalar broadcast in `calib_pars` (`imm_init=dict(low=[...])` or `high=[...])` maps cleanly to `.set()` on the uniform, no Beta-to-mean/var conversion needed. Defaults are also higher: with the old Beta mean of 0.35 and `sero_prob=0.75`, a typical first-clearance HPV16 woman had `nab_imm ≈ 0.26` (74% relative susceptibility on re-exposure); with the new uniform mean of 0.725 gated by the same `sero_prob`, she gets `nab_imm ≈ 0.54`, matching HPV epidemiology where same-type re-infection is uncommon. `sero_prob` remains a scalar gate, unchanged. Removed helpers `_beta_from_mean_var`, `_imm_init_dist`, `_cell_imm_dist`.
+
+*Regression information*: cross-immunity and CIN/cancer counts shift under the new defaults; recalibrate any parameter set that fitted the old Beta-based immunity.
+
 ## Version 3.2.0 (2026-09-02)
 
 **Reimplement the therapeutic vaccine (`hpv.txvx`) as a treatment product with conferred immunity.** It subclasses `hpv.tx` again, clearing infections and lesions per the efficacy table and conferring severity immunity, rather than reducing susceptibility as a prophylactic.

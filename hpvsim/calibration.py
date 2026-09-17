@@ -53,11 +53,21 @@ def _prepare_calib_pars(calib_pars):
             f'(got {bad!r}). Use nested dict form, e.g. '
             f'hi5=dict(cin_fn=dict(k=[best, low, high, step])).'
         )
-    # Catch Optuna spec dicts at leaves before sc.flattendict descends into them.
+    # Catch Optuna spec dicts at leaves before sc.flattendict descends into
+    # them. A spec dict has SCALAR values (best, low, high, step, guess);
+    # a legitimate nested-param dict has LIST-valued leaves. We only flag
+    # a mid-tree dict as a stray spec if every value is scalar AND at least
+    # one key is a spec keyword -- otherwise a Dist par named 'low' or 'high'
+    # (ss.uniform's pars) would false-positive.
+    _SPEC_KEYS = {'low', 'high', 'guess', 'value', 'step'}
     def _check(d, path=()):
         for k, v in d.items():
             if isinstance(v, dict):
-                if v.keys() & {'low', 'high', 'guess', 'value', 'step'}:
+                looks_like_spec = (
+                    v.keys() & _SPEC_KEYS
+                    and all(not isinstance(x, (list, tuple, dict)) for x in v.values())
+                )
+                if looks_like_spec:
                     raise ValueError(
                         f'hpv.Calibration: leaf {".".join((*path, k))!r} is a '
                         f'dict {v!r}; use the list form [best, low, high, step].'
