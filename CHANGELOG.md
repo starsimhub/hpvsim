@@ -1,18 +1,5 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
-## Unreleased
-
-**Optional cancer detection lag.** A per-genotype `dur_undetected` delays when cases show up in `new_cancers`; biological onset (which drives death, transmission and cross-genotype cancellation) is unchanged. Default is zero, so existing runs are unaffected. `new_undetected_cancers` gives the onset flow when a lag is set.
-
-**`age_risk['risk']` is now a smooth ramp, not a step at `age_risk['age']`.** Default `age_risk` is `dict(age=30, age_end=50, risk=2)`, so `dur_cin` scales from 1 at 30 up to 2 at 50. The step previously left a bimodal age-at-cancer distribution.
-
-*Regression information*: cancer age distributions shift; recalibrate parameter sets fitted against the step. A custom `age_risk` dict without `age_end` will fail — add `age_end=` or drop the override.
-
-**Post-clearance immunity uses `ss.uniform` instead of `Beta`.** `imm_init` defaults to `ss.uniform(0.5, 0.95)` and `cell_imm_init` to `ss.uniform(0.3, 0.9)`, previously Beta with means 0.35 and 0.25. Simpler to calibrate (a `low=` / `high=` dict maps straight to the distribution) and gives higher immunity — first-clearance `nab_imm` is around 0.54 instead of 0.26, closer to the epidemiological finding that same-type reinfection is uncommon.
-
-*Regression information*: cross-immunity and cancer counts shift; recalibrate.
-
-**Fixes.** `sim.results.hpv16.cancers_with_hiv` / `cancers_no_hiv` renamed to `new_cancers_with_hiv` / `new_cancers_no_hiv` so `annualize()` sums instead of averaging them — they were reading 4x too low at `dt=0.25` and the wh+nh split no longer matched the total. `BaseTreatment` clears per-step outcomes before treatment fires. `hpv.make_calib_sims` restores the per-trial `rand_seed` when re-running top trials, so reruns reproduce the original. `hpv.txvx` defaults `rel_imm` and `imm_init` to the values shipped for `txvx1`.
 
 *Regression information*: downstream code using `cancers_with_hiv` / `cancers_no_hiv` must switch to `new_cancers_with_hiv` / `new_cancers_no_hiv`.
 
@@ -40,7 +27,17 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 *Regression information*: the HIV-stratified cancer rates above change value substantially (annual and female-denominated, where they were per-timestep and all-sex), and `cancer_rate_ratio` is now `nan` rather than `0.0` in a year with no HIV-negative cancers. Any parameter set fitted against these results should be refitted.
 
-**Fixes.** Treatment and therapeutic vaccination now respect the `sex` argument, which was previously ignored in places. Age ranges are applied the same way across every intervention. Treating a woman with a latent infection now clears it. Building a test or treatment product from a data file no longer fails when the simulation starts. `hpv.dx` and `hpv.tx` now accept `name=` alongside `df=`, so a sim can hold more than one product built from a custom data file without them colliding on the class-default module name. `hpv.dx`, `hpv.tx`, `hpv.txvx` and `hpv.vx` take a new `module_name=` kwarg that separates the CSV lookup key from the module name, so two shipped-`'ablation'` (or shipped-`'bivalent'`) programs can coexist in one sim. `hpv.vx(name='bivalent')` now sets `self.name='bivalent'` (was the class default `'vx'`), matching `hpv.tx`/`hpv.dx`. Screening interventions' per-step counters are renamed `n_screened` → `new_screens` and `n_dx` → `new_dx` to match the `new_*` flow convention used everywhere else; the shipped names were per-step flows but their `n_` prefix made `ss.Result.annualize()` average them (stock semantics) instead of summing them, giving quarterly counts at `dt=0.25` when annual totals were wanted. The documentation build works again, having been broken since v3.1.0.
+**Optional cancer detection lag.** A per-genotype `dur_undetected` delays when cases show up in `new_cancers`; biological onset (which drives death, transmission and cross-genotype cancellation) is unchanged. Default is zero, so existing runs are unaffected. `new_undetected_cancers` gives the onset flow when a lag is set.
+
+**`age_risk['risk']` is now a smooth ramp, not a step at `age_risk['age']`.** Default `age_risk` is `dict(age=30, age_end=50, risk=2)`, so `dur_cin` scales from 1 at 30 up to 2 at 50. The step previously left a bimodal age-at-cancer distribution.
+
+*Regression information*: cancer age distributions shift; recalibrate parameter sets fitted against the step. A custom `age_risk` dict without `age_end` will fail — add `age_end=` or drop the override.
+
+**Post-clearance immunity uses `ss.uniform` instead of `Beta`.** `imm_init` defaults to `ss.uniform(0.5, 0.95)` and `cell_imm_init` to `ss.uniform(0.3, 0.9)`, previously Beta with means 0.35 and 0.25. Simpler to calibrate (a `low=` / `high=` dict maps straight to the distribution) and gives higher immunity — first-clearance `nab_imm` is around 0.54 instead of 0.26, closer to the epidemiological finding that same-type reinfection is uncommon.
+
+*Regression information*: cross-immunity and cancer counts shift; recalibrate.
+
+**Fixes.** `sim.results.hpv16.cancers_with_hiv` / `cancers_no_hiv` renamed to `new_cancers_with_hiv` / `new_cancers_no_hiv` so `annualize()` sums instead of averaging them — they were reading 4x too low at `dt=0.25` and the wh+nh split no longer matched the total. `BaseTreatment` clears per-step outcomes before treatment fires. `hpv.make_calib_sims` restores the per-trial `rand_seed` when re-running top trials, so reruns reproduce the original. `hpv.txvx` defaults `rel_imm` and `imm_init` to the values shipped for `txvx1`. Treatment and therapeutic vaccination now respect the `sex` argument, which was previously ignored in places. Age ranges are applied the same way across every intervention. Treating a woman with a latent infection now clears it. Building a test or treatment product from a data file no longer fails when the simulation starts. `hpv.dx` and `hpv.tx` now accept `name=` alongside `df=`, so a sim can hold more than one product built from a custom data file without them colliding on the class-default module name. `hpv.dx`, `hpv.tx`, `hpv.txvx` and `hpv.vx` take a new `module_name=` kwarg that separates the CSV lookup key from the module name, so two shipped-`'ablation'` (or shipped-`'bivalent'`) programs can coexist in one sim. `hpv.vx(name='bivalent')` now sets `self.name='bivalent'` (was the class default `'vx'`), matching `hpv.tx`/`hpv.dx`. Screening interventions' per-step counters are renamed `n_screened` → `new_screens` and `n_dx` → `new_dx` to match the `new_*` flow convention used everywhere else; the shipped names were per-step flows but their `n_` prefix made `ss.Result.annualize()` average them (stock semantics) instead of summing them, giving quarterly counts at `dt=0.25` when annual totals were wanted. The documentation build works again, having been broken since v3.1.0.
 
 *Regression information*: any downstream code reading `sim.interventions['<name>'].results['n_screened']` / `n_dx` must switch to `new_screens` / `new_dx`.
 
