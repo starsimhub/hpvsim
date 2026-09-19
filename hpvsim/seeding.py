@@ -12,16 +12,8 @@ import starsim as ss
 from .network import SexualNetwork
 
 
-# Initial HPV prevalence curves by age bracket and sex. Brackets are
-# inclusive lower bounds; the last bracket extends to age 150.
-#
-# 'total': total-HPV prevalence curve, used by _ExclusiveSeeder
-# for the per-agent any-HPV Bernoulli before genotype assignment.
-#
-# Per-genotype curves ('hpv16', 'hpv18', 'hi5', 'ohr') are used in
-# 'independent' init_seeding mode, where each genotype seeds from its own
-# curve. hpv16's per-genotype curve aliases 'total' since hpv16 dominates
-# the total prevalence. hpv18 is 0.6x of hpv16; hi5/ohr are 0.4x.
+# Initial HPV prevalence by age bracket (inclusive lower bounds, last extends to
+# 150) and sex. 'total' seeds 'exclusive' mode; per-genotype seeds 'independent'.
 _INIT_HPV_PREV_AGE_BRACKETS = np.array([12, 17, 24, 34, 44, 64, 80, 150])
 
 _INIT_PREV = {
@@ -112,8 +104,7 @@ class _ExclusiveSeeder(ss.Connector):
             seed_bern=ss.bernoulli(p=0.0),
             seed_choice=ss.choice(a=len(self.keys), p=weights),
         )
-        # Per-genotype assigned uids, aligned with self.keys. Populated lazily
-        # on the first init_prev callback.
+        # Per-genotype assigned uids, aligned with self.keys; filled lazily.
         self._assigned_uids = None
 
     def step(self):
@@ -171,16 +162,14 @@ class _ExclusiveSeeder(ss.Connector):
         if net is not None:
             p_per_uid[~net.active(people)[auids]] = 0.0
 
-        # Step 3: Bernoulli draw — who gets any HPV at all.
-        # _live_seeder routes callbacks to the connector-registered seeder, but
-        # guard anyway: init seed_bern if a copy left it uninitialised.
+        # Step 3: Bernoulli draw — who gets any HPV at all. Guarded in case a
+        # copy left seed_bern uninitialised.
         self.pars.seed_bern.set(p=p_per_uid)
         if not self.pars.seed_bern.initialized:
             self.pars.seed_bern.init(sim=sim, force=True)
         infected_uids = self.pars.seed_bern.filter(auids)
 
-        # Step 4: per-infected-agent genotype assignment. ss.choice draws
-        # independent per-uid uniforms via its auto-generated unique trace.
+        # Step 4: per-infected-agent genotype assignment.
         if len(infected_uids):
             if not self.pars.seed_choice.initialized:
                 self.pars.seed_choice.init(sim=sim, force=True)

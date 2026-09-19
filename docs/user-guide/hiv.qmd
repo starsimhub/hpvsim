@@ -1,0 +1,107 @@
+---
+title: "HIV co-infection"
+---
+
+Women living with HIV acquire HPV more readily, clear it less often, progress to cancer faster, and get less protection from both natural infection and vaccination. In high-prevalence settings this reshapes the cervical cancer burden, so HPVsim can carry HIV alongside HPV.
+
+HIV support is an optional install: `pip install hpvsim[hiv]`, which adds STIsim. Without it, `hpv.HIV_transmit`, `hpv.HIV_incidence` and `hpv.Sim(model_hiv=...)` raise an `ImportError` naming the extra. Everything else in HPVsim works without STIsim.
+
+## Two ways to drive HIV
+
+The choice is whether HIV is an input or an outcome.
+
+`hpv.HIV_incidence` imposes a known epidemic. You supply a table of `[age, sex, year, incidence]`, and each timestep susceptible agents acquire HIV at the rate their age band, sex and calendar year specify, so prevalence follows your data rather than emerging from behavior. This suits most country work: national HIV estimates already exist and reproducing them is not the point of the analysis. Every new case is diagnosed and made ART-eligible at once, so `sti.ART(coverage=...)` drives treatment with no testing cascade to configure.
+
+`hpv.HIV_transmit` spreads HIV along the same sexual network as HPV, governed by `beta_m2f` (0.0035 per act) and `rel_beta_f2m` (0.5). Use it when HIV prevalence has to respond to behavior or to an HIV intervention. It is harder to calibrate — two epidemics to fit — and brings no ART program of its own.
+
+`hpv.Sim(model_hiv=True)` builds the incidence version and its ART intervention; `model_hiv='transmission'` builds the transmitting version. `hiv_data=` supplies the data, `hiv_pars=` the parameters. Passing your own HIV module in `diseases=` also works; combining both raises an error. A bare `sti.HIV` from STIsim runs, but carries none of the effects below.
+
+## What HIV does to HPV
+
+The effects are stratified by CD4 count, in three bands:
+
+| CD4 | Acquisition (`rel_sus`) | Progression (`rel_sev`) | Immunity (`rel_imm`) | Reactivation |
+|---|---|---|---|---|
+| ≥ 500 (`cd4_upper`) | 1.0 | 1.0 | 1.0 | 1.0 |
+| 200–500 (`_hi`) | 2.2 | 1.2 | 0.76 | 1.0 |
+| < 200 (`cd4_threshold`, `_lo`) | 2.2 | 1.5 | 0.36 | 1.0 |
+
+All four factors live on the HIV module — `sim.diseases.hiv.pars.rel_sev_lo` and so on — because HIV owns the CD4 count they are stratified on.
+
+Women with a CD4 count of 500 or more get no effect at all. That band covers the newly infected, whose CD4 starts around 594, and women whose count has recovered on treatment. Effective ART therefore removes the HPV penalty by moving women out of the affected strata, which is how treatment scale-up shows up in cancer projections.
+
+`rel_sus` multiplies susceptibility to every genotype each timestep. `rel_sev` stretches the progression timescale when a new infection's trajectory is drawn. `rel_imm` scales down the immunity conferred by clearing an infection **and** by a vaccine dose. `rel_reactivation` multiplies the latent reactivation hazard; its default of 1.0 is a placeholder, not a measured value, so set it deliberately if you model latency.
+
+Results come stratified by HIV status: `hpv_prevalence_with_hiv` and `hpv_prevalence_no_hiv` under `sim.results.hiv`, and `cancers_with_hiv`, `cancers_no_hiv`, `cancer_incidence_with_hiv`, `cancer_incidence_no_hiv` and `cancer_rate_ratio` under `sim.results.all_hpv`. HIV runs on a quarterly clock whatever `dt` you give the sim; the cancer stratification is computed on the sim's clock, so no cancer is counted twice.
+
+## Getting national HIV data in
+
+HPVsim ships no HIV data. You supply your country's, and it almost always arrives in five-year age bands, because that is how UNAIDS and Spectrum report incidence and ART coverage.
+
+Banded inputs are supported. `hpv.HIV_incidence` reads each `age` value as a band's lower bound and puts every woman in the band whose lower bound is the greatest one at or below her age, with the first and last bands extending past the ends of the data. Bands can be any width and need not be evenly spaced. Years are matched to the nearest year present, so a gap mid-series is not an error. ART coverage goes through `hpv.data.reshape_art_coverage`, which takes each band's upper edge from the next age in the table and leaves the top band open-ended.
+
+Check this rather than assume it. Before v3.2, banded incidence raised an `IndexError`, and banded ART coverage was reshaped into one-year bins — so ages 1 to 4, 6 to 9 and so on got no ART at all, quietly understating treatment. It went unnoticed because the only available test data was by single year of age. After loading your own data, confirm that women on ART span the ages you expect:
+
+```python
+on_art_ages = sim.people.age[sim.diseases.hiv.on_art.uids]
+print(on_art_ages.min(), on_art_ages.max())
+```
+
+Two changes matter on upgrade. The top ART band is now open-ended, so a series ending at 80 covers everyone over 80 rather than ages 80 to 81 alone — HIV results can shift for that reason alone. And coverage is clamped to [0, 1], because STIsim reads a column whose maximum exceeds 1 as counts rather than proportions, and a single 1.0001 from rounding would put almost nobody on treatment.
+
+`hiv_data=` takes either a dictionary with `incidence`, `art_coverage` and `init_prev`, or a folder path for `hpv.data.load_hiv_data`, which expects `hiv_incidence.csv`, `art_coverage_by_age_females.csv`, `art_coverage_by_age_males.csv` and `hiv_prevalence.csv`. From the last it takes one national adult prevalence at 1990 as the seed — a flat interim value, with the age and sex shape left to calibration.
+
+## How to drive HIV from national estimates
+
+The block below is shown rather than run, because the documentation is built without the optional STIsim dependency.
+
+```{python}
+#| eval: false
+import numpy as np
+import pandas as pd
+import hpvsim as hpv
+
+# Five-year age bands, as UNAIDS and Spectrum report them
+bands = np.arange(0, 85, 5)
+years = np.arange(2000, 2021)
+
+def age_pattern(age):                     # replace with your own estimates
+    return 0.02 * np.exp(-((age - 27) ** 2) / 200)
+
+incidence = pd.DataFrame([
+    dict(age=int(a), sex=s, year=int(y),
+         incidence=age_pattern(a) * (1.0 if s == 'f' else 0.6))
+    for a in bands for s in ('f', 'm') for y in years
+])
+art = pd.DataFrame([
+    dict(age=int(a), sex=s, year=int(y),
+         coverage=float(np.interp(y, [2004, 2020], [0.0, 0.7])))
+    for a in bands for s in ('f', 'm') for y in years
+])
+
+sim = hpv.Sim(location='south africa', genotypes=[16, 18], n_agents=2000,
+              start=2000, stop=2020, model_hiv=True, verbose=0,
+              hiv_data=dict(incidence=incidence, art_coverage=art, init_prev=0.02))
+sim.run()
+
+hiv = sim.results.hiv
+print('HIV prevalence in 2020:  ', round(float(hiv.prevalence[-1]), 3))
+print('on ART in 2020:          ', round(float(hiv.p_on_art[-1]), 3))
+print('HPV prevalence, HIV+:    ', round(float(hiv.hpv_prevalence_with_hiv[-1]), 2))
+print('HPV prevalence, HIV-:    ', round(float(hiv.hpv_prevalence_no_hiv[-1]), 2))
+```
+
+With this synthetic input the run reaches about 8% HIV prevalence with 63% of those infected on treatment, and HPV prevalence of roughly 0.47 among women with HIV against 0.25 among women without. The gap comes from the CD4-stratified acquisition and immunity effects, and from both infections travelling through the same partnerships.
+
+STIsim warns that ART was added without a testing intervention. That warning does not apply here: HPVsim's HIV classes diagnose every case as it arises, which is what makes a coverage-only ART program work.
+
+Cancer counts by HIV status are rare events twice over, so raise `ms_agent_ratio` before comparing rate ratios between scenarios — at a few thousand agents `cancer_rate_ratio` will often be zero because no woman with HIV happened to reach cancer.
+
+If you are migrating from v3.0 or earlier: `hpv.hiv_incidence` (the intervention), `hpv.hiv_art`, the `hpv_hiv_connector` and `HIVStratifiedResults` are all gone. The two disease classes above replace them.
+
+## See also
+
+- [T8 - HIV co-infection](../tutorials/tut_hiv.qmd)
+- [Natural history](natural-history.qmd) for the progression timescale that `rel_sev` stretches
+- [Demographics](demographics.qmd) for `ms_agent_ratio`
+- [`hpv.hiv` API reference](../api/hiv.qmd)

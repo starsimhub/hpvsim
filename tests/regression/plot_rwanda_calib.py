@@ -1,5 +1,14 @@
 """Generate the v3 Rwanda HIV-HPV calibration figure (FigS2-style).
 
+SLATED FOR DELETION IN v3.3 (test cleanup). This is a one-off script from the
+v2 -> v3 Rwanda migration, not a test: it is not collected by pytest, it has
+no assertions, and several of these run a full Optuna calibration or a
+multi-seed sim. They are kept for now because the v3 HIV-HPV parameterization
+was derived here and the derivation is worth being able to re-read. Anything
+here that should outlive 3.3 -- most likely the CalibProbe-style age-by-HIV
+probes, which localizations reimplement -- needs promoting into the package
+or into ``tests/`` first.
+
 Runs N seeds of the calibrated incidence-driven Rwanda co-infection sim
 (tests/regression/rwanda_calib.build_rwanda_sim) and plots the headline
 validation panels against the published registry / data targets:
@@ -33,7 +42,6 @@ if str(_ROOT) not in sys.path:
 
 import hpvsim as hpv  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
 from tests.regression.rwanda_calib import build_rwanda_sim  # noqa: E402
 
 _DATA = Path(__file__).resolve().parent / 'data'
@@ -64,7 +72,7 @@ def _published_target():
 class CalibProbe(ss.Analyzer):
     def init_pre(self, sim):
         self.hpv = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        self.hiv = sim.diseases.hiv
         super().init_pre(sim)
         n = len(sim.t.timevec)
         nb = len(_AGE_LABELS)

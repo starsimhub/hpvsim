@@ -1,5 +1,14 @@
 """Post-calibration validation: genotype distribution vs Rwanda registry.
 
+SLATED FOR DELETION IN v3.3 (test cleanup). This is a one-off script from the
+v2 -> v3 Rwanda migration, not a test: it is not collected by pytest, it has
+no assertions, and several of these run a full Optuna calibration or a
+multi-seed sim. They are kept for now because the v3 HIV-HPV parameterization
+was derived here and the derivation is worth being able to re-read. Anything
+here that should outlive 3.3 -- most likely the CalibProbe-style age-by-HIV
+probes, which localizations reimplement -- needs promoting into the package
+or into ``tests/`` first.
+
 The cancer-incidence calibration (calibrate_rwanda.py) fits only the TOTAL
 (all-genotype) cancer level/shape/RR. It uses GLOBAL parameter scales that
 preserve the genotypes' relative ratios, so it cannot reshape the genotype

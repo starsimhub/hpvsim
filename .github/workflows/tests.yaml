@@ -24,7 +24,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: x64
       - name: Install HPVsim
-        run:  pip install -e .
+        run:  pip install -e ".[hiv]" # [hiv] pulls in stisim, which test_hiv.py needs
       - name: Download data on first load
         run: hpvsim-download-data
       - name: Install tests

@@ -112,6 +112,36 @@ def test_cross_layer_concurrency_filter():
         f'cross_layer=0 violated: {len(overlap)} agents in both layers'
 
 
+def test_mixing_matrix_rows_are_male_age_bands():
+    """A lone nonzero entry ``M[r, c]`` pairs males in band ``r`` with females
+    in band ``c - 1``: rows are male age bands, columns 1..N female age bands,
+    as documented. Guards against a silent transpose, which would invalidate
+    every existing calibration and country parameter set.
+    """
+    bins = np.arange(0, 80, 5)                # 16 bands: 0, 5, ..., 75
+    male_bin, female_bin = 8, 4               # males 40-45, females 20-25
+    zero_mix = np.zeros((16, 17)); zero_mix[:, 0] = bins
+    mixing = zero_mix.copy(); mixing[male_bin, female_bin + 1] = 1.0
+    probs = np.zeros((3, 16)); probs[0] = bins; probs[1, 2:] = 0.99; probs[2, 2:] = 0.99
+
+    net = SexualNetwork(mixing_marital=mixing, mixing_casual=zero_mix,
+                        layer_probs_marital=probs, layer_probs_casual=probs,
+                        m_cross_layer=0.0, f_cross_layer=0.0)
+    sim = ss.Sim(networks=[net], n_agents=8000, diseases=None,
+                 dur=ss.years(0.5), dt=ss.years(0.5), rand_seed=0, verbose=0,
+                 copy_inputs=False)
+    sim.run()
+
+    mask = net.edges_for_layer('m')
+    assert mask.sum() > 50, 'too few pairs to discriminate orientation'
+    f_ages = sim.people.age[ss.uids(np.asarray(net.edges.p1)[mask])]
+    m_ages = sim.people.age[ss.uids(np.asarray(net.edges.p2)[mask])]
+    assert set((np.digitize(f_ages, bins) - 1).tolist()) == {female_bin}
+    assert set((np.digitize(m_ages, bins) - 1).tolist()) == {male_bin}
+    # The casual layer's all-zero mixing forms nothing.
+    assert net.n_pairs_in_layer('c') == 0
+
+
 def test_age_mixing_assortativity():
     """Sampled pairs concentrate on/near the mixing-matrix diagonal.
 

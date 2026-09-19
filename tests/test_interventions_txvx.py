@@ -1,96 +1,96 @@
-"""Integration smoke tests for hpv.routine_txvx / campaign_txvx / linked_txvx."""
+"""Therapeutic vaccination: does it clear disease and confer immunity?
+
+hpv.txvx is a treatment product, not a prophylactic. It clears infections and
+lesions from a state x genotype efficacy table, then confers severity immunity
+against future infection.
+
+The shipped 'txvx1' product carries 1% placeholder efficacies, so these tests
+build an explicit product with a plausible profile: a vaccine that clears most
+infections and low-grade lesions, with weaker cross-protection beyond 16/18.
+"""
 import numpy as np
-import pytest
+import pandas as pd
 import starsim as ss
 import hpvsim as hpv
 
+GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
-def _four_genotype_sim_with(intvs):
+
+def make_txvx(efficacy=1.0, **kwargs):
+    df = pd.DataFrame([
+        {'name': 'txv', 'state': state, 'genotype': g, 'efficacy': efficacy}
+        for state in ('precin', 'cin') for g in GENOTYPES
+    ])
+    return hpv.txvx(df=df, rel_imm={'hpv16': 1.0, 'hpv18': 1.0, 'hi5': 0.5, 'ohr': 0.5},
+                    imm_init=ss.beta_mean(mean=0.35, var=0.025), **kwargs)
+
+
+def make_sim(interventions, n_agents=500, stop=2025):
     return hpv.Sim(
-        n_agents=500, start=2020, stop=2025, location='nigeria',
-        diseases=[hpv.HPV(g) for g in ('hpv16', 'hpv18', 'hi5', 'ohr')],
-        interventions=intvs,
+        n_agents=n_agents, start=2020, stop=stop, location='nigeria', rand_seed=1,
+        diseases=[hpv.HPV(g) for g in GENOTYPES],
+        interventions=interventions, verbose=0,
     )
 
 
-def test_routine_txvx_flips_tx_vaccinated():
-    intv = hpv.routine_txvx(
-        name='txvx',
-        product='txvx1',
-        prob=0.9,
-        age_range=[25, 26],
-        start_year=2021,
-        end_year=2023,
-    )
-    sim = _four_genotype_sim_with([intv])
-    sim.run()
-    live = sim.interventions['txvx']
-    assert live.tx_vaccinated.uids.size > 0
+def test_txvx_clears_lesions_and_confers_scaled_immunity():
+    """A dose clears existing disease and leaves severity immunity behind.
 
-
-def test_campaign_txvx_runs():
-    intv = hpv.campaign_txvx(
-        name='campaign',
-        product='txvx1',
-        prob=0.5,
-        age_range=[25, 30],
-        years=[2022],
-    )
-    sim = _four_genotype_sim_with([intv])
-    sim.run()
-    live = sim.interventions['campaign']
-    assert live.tx_vaccinated.uids.size > 0
-
-
-def test_linked_txvx_requires_eligibility():
-    with pytest.raises(ValueError, match='eligibility'):
-        hpv.linked_txvx(product='txvx1', prob=0.5)
-
-
-def test_linked_txvx_fires_only_on_eligibility_callback():
-    """linked_txvx with eligibility callback only dosed where callback yields uids."""
-    screen = hpv.routine_screening(
-        name='primary', product='via', prob=1.0,
-        age_range=[30, 50], sex='f',
-        start_year=2021, end_year=2022,
-    )
-    linked = hpv.linked_txvx(
-        name='linked',
-        product='txvx1',
-        prob=1.0,
-        eligibility=lambda s: s.interventions['primary'].outcomes['positive'],
-    )
-    sim = _four_genotype_sim_with([screen, linked])
-    sim.run()
-    # linked.tx_vaccinated count <= screen.screened count (positives are a subset)
-    assert sim.interventions['linked'].tx_vaccinated.uids.size <= sim.interventions['primary'].screened.uids.size
-
-
-def test_routine_txvx_string_product_resolves_to_txvx():
-    intv = hpv.routine_txvx(
-        name='txvx', product='txvx1', prob=0.5,
-        age_range=[25, 26], start_year=2021, end_year=2022,
-    )
-    sim = _four_genotype_sim_with([intv])
-    sim.init()
-    live = sim.interventions['txvx']
-    assert live.product.__class__.__name__ == 'txvx'
-    assert live.product.pars.name == 'txvx1'
-
-
-def test_linked_txvx_handles_empty_eligibility_callback():
-    """linked_txvx must run without errors when the eligibility callback
-    returns no uids (the typical 'screen fired no positives this step' path).
-    No doses delivered, no exception raised.
+    Immunity reaches everyone dosed — including those whose clearance draw
+    failed — and is scaled per target genotype by rel_imm.
     """
-    # Eligibility callback that always returns empty
-    linked = hpv.linked_txvx(
-        name='linked',
-        product='txvx1',
-        prob=1.0,
-        eligibility=lambda s: ss.uids(),
-    )
-    sim = _four_genotype_sim_with([linked])
-    sim.run()
-    live = sim.interventions['linked']
-    assert live.tx_vaccinated.uids.size == 0
+    sim = make_sim([hpv.linked_txvx(name='txv', product=make_txvx(), prob=1.0,
+                                    eligibility=lambda s: ss.uids())])
+    sim.init()
+    product = sim.interventions['txv'].product
+    m16, mohr = sim.diseases['hpv16'], sim.diseases['ohr']
+
+    uids = sim.people.female.uids[:40]
+    m16.infected[uids] = True
+    m16.cin[uids] = True
+    product.administer(uids)
+
+    assert not m16.cin[uids].any(), 'lesions not cleared'
+    assert np.isfinite(m16.ti_clearance[uids]).all(), 'clearance not scheduled'
+    # Severity immunity, not susceptibility: the therapeutic never touches rel_sus.
+    assert (m16.txvx_sev_imm[uids] > 0).all()
+    np.testing.assert_allclose(mohr.txvx_sev_imm[uids],
+                               m16.txvx_sev_imm[uids] * 0.5, rtol=1e-6)
+
+
+def test_txvx_immunity_reaches_those_it_fails_to_cure():
+    """Immunity is conferred on dosing, independently of clearance success."""
+    sim = make_sim([hpv.linked_txvx(name='txv', product=make_txvx(efficacy=0.0),
+                                    prob=1.0, eligibility=lambda s: ss.uids())])
+    sim.init()
+    product = sim.interventions['txv'].product
+    m16 = sim.diseases['hpv16']
+    uids = sim.people.female.uids[:20]
+    m16.infected[uids] = True
+    m16.cin[uids] = True
+
+    out = product.administer(uids)
+    assert len(out['successful']) == 0, 'zero-efficacy product cured someone'
+    assert m16.cin[uids].all(), 'lesions cleared despite zero efficacy'
+    assert (m16.txvx_sev_imm[uids] > 0).all(), 'no immunity for the uncured'
+
+
+def test_txvx_in_a_screening_program_reduces_cancer():
+    """Delivered to screen-positive women, the therapeutic averts cancer."""
+    def run(with_txvx):
+        ivs = [hpv.routine_screening(name='scr', product='hpv', prob=1.0,
+                                     age_range=[30, 50], start_year=2022)]
+        if with_txvx:
+            ivs.append(hpv.linked_txvx(
+                name='txv', product=make_txvx(efficacy=0.9), prob=1.0,
+                eligibility=lambda s: s.interventions['scr'].outcomes['positive']))
+        sim = make_sim(ivs, n_agents=3000, stop=2060)
+        sim.run()
+        return sim
+
+    base, txv = run(False), run(True)
+    assert txv.interventions['txv'].tx_vaccinated.uids.size > 0, 'nobody dosed'
+    base_cancers = float(base.results.all_hpv.cum_cancers[-1])
+    txv_cancers = float(txv.results.all_hpv.cum_cancers[-1])
+    assert txv_cancers < base_cancers, (
+        f'therapeutic did not avert cancer: {txv_cancers:,.0f} vs {base_cancers:,.0f}')

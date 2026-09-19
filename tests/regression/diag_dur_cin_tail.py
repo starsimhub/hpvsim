@@ -18,7 +18,6 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
 from tests.regression import rwanda_calib as rc  # noqa: E402
 from tests.regression.rwanda_calib import build_rwanda_sim  # noqa: E402
 
@@ -36,7 +35,7 @@ def _lognorm_pctiles(mean, std):
 class _AgeAtCancer(ss.Analyzer):
     def init_pre(self, sim):
         self.hpv = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        self.hiv = sim.diseases.hiv
         super().init_pre(sim)
         self.age_neg = []
         self.age_pos = []

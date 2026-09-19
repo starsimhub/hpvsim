@@ -68,6 +68,21 @@ def test_treat_num_string_product_resolves_to_tx():
     assert live.product.name == 'excision'
 
 
+def test_treat_num_age_range_upper_bound_exclusive():
+    """age_range=[lo, hi) — an agent exactly at hi is not eligible."""
+    treat = hpv.treat_num(name='rx', product='excision', prob=1.0, age_range=[30, 40])
+    sim = _four_genotype_sim_with([treat])
+    sim.init()
+    uids = sim.people.female.uids[:3]
+    for g in ('hpv16', 'hpv18', 'hi5', 'ohr'):
+        sim.diseases[g].cancerous[uids] = False
+    sim.people.age[uids] = [30.0, 39.9, 40.0]
+    eligible = sim.interventions['rx'].check_eligibility()
+    assert uids[0] in eligible
+    assert uids[1] in eligible
+    assert uids[2] not in eligible
+
+
 def test_treat_num_capacity_respected():
     """With max_capacity=5, no more than 5 agents are treated per step."""
     treat = hpv.treat_num(

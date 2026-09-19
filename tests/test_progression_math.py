@@ -23,9 +23,10 @@ def test_genotype_pars_hpv16_defaults():
         f'imm_init should be a Dist, got {type(g.imm_init)}'
     g.imm_init.mock()
     samples = g.imm_init.rvs(2000)
-    assert 0.30 < float(samples.mean()) < 0.40, \
-        f'imm_init samples mean = {float(samples.mean()):.3f}; expected ~0.35'
-    assert g.age_risk == dict(age=30, risk=2)
+    assert 0.70 < float(samples.mean()) < 0.75, \
+        f'imm_init samples mean = {float(samples.mean()):.3f}; expected ~0.725'
+    assert (samples >= 0.5).all() and (samples <= 0.95).all()
+    assert g.age_risk == dict(age=30, age_end=50, risk=2)
     assert g.rel_beta == 1.0
     assert g.sero_prob == 0.75
     # Duration distributions are starsim Dist instances, not dicts.

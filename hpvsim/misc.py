@@ -739,3 +739,43 @@ def warn(msg, category=None, verbose=None, die=None):
         raise ValueError(errormsg)
 
     return
+
+
+def import_stisim():
+    """Return the stisim module; raise a helpful ImportError if it isn't installed.
+
+    Use this when HIV is being built on purpose. For code paths that must
+    tolerate a no-HIV sim, use ``hiv_class`` / ``hiv_module`` instead —
+    those return ``None`` quietly.
+    """
+    try:
+        import stisim as sti
+    except ImportError as e:
+        raise ImportError('HIV modeling in hpvsim requires stisim: '
+                          'pip install stisim') from e
+    return sti
+
+
+def hiv_class():
+    """hpvsim's HIV base class, or ``None`` if stisim isn't installed.
+
+    Returns ``None`` silently so callers that only optionally use HIV
+    (e.g. ``CrossImmunity``, ``HPV._hiv_module``) can branch on ``is None``
+    instead of wrapping every import in try/except.
+    """
+    try:
+        from .hiv import HIV
+    except ImportError:
+        return None
+    return HIV
+
+
+def hiv_module(sim):
+    """The HIV disease in ``sim``, or ``None`` if there isn't one.
+
+    Also returns ``None`` when stisim is absent (via ``hiv_class``), so
+    HPV-only sims never trigger a stisim import.
+    """
+    cls = hiv_class()
+    return None if cls is None else next(
+        (d for d in sim.diseases.values() if isinstance(d, cls)), None)

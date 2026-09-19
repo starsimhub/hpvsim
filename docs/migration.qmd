@@ -97,24 +97,18 @@ infectious period is ~4× too short and **the epidemic silently collapses to
 near-zero prevalence with no error**. Always wrap duration means/stds in
 `ss.years(...)`.
 
-**`rel_beta` (and `transf2m`/`transm2f`) overrides do not take effect.** The
-per-genotype transmission `beta` is a *directional dict*, computed once at
-module construction:
+**`beta` is a scalar, expanded via `rel_beta`/`transf2m`/`transm2f`.** The
+per-genotype transmission `beta` is a plain scalar; `HPV.validate_beta()`
+expands it into the per-network `[female→male, male→female]` pair from
+`rel_beta`/`transf2m`/`transm2f` every time it's called, so overriding any of
+these via `genotype_pars` (or `pars=`) takes effect immediately. Pass an
+explicit `beta={'sexualnetwork': [f2m, m2f]}` dict instead to bypass the
+expansion and fully hand-specify the pair.
 
-```python
-beta = {'sexualnetwork': [gpars.beta * gpars.rel_beta * gpars.transf2m,   # female→male
-                          gpars.beta * gpars.rel_beta * gpars.transm2f]}  # male→female
-```
-
-Overriding `rel_beta` via `genotype_pars` sets the stored `rel_beta` par but
-**does not recompute this dict**, so transmission is unchanged. To scale
-transmissibility, override the `beta` dict directly (or bake the factor into
-it). See "Known issues" below.
-
-**Shape functions replace whole, not merge.** `cin_fn` / `cancer_fn` are dicts
-carrying shape params (`form`, `k`, `x_infl`, `ttc`). A partial override drops
-the missing keys and raises `KeyError: 'form'` at run time — pass the complete
-dict.
+**Shape functions merge partial overrides.** `cin_fn` / `cancer_fn` are
+`ss.Pars` (not plain dicts) carrying shape params (`form`, `k`, `x_infl`,
+`ttc`). A partial override, e.g. `{'k': 0.5}`, merges into the existing
+sibling keys rather than replacing the whole dict.
 
 ## Sexual network
 
@@ -401,11 +395,6 @@ storage are gone — re-run selected parameter sets to draw uncertainty bands.
 
 ## Known issues and tips
 
-- **Scaling transmissibility.** Because the per-genotype `beta` dict is built at
-  construction (see "Genotype parameters"), a `rel_beta` override does not change
-  transmission. Override the `beta` dict directly, e.g.
-  `genotype_pars={'hpv16': {'beta': {'sexualnetwork': [b_f2m, b_m2f]}}}`, or set
-  it after building and before running.
 - **Guard multi-worker calibration/parallel with `if __name__ == '__main__':`
   (Windows).** `hpv.Calibration(...).calibrate()` with `n_workers > 1` (and any
   `ss.MultiSim` / `sc.parallelize`) uses process *spawn* on Windows, so each

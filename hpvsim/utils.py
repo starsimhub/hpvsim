@@ -111,7 +111,6 @@ def intlogf2(upper, k, x_infl, ttc=25, y_max=1):
     integral = val_at_lim - val_at_0
 
     # Deal with those whose duration of infection exceeds the time to cancer
-    # Note, another option would be to set their transformation probability to 1
     excess_integral = upper[exceeding_ttc_inds] - ttc
     integral[exceeding_ttc_inds] += excess_integral
 
@@ -179,8 +178,7 @@ def compute_severity(t, rel_sev=None, pars=None):
 
     pars = dict(pars)
 
-    # Complete these next stages if cancer progression probabilities are being modeled
-    # as the cumulative severity-time of dysplasia.
+    # Cancer probabilities as the cumulative severity-time of dysplasia.
     if pars.get('method') == 'cin_integral':
         del pars['method']
         if pars.get('ld50'):

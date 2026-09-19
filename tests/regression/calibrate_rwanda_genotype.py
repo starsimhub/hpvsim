@@ -1,5 +1,14 @@
 """Per-genotype refinement of the Rwanda calibration.
 
+SLATED FOR DELETION IN v3.3 (test cleanup). This is a one-off script from the
+v2 -> v3 Rwanda migration, not a test: it is not collected by pytest, it has
+no assertions, and several of these run a full Optuna calibration or a
+multi-seed sim. They are kept for now because the v3 HIV-HPV parameterization
+was derived here and the derivation is worth being able to re-read. Anything
+here that should outlive 3.3 -- most likely the CalibProbe-style age-by-HIV
+probes, which localizations reimplement -- needs promoting into the package
+or into ``tests/`` first.
+
 Builds on calibrate_rwanda.py (incidence-only, gof 1.84) by adding the empirical
 genotype-distribution targets and per-genotype levers, to tighten the cancer/
 precancer genotype MIX (hi5 was under-, ohr over-represented) WITHOUT breaking
@@ -42,12 +51,12 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+import stisim as sti  # noqa: E402
 import hpvsim as hpv  # noqa: E402
 from hpvsim.hpv import HPV  # noqa: E402
-from hpvsim.hiv import HIV  # noqa: E402
+from hpvsim.hiv import HIV, HIV_incidence  # noqa: E402
 from hpvsim.parameters import get_genotype_pars  # noqa: E402
 from hpvsim.cross_genotype import CrossImmunity  # noqa: E402
-from hpvsim.hiv import hpv_hiv_connector  # noqa: E402
 from hpvsim.calibration import compute_gof  # noqa: E402
 from tests.regression import rwanda_calib as rc  # noqa: E402
 
@@ -100,11 +109,10 @@ def build_sim(seed, n_agents, start, stop, p):
         p['cin_k_scale'], p['tp_scale'],
         {'hpv18': p['tp_rel_18'], 'hi5': p['tp_rel_hi5'], 'ohr': p['tp_rel_ohr']},
         {'hpv18': p['rb_18'], 'hi5': p['rb_hi5'], 'ohr': p['rb_ohr']})
-    connectors = [CrossImmunity(rel_sev_loc=rc.REL_SEV_LOC),
-                  hpv_hiv_connector(effects=effects)]
-    hiv = hpv.HIV.from_location('rwanda', beta_m2f=0.0, init_prev_data=0.0)
-    interventions = [hpv.hiv_incidence_import.from_location('rwanda'),
-                     hpv.hiv_art.from_location('rwanda')]
+    connectors = [CrossImmunity(rel_sev_loc=rc.REL_SEV_LOC)]
+    hiv = HIV_incidence(incidence=rc.RWANDA_HIV_DATA['incidence'], init_prev_data=0.0,
+                        pars=rc.effects_to_hiv_pars(effects))
+    interventions = [sti.ART(coverage=hpv.data.reshape_art_coverage(rc.RWANDA_HIV_DATA['art_coverage']))]
     return hpv.Sim(location='rwanda', rand_seed=seed, n_agents=n_agents,
                    start=start, stop=stop, dt=_DT, genotypes=rc.GENOTYPES,
                    genotype_pars=gp, init_hpv_dist=rc.RWANDA_INIT_HPV_DIST,
