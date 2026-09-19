@@ -2,7 +2,7 @@
 title: "Natural history"
 ---
 
-HPVsim carries up to four genotypes: `hpv16`, `hpv18`, `hi5` (a pool of five other high-risk types) and `ohr` (the remaining high-risk types). Each one is a separate disease module with its own transmissibility, its own progression speed and its own record for every agent. A bare `hpv.Sim()` runs HPV16 alone; pass `genotypes=[16, 18, 'hi5', 'ohr']` for all four.
+HPVsim carries up to four genotypes. `hpv16` and `hpv18` together drive around 70% of cervical cancer worldwide and are modeled individually. `hi5` groups the five other high-risk types covered by the nonavalent vaccine (HPV 31, 33, 45, 52 and 58); `ohr` groups the remaining oncogenic types (HPV 35, 39, 51, 56 and 59). Low-risk types (HPV 6, 11 and others) rarely cause invasive cancer and are not represented. Each modeled genotype is a separate disease module with its own transmissibility, its own progression speed and its own record for every agent. A bare `hpv.Sim()` runs HPV16 alone; pass `genotypes=[16, 18, 'hi5', 'ohr']` for all four.
 
 Within a genotype, a woman moves through: infection, a precancerous phase (`precin`), CIN, invasive cancer, cancer death. She can leave the pathway by clearing at either of the first two stages. Men are infected and clear; they never enter CIN or cancer, so they matter only as a reservoir.
 

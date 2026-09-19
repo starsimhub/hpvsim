@@ -4,7 +4,7 @@ title: "Parameters"
 
 A country model has parameters of very different kinds: how many agents to run, how transmissible HPV16 is, how many casual partners women report, how much protection clearing HPV18 gives against HPV16. In HPVsim these live on different modules, because each module owns the state it acts on. That is good for the code and inconvenient for you, since a parameter set arrives as one flat table from a spreadsheet or a calibration.
 
-`hpv.route_pars` closes that gap. It takes one dictionary and delivers each entry to the module that owns it, so you can keep a country's parameters in one place.
+`hpv.route_pars` handles that. It takes one dictionary and delivers each entry to the module that owns it, so you can keep a country's parameters in one place.
 
 ## Where parameters live
 

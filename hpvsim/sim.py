@@ -8,68 +8,10 @@ HPVTotal analyzer — and forwards to ``ss.Sim``.
 
 ``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
 modules are added after the auto-defaults (CrossImmunity, the
-_ExclusiveSeeder when ``init_seeding='exclusive'``, and the HPVTotal
-analyzer). To replace the auto-defaults entirely, drop down to vanilla
-``ss.Sim``.
-
-Other slots (``diseases``, ``networks``, ``demographics``, ``people``) retain
-override semantics. ``diseases=`` is mutually exclusive with ``genotypes=``.
-
-``model_hiv=True`` (or ``'incidence'``/``'transmission'``) adds HIV
-co-infection: ``'incidence'`` (the default under ``True``) imposes a
-per-(age,sex,year) incidence curve directly (``hpv.HIV_incidence``) plus a
-coverage-based ``sti.ART`` intervention (ART data is mandatory for this mode);
-``'transmission'`` drives HIV via network transmission instead
-(``hpv.HIV_transmit``), with no auto-added ART. ``hiv_data=`` supplies the
-input data (a folder path, see ``hpv.data.load_hiv_data``, or a dict with
-``{'incidence', 'art_coverage', 'init_prev'}``); ``hiv_pars=`` overrides the
-constructed HIV disease's pars (e.g. ``rel_sus_lo``, ``beta_m2f``). Mutually
-exclusive with supplying your own HIV-family disease in ``diseases=`` — build
-it yourself via ``hpv.HIV_transmit``/``hpv.HIV_incidence`` in that case, or go
-fully manual with a vanilla ``stisim`` ``sti.HIV`` (no HPV-modulation effects
-in that case — see ``hpv.HIV``'s docstring).
-
-The final sim year is ``stop`` (Starsim's name). ``end`` is accepted as a
-deprecated v2 alias — if supplied it overrides ``stop`` and emits a warning.
-
-Kwargs:
-  ``init_seeding`` (str, default ``'exclusive'``):
-    ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
-    curve as the total HPV prevalence, then exactly one genotype assigned per
-    infected agent. No co-infection at initialisation.
-    ``'independent'`` — each genotype draws from its own per-genotype
-    init_prev curve independently; co-infection at initialisation is possible.
-
-  ``v2_compat_demographics`` (bool, default ``False``):
-    Compatibility flag that forces discrete integer-age demographics. The
-    default (False) continuous-age behaviour is preferred; this flag exists
-    only to reproduce a bit-for-bit discrete-cohort convention and should
-    not be the basis for new work.
-
-    When True, activates three demographic conventions:
-
-    1. **Annual-pulse births.** Swaps ``ss.Births`` for ``hpv.AnnualBirths``
-       so every year's birth cohort is released as a single pulse at the
-       integer-year boundary.
-    2. **Migration jitter disabled.** Passes ``v2_compat=True`` to
-       ``AgeMigration`` so immigrants land at exact integer ages (no
-       uniform [N, N+1) jitter).
-    3. **Initial population age discretization.** After ``ss.People.init_vals``
-       samples continuous ages from the UN year-band histogram (each agent
-       lands uniformly within its year bin), floors all initial ages to the
-       nearest integer, placing the starting cohort at exact integer ages.
-
-    All three effects together ensure that every agent entering or starting
-    in the sim has a discrete integer age, which aligns the eligibility-window
-    arithmetic for age-targeted interventions to integer boundaries. The
-    default (False) retains the continuous-age behaviour.
-
-  ``init_hpv_dist`` (dict or None, default ``None``):
-    Only used when ``init_seeding='exclusive'``. If ``None``, genotype
-    assignment is uniform across active genotypes. If a dict, keys must be
-    the resolved canonical genotype names (e.g. ``{'hpv16': 0.6, 'hpv18':
-    0.2, 'hi5': 0.1, 'ohr': 0.1}``) and values are weights (need not sum to
-    1; normalised internally).
+``_ExclusiveSeeder`` when ``init_seeding='exclusive'``, and the HPVTotal
+analyzer). Other slots (``diseases``, ``networks``, ``demographics``,
+``people``) retain override semantics. ``diseases=`` is mutually exclusive
+with ``genotypes=``. See ``Sim.__init__`` for the full argument set.
 """
 
 import numpy as np
@@ -88,7 +30,45 @@ from .seeding import _ExclusiveSeeder
 
 
 class Sim(ss.Sim):
-    """HPVsim simulation."""
+    """HPVsim simulation.
+
+    The final sim year is ``stop`` (Starsim's name). ``end`` is accepted as a
+    deprecated v2 alias — if supplied it overrides ``stop`` and warns.
+
+    Args:
+      init_seeding (str, default ``'exclusive'``):
+        ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
+        curve as the total HPV prevalence, then exactly one genotype
+        assigned per infected agent. No co-infection at initialisation.
+        ``'independent'`` — each genotype draws from its own per-genotype
+        ``init_prev`` curve independently; co-infection at initialisation is
+        possible.
+
+      init_hpv_dist (dict or None, default ``None``):
+        Only used when ``init_seeding='exclusive'``. If ``None``, genotype
+        assignment is uniform. If a dict, keys are canonical genotype names
+        (e.g. ``{'hpv16': 0.6, 'hpv18': 0.2, 'hi5': 0.1, 'ohr': 0.1}``) and
+        values are weights; normalised internally.
+
+      model_hiv (True, ``'incidence'``, ``'transmission'``, or ``None``):
+        Adds HIV co-infection. ``'incidence'`` (the default under ``True``)
+        imposes a per-(age,sex,year) incidence curve
+        (``hpv.HIV_incidence``) plus a coverage-based ``sti.ART``
+        intervention (ART data is mandatory in this mode);
+        ``'transmission'`` drives HIV via network transmission instead
+        (``hpv.HIV_transmit``) with no auto-added ART. ``hiv_data=``
+        supplies the input data (a folder path or a dict with
+        ``{'incidence', 'art_coverage', 'init_prev'}``); ``hiv_pars=``
+        overrides the constructed HIV disease's pars. Mutually exclusive
+        with supplying your own HIV-family disease in ``diseases=``.
+
+      v2_compat_demographics (bool, default ``False``):
+        Forces discrete integer-age demographics for bit-for-bit
+        compatibility with the v2 discrete-cohort convention. Activates
+        annual-pulse births (``hpv.AnnualBirths``), disables migration
+        jitter, and floors initial ages to integers. Not recommended for
+        new work — the continuous-age default is preferred.
+    """
 
     def __init__(self, location=None, genotypes=None, genotype_pars=None,
                  init_seeding='exclusive', init_hpv_dist=None,
@@ -147,7 +127,7 @@ class Sim(ss.Sim):
         # Autoconstruct HIV and ART if model_hiv=True.
         auto_interventions = []
         if model_hiv:
-            sti = misc.require_stisim()
+            sti = misc.import_stisim()
             from .hiv import HIV_incidence, HIV_transmit
             if any(isinstance(d, sti.HIV) for d in other_diseases):
                 raise ValueError(

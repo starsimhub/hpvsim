@@ -2,15 +2,19 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 ## Unreleased
 
-**Optional cancer detection lag.** Each HPV genotype gets a `dur_undetected` distribution (per-genotype default `ss.constant(ss.years(0))`) and a new `undetected_cancerous` BoolState / `ti_cancer_detection` FloatArr. `new_cancers` now flows at detection; `new_undetected_cancers` flows at biological onset. Death schedule, transmission, and cross-genotype cancellation still fire at onset. At the default zero delay, `new_cancers == new_undetected_cancers` per timestep, so existing results are unchanged.
+**Optional cancer detection lag.** A per-genotype `dur_undetected` delays when cases show up in `new_cancers`; biological onset (which drives death, transmission and cross-genotype cancellation) is unchanged. Default is zero, so existing runs are unaffected. `new_undetected_cancers` gives the onset flow when a lag is set.
 
-**`age_risk` multiplier on `dur_cin` is now a smooth ramp instead of a hard step.** Previously `dur_cin` was multiplied by `age_risk['risk']` (default 2) for women whose CIN onset was `>=age_risk['age']` (default 30). This step at 30 produced two visible modes in the model's age-at-cancer distribution (a "fast-progressers" cohort just below 30, a "slow-progressers" cohort at/above). The ramp now interpolates from 1 at `age_risk['age']` to `risk` at a new `age_risk['age_end']` par (default 50), so the multiplier grows gradually across the 30–50 window. `age_risk` now defaults to `dict(age=30, age_end=50, risk=2)`.
+**`age_risk['risk']` is now a smooth ramp, not a step at `age_risk['age']`.** Default `age_risk` is `dict(age=30, age_end=50, risk=2)`, so `dur_cin` scales from 1 at 30 up to 2 at 50. The step previously left a bimodal age-at-cancer distribution.
 
-*Regression information*: cancer age distributions shift under the smoothed multiplier; recalibrate any parameter set that fit the pre-ramp step. Existing scripts that pass a custom `age_risk` dict without `age_end` will fail — add `age_end=<value>` or delete the override to inherit the new default.
+*Regression information*: cancer age distributions shift; recalibrate parameter sets fitted against the step. A custom `age_risk` dict without `age_end` will fail — add `age_end=` or drop the override.
 
-**Post-clearance immunity swaps from `Beta(mean, var)` to `ss.uniform(low, high)`.** `imm_init` is now `ss.uniform(0.5, 0.95)` and `cell_imm_init` is `ss.uniform(0.3, 0.9)` (was `Beta(mean=0.35, var=0.025)` and `Beta(mean=0.25, var=0.025)` respectively). Simpler parameterization — a single scalar broadcast in `calib_pars` (`imm_init=dict(low=[...])` or `high=[...])` maps cleanly to `.set()` on the uniform, no Beta-to-mean/var conversion needed. Defaults are also higher: with the old Beta mean of 0.35 and `sero_prob=0.75`, a typical first-clearance HPV16 woman had `nab_imm ≈ 0.26` (74% relative susceptibility on re-exposure); with the new uniform mean of 0.725 gated by the same `sero_prob`, she gets `nab_imm ≈ 0.54`, matching HPV epidemiology where same-type re-infection is uncommon. `sero_prob` remains a scalar gate, unchanged. Removed helpers `_beta_from_mean_var`, `_imm_init_dist`, `_cell_imm_dist`.
+**Post-clearance immunity uses `ss.uniform` instead of `Beta`.** `imm_init` defaults to `ss.uniform(0.5, 0.95)` and `cell_imm_init` to `ss.uniform(0.3, 0.9)`, previously Beta with means 0.35 and 0.25. Simpler to calibrate (a `low=` / `high=` dict maps straight to the distribution) and gives higher immunity — first-clearance `nab_imm` is around 0.54 instead of 0.26, closer to the epidemiological finding that same-type reinfection is uncommon.
 
-*Regression information*: cross-immunity and CIN/cancer counts shift under the new defaults; recalibrate any parameter set that fitted the old Beta-based immunity.
+*Regression information*: cross-immunity and cancer counts shift; recalibrate.
+
+**Fixes.** `sim.results.hpv16.cancers_with_hiv` / `cancers_no_hiv` renamed to `new_cancers_with_hiv` / `new_cancers_no_hiv` so `annualize()` sums instead of averaging them — they were reading 4x too low at `dt=0.25` and the wh+nh split no longer matched the total. `BaseTreatment` clears per-step outcomes before treatment fires. `hpv.make_calib_sims` restores the per-trial `rand_seed` when re-running top trials, so reruns reproduce the original. `hpv.txvx` defaults `rel_imm` and `imm_init` to the values shipped for `txvx1`.
+
+*Regression information*: downstream code using `cancers_with_hiv` / `cancers_no_hiv` must switch to `new_cancers_with_hiv` / `new_cancers_no_hiv`.
 
 ## Version 3.2.0 (2026-09-02)
 

@@ -67,7 +67,7 @@ _HIV_NAMES = ('HIV', 'HIV_transmit', 'HIV_incidence')
 def __getattr__(name):
     """Expose the HIV classes lazily; stisim is an optional dependency."""
     if name in _HIV_NAMES:
-        misc.require_stisim()
+        misc.import_stisim()
         from . import hiv
         return getattr(hiv, name)
     raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

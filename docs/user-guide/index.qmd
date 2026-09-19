@@ -1,10 +1,10 @@
 ---
-title: "How HPVsim fits together"
+title: "Overview"
 ---
 
 HPVsim follows individual women and men through sexual partnerships, infection with one or more HPV genotypes, and — in women — the path from infection to precancer to invasive cervical cancer. On top of that it delivers vaccination, screening and treatment, and can carry HIV infection alongside HPV.
 
-The scope is deliberately narrow: HPVsim models cervical cancer. HPV also causes anal, oropharyngeal, penile, vaginal and vulvar cancer, and the first three of those occur in men. None of them are in the model.
+HPVsim covers cervical cancer only. HPV also causes anal, oropharyngeal, penile, vaginal and vulvar cancers — the first three of these also occur in men — but none of them are in the model.
 
 Each agent stands for many real people. When you give a `location`, HPVsim looks up that country's population size and sets `pop_scale = total_pop / n_agents`, so results come out in real-population units. A run with 2,000 agents representing Nigeria in 1990 has each agent standing for about 48,000 people. This is what makes a country projection tractable on a laptop.
 

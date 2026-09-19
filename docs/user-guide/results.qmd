@@ -20,7 +20,7 @@ Every genotype module records the same set: the stocks `n_susceptible`, `n_infec
 
 Anything counted in people is multiplied by `pop_scale` when the run finishes, so cancers, deaths and screens come out in real-population units. Proportions — `prevalence`, the age-standardized rates, the HIV-stratified prevalences — are not. The `age_pyramid`, `dalys` and `age_causal_infection` analyzers scale their own outputs, so their totals are comparable with `sim.results`.
 
-Interventions record their own time series, already scaled: `new_doses` and `cum_doses` for vaccination, `n_screened` and `n_dx` for screening, `new_cin_treated` for treatment. Vaccination also records `new_vaccinated` and `cum_vaccinated`, which count women reached rather than doses given — the two differ whenever a schedule gives more than one dose per girl.
+Interventions record their own time series, already scaled: `new_doses` and `cum_doses` for vaccination, `n_screened` and `n_dx` for screening, `new_cin_treated` for treatment. Vaccination also records `new_vaccinated` and `cum_vaccinated`, which count women reached rather than doses given — the two differ whenever a schedule gives more than one dose per person.
 
 ## Analyzers
 

@@ -1,5 +1,5 @@
 ---
-title: "Sexual network"
+title: "Sexual networks"
 ---
 
 HPV moves through sexual partnerships, so the network carries most of the local realism in a country model. A partnership is a pair of agents that lasts a drawn duration and carries a number of sex acts per timestep. Partnerships are heterosexual: women are the first partner in a pair, men the second.
@@ -24,7 +24,7 @@ Values above 1 are clipped with a warning, since the compounding formula otherwi
 
 Condom use is not a network parameter in v3; any protective effect has to be absorbed into `beta`.
 
-HPVsim ships demographic data per country but not network parameters, so the defaults above are location-agnostic starting points. Supplying local behavioral data is the highest-value change you can make to a country model.
+HPVsim ships country-specific demographic data (population, mortality, fertility, migration) and default product tables, but no network parameters and no epidemiological data — cancer-registry counts, HPV-prevalence surveys and behavioral surveys are yours to supply, either through `datafolder=` for calibration targets or through the network parameters above. Supplying local behavioral data is the highest-value change you can make to a country model.
 
 ## How to put local survey data into the network
 
