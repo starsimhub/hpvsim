@@ -446,6 +446,11 @@ class BaseTreatment(ss.BaseTreatment):
             cond = cond & _as_boolarr(self.eligibility_user(sim), sim.people)
         return cond.uids
 
+    def step(self):
+        """Reset per-step outcomes before delegating to the treatment step."""
+        self.outcomes = {'successful': ss.uids(), 'unsuccessful': ss.uids()}
+        return super().step()
+
 
 class treat_num(BaseTreatment, ss.treat_num):
     """Treat a fixed number of HPV+CIN+ agents each step (or all eligible if max_capacity=None)."""
