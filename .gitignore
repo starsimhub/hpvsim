@@ -27,6 +27,7 @@ hpvsim/regression/
 .vscode
 .DS_Store
 .claude/
+.superpowers-notes/
 
 # Calibration artifacts emitted by tests
 tests/hpvsim_calib_*.db

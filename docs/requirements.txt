@@ -1,2 +1,3 @@
 quartodoc
 jupyter
+jupyter-cache

@@ -62,8 +62,8 @@ for sim in msim.sims:
     print(f'{sim.label:>18}: {float(sim.results.all_hpv.cum_cancers[-1]):>11,.0f} cancers by 2020')
 
 prog = msim.sims[1]
-print('screens delivered: ', f'{float(prog.interventions.screen.results.n_screened.sum()):,.0f}')
-print('screen positives:  ', f'{float(prog.interventions.screen.results.n_dx.sum()):,.0f}')
+print('screens delivered: ', f'{float(prog.interventions.screen.results.new_screens.sum()):,.0f}')
+print('screen positives:  ', f'{float(prog.interventions.screen.results.new_dx.sum()):,.0f}')
 print('women treated:     ', f'{float(prog.interventions["treat_num"].results.new_cin_treated.sum()):,.0f}')
 ```
 

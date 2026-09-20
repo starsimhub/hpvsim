@@ -134,8 +134,9 @@ print(sim.diseases.hpv16.pars)
 Save a figure with Matplotlib:
 
 ```{python}
-fig = sim.plot('asr_cancer_incidence')
-fig.savefig('my-incidence.png', dpi=150)
+import pylab as plt
+sim.plot('asr_cancer_incidence')
+plt.gcf().savefig('my-incidence.png', dpi=150)
 ```
 
 Save a whole run with `sim.save()` and reopen it with `ss.load()`. Saving

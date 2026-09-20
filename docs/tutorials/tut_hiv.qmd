@@ -209,8 +209,8 @@ Cancers split by HIV status sit on the pooled HPV results:
 
 ```{python}
 pooled = sim.results.all_hpv
-with_hiv = float(np.asarray(pooled.cancers_with_hiv).sum())
-no_hiv = float(np.asarray(pooled.cancers_no_hiv).sum())
+with_hiv = float(np.asarray(pooled.new_cancers_with_hiv).sum())
+no_hiv = float(np.asarray(pooled.new_cancers_no_hiv).sum())
 total = with_hiv + no_hiv
 print(f'Cervical cancers 1990-2040, women living with HIV: {with_hiv:>12,.0f}')
 print(f'Cervical cancers 1990-2040, other women:           {no_hiv:>12,.0f}')
@@ -225,6 +225,6 @@ average, which pulls the crude ratio down. Each timestep's ratio also rests on a
 handful of events at this population size.
 
 If a rate ratio is the number you need, raise `n_agents` substantially, run
-several seeds, and build it over a window from `cancers_with_hiv` and a
+several seeds, and build it over a window from `new_cancers_with_hiv` and a
 denominator you have chosen yourself, rather than reading `cancer_rate_ratio`
 off a single timestep.

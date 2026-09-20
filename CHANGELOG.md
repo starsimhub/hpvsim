@@ -1,6 +1,6 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
-## Version 3.2.0 (2026-09-02)
+## Version 3.2.0 (2026-09-19)
 
 **Reimplement the therapeutic vaccine (`hpv.txvx`) as a treatment product with conferred immunity.** It subclasses `hpv.tx` again, clearing infections and lesions per the efficacy table and conferring severity immunity, rather than reducing susceptibility as a prophylactic.
 

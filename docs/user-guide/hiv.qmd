@@ -32,7 +32,7 @@ Women with a CD4 count of 500 or more get no effect at all. That band covers the
 
 `rel_sus` multiplies susceptibility to every genotype each timestep. `rel_sev` stretches the progression timescale when a new infection's trajectory is drawn. `rel_imm` scales down the immunity conferred by clearing an infection **and** by a vaccine dose. `rel_reactivation` multiplies the latent reactivation hazard; its default of 1.0 is a placeholder, not a measured value, so set it deliberately if you model latency.
 
-Results come stratified by HIV status: `hpv_prevalence_with_hiv` and `hpv_prevalence_no_hiv` under `sim.results.hiv`, and `cancers_with_hiv`, `cancers_no_hiv`, `cancer_incidence_with_hiv`, `cancer_incidence_no_hiv` and `cancer_rate_ratio` under `sim.results.all_hpv`. HIV runs on a quarterly clock whatever `dt` you give the sim; the cancer stratification is computed on the sim's clock, so no cancer is counted twice.
+Results come stratified by HIV status: `hpv_prevalence_with_hiv` and `hpv_prevalence_no_hiv` under `sim.results.hiv`, and `new_cancers_with_hiv`, `new_cancers_no_hiv`, `cancer_incidence_with_hiv`, `cancer_incidence_no_hiv` and `cancer_rate_ratio` under `sim.results.all_hpv`. HIV runs on a quarterly clock whatever `dt` you give the sim; the cancer stratification is computed on the sim's clock, so no cancer is counted twice.
 
 ## Getting national HIV data in
 

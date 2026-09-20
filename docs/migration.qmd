@@ -309,7 +309,7 @@ Notes:
 - ART is a data-driven coverage shortcut (`hpv.hiv_art`), not STIsim's
   test→treat cascade.
 - HIV-stratified cancer/prevalence live on `HIVStratifiedResults`
-  (`cancers_with_hiv`, `cancers_no_hiv`, …). The HIV module's own `prevalence`
+  (`new_cancers_with_hiv`, `new_cancers_no_hiv`, …). The HIV module's own `prevalence`
   result is **all-ages** and understates the adult (15–49) figure by ~2×;
   restrict to adults when validating against a national prevalence target.
 - HIV results run on the HIV module's own (finer) time axis — index via

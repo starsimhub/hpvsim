@@ -4,7 +4,7 @@ title: "Immunity"
 
 A woman who clears an HPV infection is not returned to the state she was in before it. She keeps two things, and they do different jobs.
 
-`nab_imm` is antibody-mediated immunity: it reduces the chance of acquiring an infection at all. `cell_imm` is cell-mediated immunity: it does not stop acquisition, but it shortens the next infection and so lowers the chance that it becomes precancer. Both are drawn on clearance from beta distributions — `imm_init` has a mean of 0.35, `cell_imm_init` a mean of 0.25 — and both accumulate as a running maximum, so repeated clearance can only raise a woman's protection, never lower it.
+`nab_imm` is antibody-mediated immunity: it reduces the chance of acquiring an infection at all. `cell_imm` is cell-mediated immunity: it does not stop acquisition, but it shortens the next infection and so lowers the chance that it becomes precancer. Both are drawn on clearance from uniform distributions — `imm_init` defaults to `ss.uniform(0.5, 0.95)` (mean 0.725), `cell_imm_init` to `ss.uniform(0.3, 0.9)` (mean 0.6) — and both accumulate as a running maximum, so repeated clearance can only raise a woman's protection, never lower it.
 
 Only women update immunity on clearance; men clear without seroconverting. At a woman's **first** clearance the antibody component is gated on `sero_prob` (0.75 for HPV16, 0.56 for HPV18, 0.60 for the pools): women who do not seroconvert keep `nab_imm = 0` and are fully reinfectible. Cell-mediated immunity is not gated — every woman who clears gets some severity protection. That asymmetry matters for the low-seroconversion genotypes, where treating all clearance as fully protective would understate ongoing transmission.
 
@@ -14,9 +14,12 @@ Immunity earned against one genotype partly protects against the others. The `Cr
 
 ```
 susceptibility reduction = Σ over sources k of cross_imm_sus[g, k] × nab_imm[k]
-rel_sus[g]               = (1 − that) × (1 − vax_imm[g]) × (1 − txvx_imm[g])
+rel_sus[g]               = (1 − that) × (1 − vax_imm[g])
 sev_imm[g]               = Σ over sources k of cross_imm_sev[g, k] × cell_imm[k]
+                           + txvx_sev_imm[g]
 ```
+
+Therapeutic vaccination (`hpv.txvx`) writes into `txvx_sev_imm` rather than `rel_sus`: it clears the current lesion per the efficacy table and confers severity immunity going forward, so it acts through `sev_imm`, not susceptibility.
 
 The matrices are built from five scalars, not calibrated cell by cell. `own_imm_hr` (0.9) is the diagonal for the pooled genotypes; HPV16 and HPV18 have a diagonal of 1.0. Off the diagonal, HPV16 and HPV18 protect each other at the "high" level (`cross_imm_sus_high` 0.5, `cross_imm_sev_high` 0.7) because they share a clade; every other pair uses the "medium" level (`cross_imm_sus_med` 0.3, `cross_imm_sev_med` 0.5). Per-cell calibration was removed in v3.2: calibrate the five scalars, or pass whole matrices as `cross_imm_sus=` and `cross_imm_sev=` if you have external estimates.
 
