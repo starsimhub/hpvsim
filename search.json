@@ -1463,7 +1463,7 @@
     "text": "HPVsim carries up to four genotypes. hpv16 and hpv18 together drive around 70% of cervical cancer worldwide and are modeled individually. hi5 groups the five other high-risk types covered by the nonavalent vaccine (HPV 31, 33, 45, 52 and 58); ohr groups the remaining oncogenic types (HPV 35, 39, 51, 56 and 59). Low-risk types (HPV 6, 11 and others) rarely cause invasive cancer and are not represented. Each modeled genotype is a separate disease module with its own transmissibility, its own progression speed and its own record for every agent. A bare hpv.Sim() runs HPV16 alone; pass genotypes=[16, 18, 'hi5', 'ohr'] for all four.\nWithin a genotype, a woman moves through: infection, a precancerous phase (precin), CIN, invasive cancer, cancer death. She can leave the pathway by clearing at either of the first two stages. Men are infected and clear; they never enter CIN or cancer, so they matter only as a reservoir.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Natural history"
     ]
   },
@@ -1475,7 +1475,7 @@
     "text": "Duration drives progression\nThe order of decisions is the thing to understand. On infection, HPVsim first draws how long the infection will last — dur_precin, lognormal, mean 3 years for HPV16 and 2.5 for the others, standard deviation 9 years. It then asks how likely that duration is to produce precancer: cin_fn is a logistic curve of the drawn duration, rising from zero at infection to one at 50 years (ttc=50), with k setting its steepness (0.3 for HPV16, 0.25 for HPV18, 0.2 for the pools).\nPersistence is therefore the risk factor, not a separate roll. A woman who clears in eight months almost never progresses; one whose infection would run for a decade very probably does.\nCancer works the same way. A woman who reaches CIN draws dur_cin (mean 5 years for HPV16 and HPV18, 4.5 for the pools). cancer_fn integrates the CIN curve over that duration to get accumulated lesion-severity-time, and converts it with its own transform_prob key: cancer_fn['transform_prob'] is 2e-3 for HPV16 and HPV18, 1.5e-3 for hi5 and ohr. Women aged 30 or older at CIN onset have dur_cin multiplied by age_risk['risk'] (2), which pushes cancer into the ages where it is observed.\nTwo per-woman factors stretch the whole timeline. sev_imm, built up by clearing past infections, shortens dur_precin by 1 - sev_imm. rel_sev is an intrinsic severity multiplier, one draw per woman shared across every genotype she carries; it lives on the cross-immunity module rather than on any one genotype — see Immunity.\nInvasive cancer ends transmission and cancels every other genotype’s pending progression, so a woman with two high-grade infections is one cancer case.\nAn optional detection lag sits between onset and reporting. Each cancer case draws a delay from dur_undetected — an ss.constant(ss.years(0)) by default, so detection fires the same timestep as onset and new_cancers matches new_undetected_cancers. Set dur_undetected to a non-zero constant or ss.lognorm_ex to defer detection: the woman still has invasive cancer (transmission and death schedule unchanged, undetected_cancerous=True in the interim), but new_cancers — the “reported” flow — only ticks once ti &gt;= ti_cancer_detection.\nDurations must carry units — ss.lognorm_ex(mean=ss.years(3), std=ss.years(9)). A unit-less duration is read as timesteps, making infections four times too short at dt=0.25; HPVsim raises a ValueError rather than run it.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Natural history"
     ]
   },
@@ -1487,7 +1487,7 @@
     "text": "Latency\nSome infections neither clear nor progress: the virus persists undetectably and can reactivate years later. This is an opt-in branch, off by default (hpv_control_prob=0), and female-only.\nSet hpv_control_prob above zero and that fraction of the women who would have cleared enter a latent state instead. Latent women neither transmit nor can be reinfected with that genotype. Each timestep they face the reactivation hazard hpv_reactivation — an ss.probperyear(0.025), scaled by 1 - sev_imm (strong cell-mediated immunity means less reactivation) and by HIV’s rel_reactivation. On reactivation a woman draws a fresh trajectory, counted under new_reactivations rather than new_infections.\nOne interaction to watch: the latency roll happens when the clearance date is set, not when clearance arrives. If ablation or excision brings a woman’s clearance forward and she had rolled into the latency branch, she becomes latent rather than susceptible. At the default of 0 this never arises.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Natural history"
     ]
   },
@@ -1499,7 +1499,7 @@
     "text": "How to make one genotype progress faster\nThe most common natural-history task is changing progression speed for a single genotype — either to test a hypothesis or to move a calibration. Genotype-scoped parameters merge into the existing defaults, so you change one number and leave the rest of the curve alone.\n\nimport hpvsim as hpv\n\npars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,\n            start=2000, stop=2020, verbose=0)\n\nbase = hpv.Sim(**pars, label='default HPV16')\nfast = hpv.Sim(**pars, hpv16=dict(cin_fn=dict(k=0.5)), label='steeper HPV16')\n\nfor sim in (base, fast):\n    sim.run()\n    print(f'{sim.label:&gt;15}: {float(sim.results.all_hpv.cum_cancers[-1]):,.0f} cancers by 2020')\n\n# Only k changed; the rest of the curve is intact\nprint('HPV16 cin_fn:', dict(fast.diseases.hpv16.pars.cin_fn))\nprint('HPV18 cin_fn:', dict(fast.diseases.hpv18.pars.cin_fn))\n\n  default HPV16: 311,684 cancers by 2020\n  steeper HPV16: 498,695 cancers by 2020\nHPV16 cin_fn: {'form': 'logf2', 'k': 0.5, 'x_infl': 0, 'ttc': 50}\nHPV18 cin_fn: {'form': 'logf2', 'k': 0.25, 'x_infl': 0, 'ttc': 50}\n\n\nTo change progression for every genotype at once, pass the parameter bare (hpv.Sim(hpv_control_prob=0.15)); to change one genotype, scope it by name. See Parameters for the full routing rules.\nCancer counts from a 2,000-agent run rest on a handful of simulated cases, and each case is worth pop_scale real people. Treat the comparison above as a direction, not an estimate — see Demographics for how to sharpen rare-event estimates without a bigger population.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Natural history"
     ]
   },
@@ -1511,7 +1511,7 @@
     "text": "See also\n\nT1 - Getting started and T9 - HPV latency\nImmunity for what happens after clearance\nhpv.HPV API reference and the progression functions in hpv.utils",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Natural history"
     ]
   },
@@ -1523,7 +1523,7 @@
     "text": "Cervical cancer happens decades after infection, so a useful HPVsim run spans 50 years or more and the population has to change realistically over that span. Three modules do that work: hpv.Births, ss.Deaths and hpv.AgeMigration.\nGive hpv.Sim a location and it loads that country’s bundled UN World Population Prospects data: the age and sex pyramid for the start year, crude birth rates, age- and sex-specific mortality, and the total population trajectory. Any country name in the WPP is accepted, case-insensitive.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Demographics"
     ]
   },
@@ -1535,7 +1535,7 @@
     "text": "Scaling to a real population\nThe number of agents and the size of the population are separate decisions. When location is set, total_pop is filled in from the country’s population at the start year and pop_scale = total_pop / n_agents. Every result counted in people is multiplied by that factor at the end of the run, so 2,000 agents produce national-scale numbers. Pass total_pop=n_agents if you would rather see raw agent counts.\nPopulation size therefore buys resolution, not scale. A 2,000-agent Nigeria run reports a plausible number of cervical cancers, but that number rests on perhaps a dozen simulated cases, each standing for around 48,000 people.\nhpv.Sim() with no location is a different thing entirely: uniform ages 0 to 60, nobody born, nobody dying, no migration, pop_scale=1. Useful for looking at natural history in isolation, misleading for anything else. It warns you.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Demographics"
     ]
   },
@@ -1547,7 +1547,7 @@
     "text": "Migration pins the age pyramid\nOnce a year, AgeMigration compares the simulated count in every (single-year age, sex) cell against that year’s target pyramid, scaled to agent space. Where the simulation is short it adds immigrants at that age; where it is over it removes agents through request_removal, which takes them out of the run without recording a death. Immigrant ages are spread uniformly within the year so cohorts do not cross age bands in lockstep. Flows appear as sim.results.agemigration.new_immigrants and new_emigrants.\nTwo things follow. The age structure is correct by construction, so you cannot get it wrong by mis-specifying fertility — but nor can you treat it as evidence that fertility is right, because errors there surface as large migration flows instead. And immigrants arrive HPV-naive, so where flows are large relative to the population they dilute prevalence; check prevalence against a run with migration removed.\nv2_compat_demographics=True switches on annual birth pulses, integer immigrant ages and floored starting ages. It exists to reproduce v2 runs and should not be the basis for new work.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Demographics"
     ]
   },
@@ -1559,7 +1559,7 @@
     "text": "Multiscale: more cancers for the same money\nCancer is rare, so most agents contribute nothing to the outcome you care about. ms_agent_ratio spends the compute where the signal is. When a woman reaches CIN, her agent is shrunk to weight 1/ratio and up to ratio − 1 extra agents are grown from her — full clones, each with its own cancer-bound trajectory. These “fine” agents are excluded from the sexual network, from reproduction and from the migration target, but face the same emigration rate as everyone else in their age band, so they do not accumulate unrealistically.\nThe default is 1, which is a no-op. At ms_agent_ratio=10 the cancer estimate is built from roughly ten times as many simulated cancer trajectories, for essentially no extra run time.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Demographics"
     ]
   },
@@ -1571,7 +1571,7 @@
     "text": "How to run a national projection on a laptop\n\nimport time\nimport hpvsim as hpv\n\npars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,\n            start=1990, stop=2020, verbose=0)\n\nfor ratio in (1, 10):\n    t0 = time.time()\n    sim = hpv.Sim(**pars, ms_agent_ratio=ratio)\n    sim.run()\n    print(f'ms_agent_ratio={ratio:&lt;3d} '\n          f'cancers to 2020: {float(sim.results.all_hpv.cum_cancers[-1]):&gt;11,.0f}   '\n          f'cancer-bound agents alive: {int(sim.people.fine.sum()):&gt;4d}   '\n          f'{time.time() - t0:.1f}s')\n\nprint(f'\\npop_scale:        {sim.pars.pop_scale:,.0f} people per agent')\nprint(f'population 1990:  {float(sim.results.n_alive[0]):,.0f}')\nprint(f'population 2020:  {float(sim.results.n_alive[-1]):,.0f}')\n\nms_agent_ratio=1   cancers to 2020:     383,228   cancer-bound agents alive:    0   2.9s\nms_agent_ratio=10  cancers to 2020:     522,148   cancer-bound agents alive:  183   1.9s\n\npop_scale:        47,903 people per agent\npopulation 1990:  97,387,788\npopulation 2020:  219,637,486\n\n\nBoth runs cost the same. The second builds its cancer estimate from hundreds of trajectories rather than a dozen, which is what you want before comparing scenarios that differ by a few percent.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Demographics"
     ]
   },
@@ -1583,7 +1583,7 @@
     "text": "Modeling a state, province, or district\nThe bundled data covers countries, because that is what UN World Population Prospects publishes. Plenty of real questions are not national — a single state’s screening program, one province’s vaccination rollout, a district-level pilot. For those you supply your own demographic inputs.\nPut any of these four files in a folder and pass datafolder=:\n\n\n\n\n\n\n\n\nFile\nColumns\nNotes\n\n\n\n\nage_data.csv\nAgeGrpStart, PopTotal\nThe starting age distribution. PopTotal is read in thousands, matching the WPP convention\n\n\nbirth_rate.csv\nTime, CBR\nCrude birth rate per 1,000 population, by year\n\n\ndeath_rate.csv\nTime, Sex, AgeGrpStart, mx\nMortality rate by year, sex and age. Sex takes Male and Female\n\n\npop_total.csv\nyear, pop_size\nTotal population by year, used to set pop_scale\n\n\n\nYou still pass location=, and it still matters. Any file you omit falls back to that country’s bundled data, with a warning naming the file — so a state model with only its own age structure and total population will inherit national fertility and mortality. That is often a reasonable first approximation, and the warning is there so it is a choice rather than an accident.\nsim = hpv.Sim(\n    location   = 'nigeria',        # Fallback source, and network parameters\n    datafolder = './kano_data',    # age_data.csv, pop_total.csv, ...\n    genotypes  = [16, 18],\n    n_agents   = 5000,\n    start      = 2000,\n    stop       = 2040,\n)\nTwo limitations worth knowing before you start.\nMigration targets are not read from datafolder. The age-pyramid pinning described above needs a population-by-age trajectory, and that only comes from the bundled country tables. For a subnational run, either pass it yourself with hpv.AgeMigration(pop_total=..., pop_by_age=...) in demographics=, where pop_by_age has columns year, age, male, female; or leave migration out and accept that your age structure will drift from the observed one over a long run. If the area you are modeling has significant net migration — most cities do — the second option will bias the age distribution, and cervical cancer burden is sensitive to it.\nNetwork parameters come from location and are not subnational. Partnership formation rates are calibrated at country level, so a district model inherits national sexual behavior. If local survey data says otherwise, override the network parameters directly; see Sexual network.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Demographics"
     ]
   },
@@ -1595,7 +1595,7 @@
     "text": "See also\n\nT4 - People, populations, and networks\nResults and analyzers for which results are scaled and which are not\nhpv.AgeMigration API reference",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Demographics"
     ]
   },
@@ -1607,7 +1607,7 @@
     "text": "HPVsim follows individual women and men through sexual partnerships, infection with one or more HPV genotypes, and — in women — the path from infection to precancer to invasive cervical cancer. On top of that it delivers vaccination, screening and treatment, and can carry HIV infection alongside HPV.\nHPVsim covers cervical cancer only. HPV also causes anal, oropharyngeal, penile, vaginal and vulvar cancers — the first three of these also occur in men — but none of them are in the model.\nEach agent stands for many real people. When you give a location, HPVsim looks up that country’s population size and sets pop_scale = total_pop / n_agents, so results come out in real-population units. A run with 2,000 agents representing Nigeria in 1990 has each agent standing for about 48,000 people. This is what makes a country projection tractable on a laptop.",
     "crumbs": [
       "Home",
-      "**User guide**"
+      "<strong>User guide</strong>"
     ]
   },
   {
@@ -1618,7 +1618,7 @@
     "text": "The layers\nA simulation is a set of modules that share one population. Each layer answers a different question.\n\n\n\nLayer\nWhat it does\nClasses\n\n\n\n\nPopulation\nHolds age, sex and every per-agent state; adds births, removes deaths, pins the age pyramid to the country’s trajectory\nss.People, hpv.Births, ss.Deaths, hpv.AgeMigration\n\n\nSexual network\nForms and dissolves marital and casual partnerships, and sets how many sex acts each partnership has per year\nhpv.SexualNetwork\n\n\nDisease\nOne module per genotype: transmission, clearance, latency, precancer, cancer, cancer death\nhpv.HPV\n\n\nCross-genotype\nTurns immunity earned against one genotype into protection against the others; pools per-genotype results into totals\nhpv.CrossImmunity, hpv.HPVTotal\n\n\nInterventions\nDeliver a product (vaccine, screening test, treatment) to a chosen group of people\nhpv.routine_vx, hpv.routine_screening, hpv.treat_num, …\n\n\nAnalyzers\nWatch the population and record things the disease modules do not; they never change the run\nhpv.by_age, hpv.dalys, hpv.age_pyramid, …\n\n\nHIV (optional)\nRaises HPV acquisition, speeds progression, and weakens immunity, by CD4 stratum\nhpv.HIV_transmit, hpv.HIV_incidence\n\n\n\nhpv.Sim assembles all of this from a location and a genotype list:\n\nimport hpvsim as hpv\n\nsim = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,\n              start=2000, stop=2002, verbose=0)\nsim.init()\n\nprint('diseases:    ', list(sim.diseases.keys()))\nprint('networks:    ', list(sim.networks.keys()))\nprint('demographics:', list(sim.demographics.keys()))\nprint('connectors:  ', list(sim.connectors.keys()))\nprint('analyzers:   ', list(sim.analyzers.keys()))\n\ndiseases:     ['hpv16', 'hpv18']\nnetworks:     ['sexualnetwork']\ndemographics: ['births', 'deaths', 'agemigration']\nconnectors:   ['crossimmunity', '_exclusiveseeder']\nanalyzers:    ['all_hpv']\n\n\nOne disease module per genotype is the central design choice. Genotypes differ in how well they transmit, how fast they progress, and how well vaccines cover them, and each of those needs its own per-agent record. Because the modules share one population, a woman can carry HPV16 and HPV18 at the same time — and when one genotype takes her to cancer, the other genotypes’ pending progression is cancelled, so she is counted as one cancer case, not two.",
     "crumbs": [
       "Home",
-      "**User guide**"
+      "<strong>User guide</strong>"
     ]
   },
   {
@@ -1629,7 +1629,7 @@
     "text": "What happens in a timestep\nThe default timestep is three months (dt=0.25). Within each one, the order is fixed:\n\nDemographics. Births are added, deaths removed. Once a year, migration adds or removes people so the age and sex composition matches the country’s projected pyramid.\nProgression. Each genotype moves its infected women along: infections clear (or turn latent), precancer becomes CIN, CIN becomes cancer, and women with cancer die.\nImmunity. The cross-immunity module reads the antibody and cell-mediated immunity each woman has accumulated and writes this timestep’s susceptibility and severity factors for every genotype.\nPartnerships. The network dissolves the pairs whose duration has run out and forms new ones.\nInterventions. Vaccines, screening tests and treatments are delivered.\nTransmission. Each genotype passes along the partnerships formed in step 4.\nBookkeeping. The dead are removed, results are recorded, analyzers run.\n\nTwo consequences of that order are worth holding onto. Immunity is applied before interventions, so a woman vaccinated in one timestep is protected from the next one onwards — a three-month lag at the default dt. And transmission uses the partnerships formed in the same timestep, so partnership turnover and transmission are never more than one timestep out of step.\nNot every module runs on the sim’s clock. Migration and hpv.AnnualBirths run once per calendar year; the HIV modules run quarterly whatever dt you choose.",
     "crumbs": [
       "Home",
-      "**User guide**"
+      "<strong>User guide</strong>"
     ]
   },
   {
@@ -1640,7 +1640,7 @@
     "text": "Reading the results\nResults are grouped by the module that produced them: sim.results.hpv16.new_cancers for one genotype, sim.results.all_hpv.cum_cancers for the pooled total, sim.results.agemigration.new_immigrants for migration flows. Anything counted in people is multiplied by pop_scale; anything that is a proportion is not. See Results and analyzers.",
     "crumbs": [
       "Home",
-      "**User guide**"
+      "<strong>User guide</strong>"
     ]
   },
   {
@@ -1651,7 +1651,7 @@
     "text": "The rest of this guide\n\n\n\nPage\nCovers\n\n\n\n\nNatural history\nGenotypes, the infection-to-cancer pathway, how duration drives progression, latency\n\n\nImmunity\nImmunity earned by clearing an infection, cross-protection between genotypes, vaccine immunity\n\n\nSexual network\nMarital and casual partnerships, age mixing, acts, and how beta becomes a per-act risk\n\n\nDemographics\nBirths, deaths, migration, population scaling, and multiscale runs for rare cancers\n\n\nInterventions\nProducts versus delivery, vaccination, screening and treatment cascades\n\n\nHIV co-infection\nThe two ways to drive HIV, CD4-stratified effects on HPV, ART\n\n\nParameters\nWhere each parameter lives, and how one dictionary reaches every module\n\n\nResults and analyzers\nResult structure, age-standardized rates, results by age, DALYs\n\n\nCalibration\nFitting to sparse local data and checking whether the fit is real",
     "crumbs": [
       "Home",
-      "**User guide**"
+      "<strong>User guide</strong>"
     ]
   },
   {
@@ -1662,7 +1662,7 @@
     "text": "See also\n\nT1 - Getting started for the shortest possible working example\nMigrating from v2 if you have HPVsim v2 scripts\nhpv.Sim API reference",
     "crumbs": [
       "Home",
-      "**User guide**"
+      "<strong>User guide</strong>"
     ]
   },
   {
@@ -1673,7 +1673,7 @@
     "text": "Results are grouped by the module that produced them, because each module records what it can see. sim.results.hpv16 holds HPV16’s own time series; sim.results.agemigration holds migration flows; sim.results.all_hpv holds the pooled HPV totals. A named intervention appears under its own name.\nEvery genotype module records the same set: the stocks n_susceptible, n_infected, n_precin, n_cin, n_cancerous, n_latent; the flows new_infections, new_cancers, new_cancer_deaths, new_reactivations; their cumulative counterparts; and prevalence. Two accumulators, sum_age_at_cancer and sum_age_at_cancer_death, let you recover mean age at diagnosis or death: divide by new_cancers or new_cancer_deaths over the period you care about.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Results and analyzers"
     ]
   },
@@ -1685,7 +1685,7 @@
     "text": "Pooling across genotypes\nsim.results.all_hpv comes from the HPVTotal analyzer, which HPVsim attaches automatically. It mirrors the per-genotype schema but pools three different ways, and the difference matters when you report numbers:\n\nStocks are counted per person. A woman with HPV16 and HPV18 counts once in all_hpv.n_infected. prevalence and n_susceptible follow from that, and cum_infections_unique counts women ever infected with anything.\nCancer flows are exact sums. Each cancer is attributed to a single genotype, so all_hpv.new_cancers is the true total.\nInfection flows are plain sums, and overcount. all_hpv.new_infections adds the genotypes together, so a woman who acquires two genotypes in one timestep contributes two. Use cum_infections_unique when you mean people.\n\nall_hpv also carries asr_cancer_incidence and asr_cancer_mortality: age-standardized rates per 100,000 person-years against the WHO 2000 world standard population. These are the figures comparable to a cancer registry or to GLOBOCAN, and no analyzer is needed to get them. They are computed once per calendar year, and every timestep in that year carries the same value.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Results and analyzers"
     ]
   },
@@ -1697,7 +1697,7 @@
     "text": "What is scaled and what is not\nAnything counted in people is multiplied by pop_scale when the run finishes, so cancers, deaths and screens come out in real-population units. Proportions — prevalence, the age-standardized rates, the HIV-stratified prevalences — are not. The age_pyramid, dalys and age_causal_infection analyzers scale their own outputs, so their totals are comparable with sim.results.\nInterventions record their own time series, already scaled: new_doses and cum_doses for vaccination, new_screens and new_dx for screening, new_cin_treated for treatment. Vaccination also records new_vaccinated and cum_vaccinated, which count women reached rather than doses given — the two differ whenever a schedule gives more than one dose per person.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Results and analyzers"
     ]
   },
@@ -1709,7 +1709,7 @@
     "text": "Analyzers\nAnalyzers watch the population and record what the disease modules do not. They never change a run, so adding one cannot alter your results.\n\n\n\nAnalyzer\nGives you\n\n\n\n\nhpv.by_age\nAny of a fixed set of HPV outputs, binned by age bands you choose\n\n\nhpv.age_pyramid\nMale and female counts by age band at chosen dates\n\n\nhpv.dalys\nYLL and YLD from cervical cancer per year, attributed at cancer onset\n\n\nhpv.age_causal_infection\nAge at the causal infection, at CIN and at cancer, plus dwell times\n\n\nhpv.snapshot\nA frozen copy of the population at chosen dates\n\n\n\nhpv.by_age replaced AgeResults in v3.1 and its interface is different: keys come first and positionally, hpv.by_age(['cancers', 'hpv_prevalence'], edges=..., years=...). It accepts the flows cancers and cins, the stocks n_infected, n_precin, n_cin, n_cancerous, the population denominators n_alive, n_females, n_males, and the proportions hpv_prevalence, precin_prevalence, cin_prevalence, cancer_prevalence. Each (key, age band) pair becomes its own result — sim.results.by_age.cancers_30_40 — and to_dataframe(key) returns a year-by-age-band table, summing flows across each calendar year and averaging stocks and proportions.\nBecause by_age supplies its own denominators, you can build crude age-specific rates from one analyzer: ask for cancers and n_females over the same bins and divide. The age-standardized asr_cancer_incidence remains the better choice for anything you intend to compare against a registry or across countries, since it removes the effect of differing age structures.\nOne caveat if you cross-check against sim-level results: by_age’s n_females counts living women only, while starsim’s own sim.results.n_female includes agents pending removal and so runs a few percent higher. Use by_age’s denominators with by_age’s numerators.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Results and analyzers"
     ]
   },
@@ -1721,7 +1721,7 @@
     "text": "How to produce cancer outputs you can compare with a registry\nRegistries report cases by five- or ten-year age band for a given year, and often an age-standardized rate. This assembles both, plus the genotype distribution used to check that the right types are driving cancer, and the DALYs a cost-effectiveness analysis needs.\n\nimport numpy as np\nimport hpvsim as hpv\n\nregistry_bins = np.array([0, 30, 40, 50, 60, 70, 100])\nages = hpv.by_age('cancers', edges=registry_bins)\nburden = hpv.dalys(start=2010)\n\nsim = hpv.Sim(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'],\n              n_agents=3000, start=1990, stop=2020, ms_agent_ratio=10,\n              analyzers=[ages, burden], verbose=0)\nsim.run()\n\nprint('Cancers by age band:')\nprint(sim.analyzers.by_age.to_dataframe('cancers').loc[[2015.0, 2019.0]].round(0))\n\nyears = np.floor(sim.timevec.years).astype(int)\ni = np.where(years == 2019)[0][0]\nprint('\\nAge-standardized incidence in 2019, per 100k:',\n      round(float(sim.results.all_hpv.asr_cancer_incidence[i]), 1))\n\nprint('DALYs in 2019:', f'{float(sim.analyzers.dalys.dalys[sim.analyzers.dalys.years == 2019][0]):,.0f}')\nprint('\\nGenotype share of cumulative cancers:')\nprint(hpv.results_by_genotype(sim, 'cum_cancers', normalize=True).tail(1).round(2))\n\nCancers by age band:\n        0-30    30-40    40-50  50-60   60-70     70+\nt                                                    \n2015.0   0.0  12774.0  12774.0    0.0  3194.0     0.0\n2019.0   0.0   6387.0  12774.0    0.0  3194.0  6387.0\n\nAge-standardized incidence in 2019, per 100k: 0.0\nDALYs in 2019: 1,372,090\n\nGenotype share of cumulative cancers:\n        hpv16  hpv18   hi5  ohr\nyear                           \n2020.0   0.49   0.28  0.13  0.1\n\n\nThe age-standardized rate this run produces is several times Nigeria’s observed rate, which is the expected result: these are default parameters, not a calibrated Nigeria model. Getting from here to a defensible national estimate is what Calibration is for.\nTwo habits worth keeping. Run with ms_agent_ratio above 1 whenever cancer is the outcome, or the age table will be mostly zeros with occasional spikes. And plot rather than tabulate first: hpv.plot_by_age(sim.analyzers.by_age, 'cancers'), hpv.plot_by_genotype(sim) and analyzer.plot() exist for exactly this, and a lumpy age curve is obvious in a figure and invisible in a summary statistic.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Results and analyzers"
     ]
   },
@@ -1733,7 +1733,7 @@
     "text": "See also\n\nT6 - Using analyzers and T2 - Plotting, printing, and saving\nDemographics for pop_scale and ms_agent_ratio\nhpv.analyzers and hpv.plotting API reference",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Results and analyzers"
     ]
   },
@@ -1745,7 +1745,7 @@
     "text": "HPV moves through sexual partnerships, so the network carries most of the local realism in a country model. A partnership is a pair of agents that lasts a drawn duration and carries a number of sex acts per timestep. Partnerships are heterosexual: women are the first partner in a pair, men the second.\nOne hpv.SexualNetwork holds both kinds of partnership in a single table, tagged by layer: marital ('m') and casual ('c'). They differ in every quantity that matters. dur_pship_marital has a mean of 80 years, which makes most marriages lifelong — around two-thirds last 50 years or more — while dur_pship_casual averages a year, with a third ending inside three months. Marital partnerships have about 80 acts a year (acts_marital), casual ones about 50.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Sexual networks"
     ]
   },
@@ -1757,7 +1757,7 @@
     "text": "Who partners with whom\nEach timestep the network dissolves every pair whose duration has expired, then forms new ones layer by layer:\n\nDebut. Each agent has one age at first sex, shared across both layers: debut_f is normal(15.0, 2.1), debut_m normal(17.6, 1.8). Agents younger than their debut age never partner.\nParticipation. layer_probs_marital and layer_probs_casual are (3, N) arrays: row 0 is the lower bound of each five-year age band, rows 1 and 2 the annual probability that a woman or a man in that band seeks a partner in that layer. These annual probabilities are converted to the timestep in use, so changing dt does not change behavior.\nConcurrency. Each agent has a per-layer target partner count, drawn from a Poisson and then shifted up by one — a participating agent wants at least one partner by definition, so lam (0.01 marital, 0.5 casual) governs only the tail of extra concurrent partners. Agents already partnered in the other layer must also pass an annual cross-layer roll: m_cross_layer 0.760, f_cross_layer 0.185.\nAge mixing. mixing_marital and mixing_casual say which men a woman of a given age partners with. Column 0 holds the age-band labels; each remaining column belongs to one band of women, and the values down that column weight male partners by their own band (the rows). Where a band has more women seeking partners than there are eligible men, a random subset of those women goes unpartnered this timestep — which is how a shortage of men in one band propagates.\nActs. The drawn annual act count is scaled by the couple’s average age: linearly from half (debut_ratio 0.5) at debut to full at peak (30 marital, 25 casual), then down to a tenth (retirement_ratio 0.1) by retirement. It is then converted to acts per timestep.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Sexual networks"
     ]
   },
@@ -1769,7 +1769,7 @@
     "text": "From beta to a per-act risk\nHPV.pars.beta is a plain scalar — the per-act transmission probability, 0.25 by default — not the per-partnership or per-timestep risk. Three per-genotype scalars expand it: rel_beta (1.0 for HPV16, 0.75 for HPV18, 0.9 for the pools), transf2m (1.0, female to male) and transm2f (2.0, male to female). validate_beta() returns the numbers actually used, as [female-to-male, male-to-female] per network. The network compounds across acts: a pair transmits in one timestep with probability 1 − (1 − per-act probability)^acts.\nValues above 1 are clipped with a warning, since the compounding formula otherwise produces NaN silently. Watch for that warning if you raise transm2f or rel_beta during calibration.\nCondom use is not a network parameter in v3; any protective effect has to be absorbed into beta.\nHPVsim ships country-specific demographic data (population, mortality, fertility, migration) and default product tables, but no network parameters and no epidemiological data — cancer-registry counts, HPV-prevalence surveys and behavioral surveys are yours to supply, either through datafolder= for calibration targets or through the network parameters above. Supplying local behavioral data is the highest-value change you can make to a country model.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Sexual networks"
     ]
   },
@@ -1781,7 +1781,7 @@
     "text": "How to put local survey data into the network\nBehavioral surveys usually give you age at first sex, the proportion reporting a partner in the last year, and the number of partners. Those map onto debut_*, layer_probs_* and *_partners_*. Pass them with nw_pars=:\n\nimport starsim as ss\nimport hpvsim as hpv\n\nsurvey = dict(\n    debut_f = ss.normal(loc=17.0, scale=2.0),        # median age at first sex, women\n    debut_m = ss.normal(loc=18.5, scale=2.0),        # ... and men\n    f_partners_casual = ss.poisson(lam=0.2),         # extra concurrent casual partners\n    m_partners_casual = ss.poisson(lam=0.3),\n    acts_casual = ss.nbinom(n=5, p=5/(5+30)),        # mean 30 acts per year\n)\n\nsim = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,\n              start=2000, stop=2020, nw_pars=survey, verbose=0)\nsim.run()\n\nnet = sim.networks.sexualnetwork\nprint('marital pairs in 2020:', net.n_pairs_in_layer('m'))\nprint('casual pairs in 2020: ', net.n_pairs_in_layer('c'))\nprint('per-act [f2m, m2f]:   ', sim.diseases.hpv16.validate_beta()['sexualnetwork'])\nprint('HPV prevalence in 2020:', round(float(sim.results.all_hpv.prevalence[-1]), 3))\n\nmarital pairs in 2020: 745\ncasual pairs in 2020:  127\nper-act [f2m, m2f]:    [0.25, 0.5]\nHPV prevalence in 2020: 0.036\n\n\nEvery value in hpv.NetworkPars can be replaced this way. nw_pars= is a shortcut for the network HPVsim builds for you; if you construct your own hpv.SexualNetwork(...) and pass it as networks=, set its parameters there instead — passing both raises an error rather than silently ignoring one.\nChange the network and you change transmission, so beta will need recalibrating alongside it. Fit behavior to behavioral data first, then fit beta to prevalence.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Sexual networks"
     ]
   },
@@ -1793,7 +1793,7 @@
     "text": "See also\n\nT4 - People, populations, and networks\nParameters for the other ways to reach network parameters\nhpv.SexualNetwork API reference and hpv.NetworkPars",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Sexual networks"
     ]
   },
@@ -2146,7 +2146,7 @@
     "text": "HPVsim separates what is given from who gets it. A product is the vaccine, screening test or treatment itself, with its own efficacy or test-positivity by genotype and disease state. An intervention is the delivery program: which people, from which year, at what coverage. The same product can be delivered several ways, and the same delivery pattern can carry different products.\nProduct characteristics live in CSVs under hpvsim/data/, so you can read exactly what the model assumes:\nDiagnostics are multinomial draws conditioned on true state and genotype. Where a woman is positive for more than one genotype, the most severe result in the product’s hierarchy wins. Results come back as intervention.outcomes['&lt;result label&gt;'], and that dictionary is how a cascade is wired: each downstream step’s eligibility reads the upstream step’s outcomes.\nTreatment products act on the model’s disease states directly. Ablation and excision clear precancer and CIN — since v3.1 they clear precancer too, which makes screen-and-treat avert more cancers than in earlier versions. Radiation extends time to cancer death by a drawn duration (mean 18 months); a woman treated for cancer still has cancer.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Interventions"
     ]
   },
@@ -2158,7 +2158,7 @@
     "text": "Delivery, coverage and targeting\nEvery intervention is either routine or campaign. hpv.routine_screening(start_year=2015, prob=0.3) offers a screen every year from 2015; hpv.campaign_screening(years=[2015, 2025], prob=0.3) offers it twice. prob is an annual probability, converted internally to the timestep in use — so prob=0.3 with quarterly steps does not mean 30% per quarter. Pass a list of probabilities alongside a list of years to ramp coverage over time. start_year and end_year must fall inside the simulation window or the run stops with an error.\nAll vaccination, screening, treatment and therapeutic-vaccination interventions default to sex='f'. That changed in v3.1: pass sex=None explicitly for gender-neutral vaccination. Age targeting uses age_range=[lo, hi], and the upper bound is treated as exclusive for vaccination, screening and triage but inclusive for treatment — so age_range=[30, 50] on a screening program reaches women up to their 50th birthday.\nGive every intervention in a cascade a name, since downstream steps refer to it by name. Names share a namespace with product modules, so avoid 'vx', 'dx', 'tx' and 'radiation' as intervention names — a collision raises Module vx already added at initialisation.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Interventions"
     ]
   },
@@ -2170,7 +2170,7 @@
     "text": "How to build a screen-and-treat cascade\nA screening program is a chain: screen, triage the positives, treat what triage finds. Each link is its own intervention, and eligibility functions connect them.\n\nimport numpy as np\nimport starsim as ss\nimport hpvsim as hpv\n\nscreen = hpv.routine_screening(product='hpv', prob=0.35, age_range=[30, 50],\n                               start_year=2010, name='screen')\n\n# Women who screen positive go to colposcopy\npositives = lambda sim: sim.interventions['screen'].outcomes['positive']\ntriage = hpv.routine_triage(product='colposcopy', prob=0.9, eligibility=positives,\n                            start_year=2010, name='triage')\n\n# Women with a low- or high-grade lesion are offered ablation\nlesions = lambda sim: np.union1d(sim.interventions['triage'].outcomes['hsil'],\n                                 sim.interventions['triage'].outcomes['lsil'])\nablate = hpv.treat_num(product='ablation', prob=0.9, eligibility=lesions,\n                       max_capacity=None)\n\npars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,\n            start=2000, stop=2020, verbose=0)\nbaseline = hpv.Sim(**pars, label='no screening')\nprogram = hpv.Sim(**pars, interventions=[screen, triage, ablate],\n                    label='screen and treat')\n\nmsim = ss.MultiSim([baseline, program])\nmsim.run(parallel=False, verbose=0)\n\nfor sim in msim.sims:\n    print(f'{sim.label:&gt;18}: {float(sim.results.all_hpv.cum_cancers[-1]):&gt;11,.0f} cancers by 2020')\n\nprog = msim.sims[1]\nprint('screens delivered: ', f'{float(prog.interventions.screen.results.new_screens.sum()):,.0f}')\nprint('screen positives:  ', f'{float(prog.interventions.screen.results.new_dx.sum()):,.0f}')\nprint('women treated:     ', f'{float(prog.interventions[\"treat_num\"].results.new_cin_treated.sum()):,.0f}')\n\n      no screening:     311,684 cancers by 2020\n  screen and treat:     249,347 cancers by 2020\nscreens delivered:  77,734,008\nscreen positives:   8,415,470\nwomen treated:      810,379\n\n\nmax_capacity=None treats everyone eligible. Set it to a number of women per timestep to represent a service constrained by staff or theatre time, which is usually closer to reality than unlimited treatment. Use hpv.treat_delay(delay=1.0, ...) where women are referred and treated later, and expect loss to follow-up to matter: the cascade multiplies, so 35% screened × 90% triaged × 90% treated reaches under 30% of the women you intended.\nTo ramp a program’s coverage over calendar time without writing several interventions, use hpv.dynamic_pars with a dotted path, for example {'screen.prob': {'years': [2010, 2030], 'vals': [0.1, 0.7]}}.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Interventions"
     ]
   },
@@ -2182,7 +2182,7 @@
     "text": "See also\n\nT5 - Using interventions, and examples/t05_screen_algorithms.py for the seven WHO-recommended screening algorithms\nImmunity for how vaccine protection is applied\nhpv.interventions and hpv.products API reference",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Interventions"
     ]
   },
@@ -2194,7 +2194,7 @@
     "text": "A woman who clears an HPV infection is not returned to the state she was in before it. She keeps two things, and they do different jobs.\nnab_imm is antibody-mediated immunity: it reduces the chance of acquiring an infection at all. cell_imm is cell-mediated immunity: it does not stop acquisition, but it shortens the next infection and so lowers the chance that it becomes precancer. Both are drawn on clearance from uniform distributions — imm_init defaults to ss.uniform(0.5, 0.95) (mean 0.725), cell_imm_init to ss.uniform(0.3, 0.9) (mean 0.6) — and both accumulate as a running maximum, so repeated clearance can only raise a woman’s protection, never lower it.\nOnly women update immunity on clearance; men clear without seroconverting. At a woman’s first clearance the antibody component is gated on sero_prob (0.75 for HPV16, 0.56 for HPV18, 0.60 for the pools): women who do not seroconvert keep nab_imm = 0 and are fully reinfectible. Cell-mediated immunity is not gated — every woman who clears gets some severity protection. That asymmetry matters for the low-seroconversion genotypes, where treating all clearance as fully protective would understate ongoing transmission.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Immunity"
     ]
   },
@@ -2206,7 +2206,7 @@
     "text": "Cross-protection is a matrix, vaccine protection is not\nImmunity earned against one genotype partly protects against the others. The CrossImmunity module holds two 4×4 matrices — rows are the genotype being protected, columns the genotype that was cleared — and every timestep it computes, for each genotype g:\nsusceptibility reduction = Σ over sources k of cross_imm_sus[g, k] × nab_imm[k]\nrel_sus[g]               = (1 − that) × (1 − vax_imm[g])\nsev_imm[g]               = Σ over sources k of cross_imm_sev[g, k] × cell_imm[k]\n                           + txvx_sev_imm[g]\nTherapeutic vaccination (hpv.txvx) writes into txvx_sev_imm rather than rel_sus: it clears the current lesion per the efficacy table and confers severity immunity going forward, so it acts through sev_imm, not susceptibility.\nThe matrices are built from five scalars, not calibrated cell by cell. own_imm_hr (0.9) is the diagonal for the pooled genotypes; HPV16 and HPV18 have a diagonal of 1.0. Off the diagonal, HPV16 and HPV18 protect each other at the “high” level (cross_imm_sus_high 0.5, cross_imm_sev_high 0.7) because they share a clade; every other pair uses the “medium” level (cross_imm_sus_med 0.3, cross_imm_sev_med 0.5). Per-cell calibration was removed in v3.2: calibrate the five scalars, or pass whole matrices as cross_imm_sus= and cross_imm_sev= if you have external estimates.\nVaccine immunity works differently on purpose. It is stored per target genotype in vax_imm and applied directly, bypassing the matrix, because the per-genotype rel_imm values in hpvsim/data/products_vx.csv already are the vaccine’s complete cross-protection profile — bivalent gives 1.0 against HPV16 and HPV18, 0.5 against hi5, 0.1 against ohr; nonavalent gives 1.0 against hi5 too. Putting those through the clearance matrix would double-count protection they already describe.\nVaccine protection is all-or-nothing per woman: one draw at sterilizing_p (0.95) settles her fate for every genotype at once. Women who draw sterilizing immunity get vax_imm[g] = rel_imm[g]; the rest get rel_imm[g] × 0.95 as leaky protection. Existing immunity is never downgraded.\nThe same module owns rel_sev, each woman’s intrinsic progression speed. It is not immunity, but it lives here for the same reason the matrices do: it must be one draw per woman, shared across every genotype she carries. It is sampled from a folded normal — ss.normal(loc=1.0, scale=0.2) with the sign discarded — and multiplies the time axis of both progression curves in Natural history. Calibrations often lower its center.\nTwo limits to state plainly. Immunity does not wane in v3: protection earned is kept for life. And because immunity is applied before interventions within a timestep, a woman vaccinated in one timestep is protected from the next onwards — three months at the default dt.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Immunity"
     ]
   },
@@ -2218,7 +2218,7 @@
     "text": "How to test whether cross-protection matters for your setting\nCross-protection is one of the least well-measured parts of the model, and it changes prevalence substantially. Before calibrating it, find out how much your outputs depend on it: run with the defaults and with cross-protection switched off, leaving own-genotype immunity intact.\n\nimport pandas as pd\nimport hpvsim as hpv\n\npars = dict(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'],\n            n_agents=2000, start=2000, stop=2020, verbose=0)\n\ndefault = hpv.Sim(**pars, label='default cross-protection')\nno_cross = hpv.Sim(**pars, label='no cross-protection',\n                   imm_pars=dict(cross_imm_sus_med=0.0, cross_imm_sus_high=0.0,\n                                 cross_imm_sev_med=0.0, cross_imm_sev_high=0.0))\n\nfor sim in (default, no_cross):\n    sim.run()\n    print(f'{sim.label:&gt;25}: HPV prevalence in 2020 = '\n          f'{float(sim.results.all_hpv.prevalence[-1]):.3f}')\n\n# The matrix the defaults produce: rows protected, columns cleared\ngenotypes = ['hpv16', 'hpv18', 'hi5', 'ohr']\nprint(pd.DataFrame(default.connectors.crossimmunity.cross_imm_sus,\n                   index=genotypes, columns=genotypes))\n\n default cross-protection: HPV prevalence in 2020 = 0.067\n      no cross-protection: HPV prevalence in 2020 = 0.158\n       hpv16  hpv18  hi5  ohr\nhpv16    1.0    0.5  0.3  0.3\nhpv18    0.5    1.0  0.3  0.3\nhi5      0.3    0.3  0.9  0.3\nohr      0.3    0.3  0.3  0.9\n\n\nSetting the four off-diagonal scalars to zero leaves the diagonal — a woman is still protected against the genotype she cleared. If the gap between the two runs is wide, cross-protection belongs in your calibrated parameter set; if it is narrow, fix it at the defaults and spend your trials elsewhere.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Immunity"
     ]
   },
@@ -2230,7 +2230,7 @@
     "text": "See also\n\nNatural history for how sev_imm shortens the next infection\nInterventions for delivering vaccines to a population\nhpv.CrossImmunity API reference and hpv.vx",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Immunity"
     ]
   },
@@ -2242,7 +2242,7 @@
     "text": "Women living with HIV acquire HPV more readily, clear it less often, progress to cancer faster, and get less protection from both natural infection and vaccination. In high-prevalence settings this reshapes the cervical cancer burden, so HPVsim can carry HIV alongside HPV.\nHIV support is an optional install: pip install hpvsim[hiv], which adds STIsim. Without it, hpv.HIV_transmit, hpv.HIV_incidence and hpv.Sim(model_hiv=...) raise an ImportError naming the extra. Everything else in HPVsim works without STIsim.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "HIV co-infection"
     ]
   },
@@ -2254,7 +2254,7 @@
     "text": "Two ways to drive HIV\nThe choice is whether HIV is an input or an outcome.\nhpv.HIV_incidence imposes a known epidemic. You supply a table of [age, sex, year, incidence], and each timestep susceptible agents acquire HIV at the rate their age band, sex and calendar year specify, so prevalence follows your data rather than emerging from behavior. This suits most country work: national HIV estimates already exist and reproducing them is not the point of the analysis. Every new case is diagnosed and made ART-eligible at once, so sti.ART(coverage=...) drives treatment with no testing cascade to configure.\nhpv.HIV_transmit spreads HIV along the same sexual network as HPV, governed by beta_m2f (0.0035 per act) and rel_beta_f2m (0.5). Use it when HIV prevalence has to respond to behavior or to an HIV intervention. It is harder to calibrate — two epidemics to fit — and brings no ART program of its own.\nhpv.Sim(model_hiv=True) builds the incidence version and its ART intervention; model_hiv='transmission' builds the transmitting version. hiv_data= supplies the data, hiv_pars= the parameters. Passing your own HIV module in diseases= also works; combining both raises an error. A bare sti.HIV from STIsim runs, but carries none of the effects below.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "HIV co-infection"
     ]
   },
@@ -2266,7 +2266,7 @@
     "text": "What HIV does to HPV\nThe effects are stratified by CD4 count, in three bands:\n\n\n\n\n\n\n\n\n\n\nCD4\nAcquisition (rel_sus)\nProgression (rel_sev)\nImmunity (rel_imm)\nReactivation\n\n\n\n\n≥ 500 (cd4_upper)\n1.0\n1.0\n1.0\n1.0\n\n\n200–500 (_hi)\n2.2\n1.2\n0.76\n1.0\n\n\n&lt; 200 (cd4_threshold, _lo)\n2.2\n1.5\n0.36\n1.0\n\n\n\nAll four factors live on the HIV module — sim.diseases.hiv.pars.rel_sev_lo and so on — because HIV owns the CD4 count they are stratified on.\nWomen with a CD4 count of 500 or more get no effect at all. That band covers the newly infected, whose CD4 starts around 594, and women whose count has recovered on treatment. Effective ART therefore removes the HPV penalty by moving women out of the affected strata, which is how treatment scale-up shows up in cancer projections.\nrel_sus multiplies susceptibility to every genotype each timestep. rel_sev stretches the progression timescale when a new infection’s trajectory is drawn. rel_imm scales down the immunity conferred by clearing an infection and by a vaccine dose. rel_reactivation multiplies the latent reactivation hazard; its default of 1.0 is a placeholder, not a measured value, so set it deliberately if you model latency.\nResults come stratified by HIV status: hpv_prevalence_with_hiv and hpv_prevalence_no_hiv under sim.results.hiv, and new_cancers_with_hiv, new_cancers_no_hiv, cancer_incidence_with_hiv, cancer_incidence_no_hiv and cancer_rate_ratio under sim.results.all_hpv. HIV runs on a quarterly clock whatever dt you give the sim; the cancer stratification is computed on the sim’s clock, so no cancer is counted twice.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "HIV co-infection"
     ]
   },
@@ -2278,7 +2278,7 @@
     "text": "Getting national HIV data in\nHPVsim ships no HIV data. You supply your country’s, and it almost always arrives in five-year age bands, because that is how UNAIDS and Spectrum report incidence and ART coverage.\nBanded inputs are supported. hpv.HIV_incidence reads each age value as a band’s lower bound and puts every woman in the band whose lower bound is the greatest one at or below her age, with the first and last bands extending past the ends of the data. Bands can be any width and need not be evenly spaced. Years are matched to the nearest year present, so a gap mid-series is not an error. ART coverage goes through hpv.data.reshape_art_coverage, which takes each band’s upper edge from the next age in the table and leaves the top band open-ended.\nCheck this rather than assume it. Before v3.2, banded incidence raised an IndexError, and banded ART coverage was reshaped into one-year bins — so ages 1 to 4, 6 to 9 and so on got no ART at all, quietly understating treatment. It went unnoticed because the only available test data was by single year of age. After loading your own data, confirm that women on ART span the ages you expect:\non_art_ages = sim.people.age[sim.diseases.hiv.on_art.uids]\nprint(on_art_ages.min(), on_art_ages.max())\nTwo changes matter on upgrade. The top ART band is now open-ended, so a series ending at 80 covers everyone over 80 rather than ages 80 to 81 alone — HIV results can shift for that reason alone. And coverage is clamped to [0, 1], because STIsim reads a column whose maximum exceeds 1 as counts rather than proportions, and a single 1.0001 from rounding would put almost nobody on treatment.\nhiv_data= takes either a dictionary with incidence, art_coverage and init_prev, or a folder path for hpv.data.load_hiv_data, which expects hiv_incidence.csv, art_coverage_by_age_females.csv, art_coverage_by_age_males.csv and hiv_prevalence.csv. From the last it takes one national adult prevalence at 1990 as the seed — a flat interim value, with the age and sex shape left to calibration.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "HIV co-infection"
     ]
   },
@@ -2290,7 +2290,7 @@
     "text": "How to drive HIV from national estimates\nThe block below is shown rather than run, because the documentation is built without the optional STIsim dependency.\n\nimport numpy as np\nimport pandas as pd\nimport hpvsim as hpv\n\n# Five-year age bands, as UNAIDS and Spectrum report them\nbands = np.arange(0, 85, 5)\nyears = np.arange(2000, 2021)\n\ndef age_pattern(age):                     # replace with your own estimates\n    return 0.02 * np.exp(-((age - 27) ** 2) / 200)\n\nincidence = pd.DataFrame([\n    dict(age=int(a), sex=s, year=int(y),\n         incidence=age_pattern(a) * (1.0 if s == 'f' else 0.6))\n    for a in bands for s in ('f', 'm') for y in years\n])\nart = pd.DataFrame([\n    dict(age=int(a), sex=s, year=int(y),\n         coverage=float(np.interp(y, [2004, 2020], [0.0, 0.7])))\n    for a in bands for s in ('f', 'm') for y in years\n])\n\nsim = hpv.Sim(location='south africa', genotypes=[16, 18], n_agents=2000,\n              start=2000, stop=2020, model_hiv=True, verbose=0,\n              hiv_data=dict(incidence=incidence, art_coverage=art, init_prev=0.02))\nsim.run()\n\nhiv = sim.results.hiv\nprint('HIV prevalence in 2020:  ', round(float(hiv.prevalence[-1]), 3))\nprint('on ART in 2020:          ', round(float(hiv.p_on_art[-1]), 3))\nprint('HPV prevalence, HIV+:    ', round(float(hiv.hpv_prevalence_with_hiv[-1]), 2))\nprint('HPV prevalence, HIV-:    ', round(float(hiv.hpv_prevalence_no_hiv[-1]), 2))\n\nWith this synthetic input the run reaches about 8% HIV prevalence with 63% of those infected on treatment, and HPV prevalence of roughly 0.47 among women with HIV against 0.25 among women without. The gap comes from the CD4-stratified acquisition and immunity effects, and from both infections travelling through the same partnerships.\nSTIsim warns that ART was added without a testing intervention. That warning does not apply here: HPVsim’s HIV classes diagnose every case as it arises, which is what makes a coverage-only ART program work.\nCancer counts by HIV status are rare events twice over, so raise ms_agent_ratio before comparing rate ratios between scenarios — at a few thousand agents cancer_rate_ratio will often be zero because no woman with HIV happened to reach cancer.\nIf you are migrating from v3.0 or earlier: hpv.hiv_incidence (the intervention), hpv.hiv_art, the hpv_hiv_connector and HIVStratifiedResults are all gone. The two disease classes above replace them.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "HIV co-infection"
     ]
   },
@@ -2302,7 +2302,7 @@
     "text": "See also\n\nT8 - HIV co-infection\nNatural history for the progression timescale that rel_sev stretches\nDemographics for ms_agent_ratio\nhpv.hiv API reference",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "HIV co-infection"
     ]
   },
@@ -2314,7 +2314,7 @@
     "text": "A country model has parameters of very different kinds: how many agents to run, how transmissible HPV16 is, how many casual partners women report, how much protection clearing HPV18 gives against HPV16. In HPVsim these live on different modules, because each module owns the state it acts on. That is good for the code and inconvenient for you, since a parameter set arrives as one flat table from a spreadsheet or a calibration.\nhpv.route_pars handles that. It takes one dictionary and delivers each entry to the module that owns it, so you can keep a country’s parameters in one place.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Parameters"
     ]
   },
@@ -2326,7 +2326,7 @@
     "text": "Where parameters live\n\n\n\nHome\nExamples\nReach it with\n\n\n\n\nSim\nn_agents, start, stop, dt, rand_seed, total_pop, verbose\na bare key\n\n\nConstruction only\nlocation, genotypes, datafolder, model_hiv, init_seeding, v2_compat_demographics\na keyword argument to hpv.Sim, never inside pars=\n\n\nEach HPV genotype\nbeta, rel_beta, transm2f, dur_precin, dur_cin, cin_fn, cancer_fn, age_risk, sero_prob, imm_init, hpv_control_prob, hpv_reactivation, ms_agent_ratio\na bare key (all genotypes) or hpv16=dict(...) (one genotype)\n\n\nSexual network\neverything in hpv.NetworkPars\na bare key, network=dict(...), or nw_pars=\n\n\nCross-immunity\nown_imm_hr, cross_imm_sus_med, cross_imm_sus_high, cross_imm_sev_med, cross_imm_sev_high, rel_sev\na bare key, cross_immunity=dict(...), or imm_pars=\n\n\nHIV\nbeta_m2f, rel_sus_lo, rel_sev_lo, cd4_threshold, …\nhiv=dict(...) or hiv_pars=\n\n\n\nThree rules govern the routing:\nA bare key goes everywhere it fits. beta=0.2 sets beta on every genotype. n_agents=2000 sets it on the sim. A name that exists in two places is written to both, which is intended — ms_agent_ratio belongs on every genotype at once.\nHIV is never reached by a bare key. HIV shares parameter names with HPV (beta, init_prev), so a bare beta= would silently switch on HIV transmission. HIV parameters must be scoped: hiv=dict(beta_m2f=0.008) or hiv_pars=dict(...).\nSpecific beats general. Scoped entries are applied after bare ones, whatever order your dictionary is in, so dict(beta=0.2, hpv16=dict(beta=0.3)) gives HPV16 0.3 and every other genotype 0.2. Dotted keys are accepted too — 'hpv16.cin_fn.k' is the same as hpv16=dict(cin_fn=dict(k=...)) — which is what calibration output looks like.\nNested parameter groups merge rather than replace. cin_fn, cancer_fn, age_risk and the network’s age_act_pars_* are parameter objects, so hpv16=dict(cin_fn=dict(k=0.4)) changes k and leaves form, x_infl and ttc alone.\nAn unrecognized name raises a ValueError listing it. That is deliberate: a typo in a country parameter file should stop the run, not run the defaults.\nThe sim-level defaults are in hpv.SimPars: 10,000 agents, 1990 to 2060, dt=0.25 (three months), seed 0. hpv.Sim itself does not assume a country — pass location= or you get the location-free playground described in Demographics.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Parameters"
     ]
   },
@@ -2338,7 +2338,7 @@
     "text": "How to organize a country parameter set\nThe simplest option is the define a dictionary of inputs for your setting, grouped by purpose, and pass it into hpv.Sim.\n\nimport hpvsim as hpv\n\nnigeria_inputs = dict(\n    location = 'nigeria',\n    n_agents = 2000,\n    start = 2000,\n    stop = 2020,\n    beta = 0.2,                                # every genotype\n    hpv16 = dict(cin_fn=dict(k=0.4)),          # one genotype\n    network = dict(f_cross_layer=0.25),        # sexual network\n    cross_immunity = dict(own_imm_hr=0.8),     # cross-protection\n    verbose = 0,\n)\n\nsim = hpv.Sim(genotypes=[16, 18], **nigeria_inputs)\nsim.init()\n\nprint('HPV16 beta:      ', sim.diseases.hpv16.pars.beta)\nprint('HPV18 beta:      ', sim.diseases.hpv18.pars.beta)\nprint('HPV16 cin_fn:    ', dict(sim.diseases.hpv16.pars.cin_fn))\nprint('HPV18 cin_fn:    ', dict(sim.diseases.hpv18.pars.cin_fn))\nprint('f_cross_layer:   ', sim.networks.sexualnetwork.pars.f_cross_layer)\nprint('own_imm_hr:      ', sim.connectors.crossimmunity.pars.own_imm_hr)\nprint('people per agent:', f'{sim.pars.pop_scale:,.0f}')\n\nHPV16 beta:       0.2\nHPV18 beta:       0.2\nHPV16 cin_fn:     {'form': 'logf2', 'k': 0.4, 'x_infl': 0, 'ttc': 50}\nHPV18 cin_fn:     {'form': 'logf2', 'k': 0.25, 'x_infl': 0, 'ttc': 50}\nf_cross_layer:    0.25\nown_imm_hr:       0.8\npeople per agent: 62,337\n\n\nbeta reached both genotypes but their per-act transmission probabilities still differ, because each genotype scales beta by its own rel_beta. Check what the model actually uses with sim.diseases.hpv16.validate_beta().\nWithin the nigeria_inputs dictionary there are different kinds of inputs: location is a constructor argument, not a routed parameter, so hpv.Sim(**nigeria) works while hpv.Sim(pars=nigeria) does not.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Parameters"
     ]
   },
@@ -2350,7 +2350,7 @@
     "text": "See also\n\nCalibration, which uses the same nested form for calib_pars\nMigrating from v2 for the v2 parameter names\nhpv.SimPars, hpv.GenotypePars, hpv.NetworkPars, hpv.route_pars",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Parameters"
     ]
   },
@@ -2362,7 +2362,7 @@
     "text": "The default parameters are a point of departure, not a description of your setting. Calibration finds the values that best explain the data you have — and for cervical cancer that data is usually thin: a registry with counts by age band for one or two years, perhaps an HPV prevalence survey, perhaps a genotype distribution among a few hundred cases. The workflow is built around that, not around dense time series.\nhpv.Calibration wraps Starsim’s calibration machinery, which uses Optuna to search the parameter space. You give it a sim, the parameters to vary, and the data.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Calibration"
     ]
   },
@@ -2374,7 +2374,7 @@
     "text": "Telling it what your data is\nTargets go in as one table, with a float year index named t and column names that say what each column is:\n\n\n\nColumn form\nMeaning\nWhere the model value comes from\n\n\n\n\nall_hpv.&lt;name&gt;\nOne number per year\nsim.results.all_hpv.&lt;name&gt; — for example all_hpv.asr_cancer_incidence\n\n\nall_hpv.&lt;name&gt;.&lt;bin&gt;\nAge-stratified, one column per band\nA by_age analyzer, attached automatically\n\n\nby_genotype.&lt;name&gt;.&lt;g&gt;\nGenotype shares, one column per genotype\nhpv.results_by_genotype\n\n\n\nYou can also pass a dictionary of data frames, or a list of long-format CSVs with columns year, name, [age, sex, genotype,] value.\nAge-stratified columns configure the model for you: HPVsim reads the band labels ('0-30', '70+') for the bin edges and the index for the years, attaches a by_age analyzer with those settings, and extends sim.pars.stop past your last data year if the sim would have finished too early. Keeping analyzer bins and registry bins in sync by hand is a common source of quiet error, and this removes it.\nMissing cells are allowed: NaN is skipped, so a registry reporting 2015 and 2019 but not the years between costs you nothing.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Calibration"
     ]
   },
@@ -2386,7 +2386,7 @@
     "text": "Choosing parameters and reading the mismatch\ncalib_pars is nested by scope, and each leaf is a list: [best guess, low, high, step], with step optional.\ncalib_pars = dict(\n    beta = [0.25, 0.10, 0.40, 0.05],                    # all genotypes\n    hpv16 = dict(cin_fn=dict(k=[0.30, 0.15, 0.50, 0.05])),\n    network = dict(f_partners_casual=[0.5, 0.1, 0.9, 0.05]),\n    cross_immunity = dict(own_imm_hr=[0.9, 0.7, 1.0, 0.05]),\n)\nThe scopes are the same ones described in Parameters. Flat dotted keys, and the older dict(low=..., high=..., guess=...) leaf form, are no longer accepted — both raise an error telling you which form to use.\nMismatch is a weighted sum over columns. Each column’s error is normalized by the largest observed value in it, so a cancer count in the thousands and a prevalence of 0.1 contribute comparably; weights={'all_hpv.prevalence': 2.0} then adjusts deliberately. Because normalization depends on the data you supplied, mismatch values are comparable within one calibration and meaningless between two.\nTwo defaults exist because of how rare cervical cancer is. reseed=False keeps the random seed fixed across trials — with reseeding, cancer counts move more with the seed than with the parameters, and the search converges on the luckiest seed rather than the best parameters. And Optuna trials are stored in an append-only journal file rather than SQLite, which deadlocks past about 32 concurrent workers.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Calibration"
     ]
   },
@@ -2398,7 +2398,7 @@
     "text": "Checking whether the fit is real\nA single best-fitting trial tells you very little when the outcome is a handful of rare events. Look at the spread of the best trials instead: hpv.plot_calibration re-runs the top trials and draws the model’s range against your data, one panel per target. calib.df holds every trial’s mismatch and parameter values — a flat mismatch across a parameter’s full range means your data cannot identify it, so fix it to a literature value rather than let the search wander.\nTo inspect any output other than your targets, re-run the best trials with hpv.make_calib_sims(calib, n=50, extract_fn=...); without an extract_fn you get 50 full sims back, which is many gigabytes. Use calib.shrink() before committing a calibration to source control.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Calibration"
     ]
   },
@@ -2410,7 +2410,7 @@
     "text": "How to run a first calibration\nStart deliberately small. A handful of trials on a small population tells you whether the plumbing works — that the data is read, the parameters move, and the mismatch responds. Only then scale up trials and population.\n\nimport pandas as pd\nimport hpvsim as hpv\n\n# Two rounds of an HPV prevalence survey (illustrative values)\ndata = pd.DataFrame({'all_hpv.prevalence': [0.12, 0.10]},\n                    index=pd.Index([2010.0, 2015.0], name='t'))\n\ndef make_sim():\n    return hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,\n                   start=2000, stop=2016, dt=0.5, verbose=0)\n\ncalib_pars = dict(\n    beta = [0.25, 0.10, 0.40, 0.05],\n    hpv16 = dict(cin_fn=dict(k=[0.30, 0.15, 0.50, 0.05])),\n)\n\ncalib = hpv.Calibration(make_sim(), calib_pars, data=data,\n                        total_trials=6, n_workers=2)\ncalib.calibrate()\n\nprint('best parameters:', calib.best_pars)\nprint(calib.df[['mismatch', 'beta', 'hpv16.cin_fn.k']].head())\n\n\n[I 2026-09-19 16:44:52,619] A new study created in Journal with name: hpvsim_calibration\n\n\n\n\n&lt;optuna.storages.journal._storage.JournalStorage object at 0x776a1d72fc10&gt;\n\n\n\n[I 2026-09-19 16:44:53,308] Trial 0 finished with value: 1.1170912322898707 and parameters: {'beta': 0.1, 'hpv16.cin_fn.k': 0.35}. Best is trial 0 with value: 1.1170912322898707.\n\n[I 2026-09-19 16:44:53,327] Trial 1 finished with value: 1.1170912322898707 and parameters: {'beta': 0.1, 'hpv16.cin_fn.k': 0.35}. Best is trial 0 with value: 1.1170912322898707.\n\n[I 2026-09-19 16:44:53,833] Trial 2 finished with value: 1.02317247291406 and parameters: {'beta': 0.2, 'hpv16.cin_fn.k': 0.4}. Best is trial 2 with value: 1.02317247291406.\n\n[I 2026-09-19 16:44:53,852] Trial 3 finished with value: 1.13137546988825 and parameters: {'beta': 0.35, 'hpv16.cin_fn.k': 0.15}. Best is trial 2 with value: 1.02317247291406.\n\n[I 2026-09-19 16:44:54,511] Trial 4 finished with value: 1.0911397735277812 and parameters: {'beta': 0.2, 'hpv16.cin_fn.k': 0.35}. Best is trial 2 with value: 1.02317247291406.\n\n[I 2026-09-19 16:44:54,516] Trial 5 finished with value: 1.0768554893632731 and parameters: {'beta': 0.4, 'hpv16.cin_fn.k': 0.2}. Best is trial 2 with value: 1.02317247291406.\n\n\n\n\nMaking results structure...\nProcessed 6 trials; 0 failed\nBest pars: {'beta': 0.2, 'hpv16.cin_fn.k': 0.4}\nbest parameters: {'beta': 0.2, 'hpv16.cin_fn.k': 0.4}\n   mismatch  beta  hpv16.cin_fn.k\n2  1.023172   0.2            0.40\n5  1.076855   0.4            0.20\n4  1.091140   0.2            0.35\n0  1.117091   0.1            0.35\n1  1.117091   0.1            0.35\n\n\n\nfig = hpv.plot_calibration(calib, top_n=4)\n\n\n\n\n\n\n\n\nSix trials over two parameters is a plumbing test, not a calibration. For real work: fit the sexual network to behavioral data first, then transmission to prevalence, then progression to cancer, adding parameters only where the data can identify them. Expect several hundred to a few thousand trials, and run those on a machine you are not also using for anything else.\nCoverage runs matter more than trial counts. Before spending compute, run 50 parameter sets drawn from your ranges and check that your data falls inside the resulting spread. If it does not, no number of trials will help — the model as configured cannot produce your data, and something structural (network, demographics, the target itself) needs attention first.",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Calibration"
     ]
   },
@@ -2422,7 +2422,7 @@
     "text": "See also\n\nT7 - Calibration\nParameters for the scoping rules calib_pars uses\nResults and analyzers for the result names available as targets\nhpv.Calibration API reference",
     "crumbs": [
       "Home",
-      "**User guide**",
+      "<strong>User guide</strong>",
       "Calibration"
     ]
   },
