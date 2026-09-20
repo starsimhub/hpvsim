@@ -2,17 +2,23 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.42">
+<meta name="generator" content="quarto-1.10.18">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
 <title>calibration – HPVsim</title>
 <style>
-code{white-space: pre-wrap;}
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: min(4vw, 1.5em);}
-div.column{flex: auto; overflow-x: auto;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -21,8 +27,9 @@ ul.task-list li input[type="checkbox"] {
   vertical-align: middle;
 }
 /* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -33,7 +40,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -64,20 +71,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../api/defaults.html" rel="next">
-<link href="../api/base.html" rel="prev">
+<link href="../api/cross_genotype.html" rel="next">
+<link href="../api/analyzers.html" rel="prev">
 <link href="..//assets/favicon.ico" rel="icon">
-<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="../site_libs/quarto-html/popper.min.js"></script>
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-de84f8d6bb715db06a919283c2d1e787.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-9a023c9ade86a60361e96e3e3f11bc54.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-5a1953863e1f72ef3b996ef827f01ca7.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-59543038ce2dbea0d2434f74fa4d1829.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-7ea877b0c499ea30230d408925a201b3.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-5f934333b9cb001fe9db7f716924a364.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-cb249ba130f789a842292e0ffd9447c3.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-5f934333b9cb001fe9db7f716924a364.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -109,7 +119,169 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link rel="stylesheet" href="../assets/styles.css">
 </head>
 
-<body class="nav-sidebar floating nav-fixed">
+<body class="nav-sidebar floating nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -117,7 +289,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a href="../index.html" class="navbar-brand navbar-brand-logo">
-    <img src="../assets/starsim-logo.png" alt="" class="navbar-logo">
+    <img src="../assets/starsim-logo.png" alt="" class="navbar-logo light-content">
+    <img src="../assets/starsim-logo.png" alt="" class="navbar-logo dark-content">
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -139,8 +312,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">What’s new</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="../migration.html"> 
+<span class="menu-text">Migrating from v2</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="../tutorials.html"> 
 <span class="menu-text">Tutorials</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../user-guide/index.html"> 
+<span class="menu-text">User guide</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="../conduct.html"> 
@@ -165,7 +346,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/analysis.html"><strong>Modules</strong></a></li><li class="breadcrumb-item"><a href="../api/calibration.html">calibration</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/analyzers.html"><strong>Modules</strong></a></li><li class="breadcrumb-item"><a href="../api/calibration.html">calibration</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -200,14 +381,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/analysis.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">analysis</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../api/base.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">base</span></a>
+  <a href="../api/analyzers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">analyzers</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -218,8 +393,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../api/cross_genotype.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cross_genotype</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../api/defaults.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">defaults</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/demographics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">demographics</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -230,8 +417,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/immunity.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">immunity</span></a>
+  <a href="../api/hpv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">hpv</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -248,14 +435,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/parameters.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">parameters</span></a>
+  <a href="../api/network.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">network</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/people.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">people</span></a>
+  <a href="../api/parameters.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">parameters</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -266,14 +453,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/population.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">population</span></a>
+  <a href="../api/products.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">products</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../api/run.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">run</span></a>
+  <a href="../api/seeding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">seeding</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -320,32 +507,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#hpvsim.calibration" id="toc-hpvsim.calibration" class="nav-link active" data-scroll-target="#hpvsim.calibration">calibration</a>
   <ul>
+  <li><a href="#provides" id="toc-provides" class="nav-link" data-scroll-target="#provides">Provides</a></li>
   <li><a href="#classes" id="toc-classes" class="nav-link" data-scroll-target="#classes">Classes</a>
   <ul>
   <li><a href="#hpvsim.calibration.Calibration" id="toc-hpvsim.calibration.Calibration" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration">Calibration</a>
   <ul class="collapse">
-  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
-  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
   <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
   <ul class="collapse">
-  <li><a href="#hpvsim.calibration.Calibration.calibrate" id="toc-hpvsim.calibration.Calibration.calibrate" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.calibrate">calibrate</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.get_full_pars" id="toc-hpvsim.calibration.Calibration.get_full_pars" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.get_full_pars">get_full_pars</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.make_study" id="toc-hpvsim.calibration.Calibration.make_study" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.make_study">make_study</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.parse_study" id="toc-hpvsim.calibration.Calibration.parse_study" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.parse_study">parse_study</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.plot" id="toc-hpvsim.calibration.Calibration.plot" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.plot">plot</a></li>
   <li><a href="#hpvsim.calibration.Calibration.remove_db" id="toc-hpvsim.calibration.Calibration.remove_db" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.remove_db">remove_db</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.run_sim" id="toc-hpvsim.calibration.Calibration.run_sim" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.run_sim">run_sim</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.run_trial" id="toc-hpvsim.calibration.Calibration.run_trial" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.run_trial">run_trial</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.run_workers" id="toc-hpvsim.calibration.Calibration.run_workers" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.run_workers">run_workers</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.sim_to_sample_pars" id="toc-hpvsim.calibration.Calibration.sim_to_sample_pars" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.sim_to_sample_pars">sim_to_sample_pars</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.to_json" id="toc-hpvsim.calibration.Calibration.to_json" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.to_json">to_json</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.trial_pars_to_sim_pars" id="toc-hpvsim.calibration.Calibration.trial_pars_to_sim_pars" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.trial_pars_to_sim_pars">trial_pars_to_sim_pars</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.trial_to_sim_pars" id="toc-hpvsim.calibration.Calibration.trial_to_sim_pars" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.trial_to_sim_pars">trial_to_sim_pars</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.update_dict_pars" id="toc-hpvsim.calibration.Calibration.update_dict_pars" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.update_dict_pars">update_dict_pars</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.update_dict_pars_from_trial" id="toc-hpvsim.calibration.Calibration.update_dict_pars_from_trial" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.update_dict_pars_from_trial">update_dict_pars_from_trial</a></li>
-  <li><a href="#hpvsim.calibration.Calibration.update_dict_pars_init_and_bounds" id="toc-hpvsim.calibration.Calibration.update_dict_pars_init_and_bounds" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.update_dict_pars_init_and_bounds">update_dict_pars_init_and_bounds</a></li>
+  <li><a href="#hpvsim.calibration.Calibration.shrink" id="toc-hpvsim.calibration.Calibration.shrink" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.shrink">shrink</a></li>
   <li><a href="#hpvsim.calibration.Calibration.worker" id="toc-hpvsim.calibration.Calibration.worker" class="nav-link" data-scroll-target="#hpvsim.calibration.Calibration.worker">worker</a></li>
   </ul></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#functions" id="toc-functions" class="nav-link" data-scroll-target="#functions">Functions</a>
+  <ul>
+  <li><a href="#hpvsim.calibration.compute_gof" id="toc-hpvsim.calibration.compute_gof" class="nav-link" data-scroll-target="#hpvsim.calibration.compute_gof">compute_gof</a>
+  <ul class="collapse">
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  </ul></li>
+  <li><a href="#hpvsim.calibration.default_eval_fn" id="toc-hpvsim.calibration.default_eval_fn" class="nav-link" data-scroll-target="#hpvsim.calibration.default_eval_fn">default_eval_fn</a></li>
+  <li><a href="#hpvsim.calibration.make_calib_sims" id="toc-hpvsim.calibration.make_calib_sims" class="nav-link" data-scroll-target="#hpvsim.calibration.make_calib_sims">make_calib_sims</a>
+  <ul class="collapse">
+  <li><a href="#parameters-1" id="toc-parameters-1" class="nav-link" data-scroll-target="#parameters-1">Parameters</a></li>
+  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
+  <li><a href="#note" id="toc-note" class="nav-link" data-scroll-target="#note">Note</a></li>
   </ul></li>
   </ul></li>
   </ul></li>
@@ -353,7 +539,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="toc-actions"><ul><li><a href="https://github.com/starsimhub/hpvsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/analysis.html"><strong>Modules</strong></a></li><li class="breadcrumb-item"><a href="../api/calibration.html">calibration</a></li></ol></nav></header>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../api/analyzers.html"><strong>Modules</strong></a></li><li class="breadcrumb-item"><a href="../api/calibration.html">calibration</a></li></ol></nav></header>
+
 
 
 
@@ -361,7 +548,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="hpvsim.calibration" class="level1">
 <h1>calibration</h1>
 <p><a href="../api/calibration.html#hpvsim.calibration" title="0"><code>calibration</code></a></p>
-<p>Define the calibration class</p>
+<p>HPVsim calibration — ss.Calibration subclass with a weighted-gof eval.</p>
+<section id="provides" class="level2 doc-section doc-section-provides">
+<h2 class="doc-section doc-section-provides anchored" data-anchor-id="provides">Provides</h2>
+<ul>
+<li>hpv.Calibration: ss.Calibration subclass that takes <code>data</code> (a standardized wide DataFrame, a dict of pre-scoped DataFrames, or a list of CSV paths / long-format DataFrames — all normalized via <a href="../api/data.loaders.html#hpvsim.data.loaders.load_calib_data" title="0"><code>hpv.data.loaders.load_calib_data</code></a>) and computes a single weighted mismatch using <code>compute_gof</code>.</li>
+<li>compute_gof: goodness-of-fit between actual and predicted arrays.</li>
+<li>build_sim: default build_fn that routes flat dotted-key calib_pars to sim.pars, sim.diseases[<genotype>].pars, or the CrossImmunity connector.</genotype></li>
+</ul>
+<p>Standardized <code>data</code> DataFrame: index=‘t’ (float years), columns dot-scoped: - <code>all_hpv.&lt;name&gt;</code> scalar-per-year pooled target; looked up on <code>sim.results.all_hpv</code> (HPVTotal) at eval time (e.g.&nbsp;<code>all_hpv.asr_cancer_incidence</code>). - <code>all_hpv.&lt;name&gt;.&lt;bin&gt;</code> age-stratified pooled target; looked up on the auto-attached <code>all_hpv_by_age</code> <a href="../api/analyzers.html#hpvsim.analyzers.by_age" title="0"><code>by_age</code></a> analyzer (e.g.&nbsp;<code>all_hpv.cancers.0-15</code>). - <code>by_genotype.&lt;name&gt;.&lt;g&gt;</code> per-genotype distribution target; computed at eval time via <a href="../api/analyzers.html#hpvsim.analyzers.results_by_genotype" title="0"><code>hpv.results_by_genotype</code></a>.</p>
+</section>
 <section id="classes" class="level2">
 <h2 class="anchored" data-anchor-id="classes">Classes</h2>
 <table class="caption-top table">
@@ -374,206 +570,38 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td><a href="#hpvsim.calibration.Calibration">Calibration</a></td>
-<td>A class to handle calibration of HPVsim simulations. Uses the Optuna hyperparameter</td>
+<td>HPVsim calibration. Delegates to ss.Calibration with HPV-aware defaults.</td>
 </tr>
 </tbody>
 </table>
 <section id="hpvsim.calibration.Calibration" class="level3">
 <h3 class="anchored" data-anchor-id="hpvsim.calibration.Calibration">Calibration</h3>
-<div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration(</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    sim,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    datafiles,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    calib_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    genotype_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    hiv_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    fit_args<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    extra_sim_result_keys<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    par_samplers<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    n_trials<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    n_workers<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    total_trials<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    db_name<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    estimator<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    keep_db<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    rand_seed<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    sampler<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    die<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    verbose<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>A class to handle calibration of HPVsim simulations. Uses the Optuna hyperparameter optimization library (optuna.org), which must be installed separately (via pip install optuna).</p>
-<p>Note: running a calibration does not guarantee a good fit! You must ensure that you run for a sufficient number of iterations, have enough free parameters, and that the parameters have wide enough bounds. Please see the tutorial on calibration for more information.</p>
-<section id="parameters" class="level4 doc-section doc-section-parameters">
-<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 15%">
-<col style="width: 4%">
-<col style="width: 73%">
-<col style="width: 6%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>sim (Sim)</td>
-<td></td>
-<td>the simulation to calibrate</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>datafiles (list)</td>
-<td></td>
-<td>list of datafile strings to calibrate to</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>calib_pars (dict)</td>
-<td></td>
-<td>a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>genotype_pars(dict)</td>
-<td></td>
-<td>a dictionary of the genotype-specific parameters to calibrate of the format dict(genotype=dict(key1=[best, low, high]))</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>hiv_pars (dict)</td>
-<td></td>
-<td>a dictionary of the hiv-specific parameters to calibrate of the format dict(key1=[best, low, high])</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>extra_sim_results (list)</td>
-<td></td>
-<td>list of result strings to store</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>fit_args (dict)</td>
-<td></td>
-<td>a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>par_samplers (dict)</td>
-<td></td>
-<td>an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_float</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>n_trials (int)</td>
-<td></td>
-<td>the number of trials per worker</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>n_workers (int)</td>
-<td></td>
-<td>the number of parallel workers (default: maximum</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>total_trials (int)</td>
-<td></td>
-<td>if n_trials is not supplied, calculate by dividing this number by n_workers)</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>name (str)</td>
-<td></td>
-<td>the name of the database (default: ‘hpvsim_calibration’)</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>db_name (str)</td>
-<td></td>
-<td>the name of the database file (default: ‘hpvsim_calibration.db’)</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>keep_db (bool)</td>
-<td></td>
-<td>whether to keep the database after calibration (default: false)</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>storage (str)</td>
-<td></td>
-<td>the location of the database (default: sqlite)</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>rand_seed (int)</td>
-<td></td>
-<td>if provided, use this random seed to initialize Optuna runs (for reproducibility)</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>label (str)</td>
-<td></td>
-<td>a label for this calibration object</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>die (bool)</td>
-<td></td>
-<td>whether to stop if an exception is encountered (default: false)</td>
-<td><em>required</em></td>
-</tr>
-<tr class="odd">
-<td>verbose (bool)</td>
-<td></td>
-<td>whether to print details of the calibration</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>kwargs (dict)</td>
-<td></td>
-<td>passed to hpv.Calibration()</td>
-<td><em>required</em></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="returns" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td></td>
-<td>A Calibration object</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Example</strong>::</p>
-<pre><code>sim = hpv.Sim(pars, genotypes=[16, 18])
-calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
-calib = hpv.Calibration(sim, calib_pars=calib_pars,
-                        datafiles=['test_data/south_africa_hpv_data.xlsx',
-                                   'test_data/south_africa_cancer_data.xlsx'],
-                        total_trials=10, n_workers=4)
-calib.calibrate()
-calib.plot()</code></pre>
-</section>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    calib_pars,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    weights<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    gof_kwargs<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    build_fn<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    eval_fn<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    eval_kw<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>HPVsim calibration. Delegates to ss.Calibration with HPV-aware defaults.</p>
+<p>Three entry points to specify the fit target:</p>
+<ul>
+<li><code>datafiles=['data/foo_cancer_cases.csv', ...]</code>: list of long-format CSV paths (columns <code>year,name,[age,sex,genotype,]value</code>). The loader dispatches on stratification columns: files with an <code>age</code> column go to a shared <a href="../api/analyzers.html#hpvsim.analyzers.by_age" title="0"><code>by_age</code></a> analyzer named <code>'calib_by_age'</code> (attached to <code>sim.pars.analyzers</code> if not already there); <a href="../api/analyzers.html#hpvsim.analyzers.by_age" title="0"><code>by_age</code></a> result keys then live under the scoped data key <code>'calib_by_age.&lt;name&gt;'</code>. Ages and years are derived from the data itself. Genotype-stratified files (no <code>age</code> column) are reserved for <code>'calib_by_genotype.&lt;name&gt;'</code> but not yet wired up (<a href="https://docs.python.org/3/builtins/exceptions.html#NotImplementedError" title="1"><code>NotImplementedError</code></a>).</li>
+<li><code>data={'calib_by_age.cancers': df, ...}</code>: pre-built dict of ‘t’-indexed DataFrames. Keys are <code>'&lt;analyzer_name&gt;.&lt;result_key&gt;'</code> (scoped) or a bare result key that unambiguously matches a single <a href="../api/analyzers.html#hpvsim.analyzers.by_age" title="0"><code>by_age</code></a> analyzer on the sim. The default eval_fn extracts each, aligns on <code>(index, columns)</code>, and sums <code>compute_gof</code> across all cells, scaled by per-key <code>weights</code>.</li>
+<li><code>components=[...]</code> or a custom <code>eval_fn</code>: standard ss.Calibration paths, unchanged.</li>
+</ul>
+<p><code>calib_pars</code> is a nested dict grouped by scope, with <strong>list</strong> leaves <code>[best, low, high, step]</code> (step optional). <a href="https://docs.sciris.org/api/sc_nested.html#sciris.sc_nested.flattendict" title="0"><code>sc.flattendict</code></a> collapses the scope tree to <a href="https://docs.starsim.org/api/calibration.html#starsim.calibration.Calibration" title="0"><code>ss.Calibration</code></a>’s flat dotted-key form::</p>
+<pre><code>calib_pars = dict(
+    beta=[0.2, 0.1, 0.34, 0.02],
+    network=dict(m_partners_casual=[0.5, 0.1, 0.9, 0.05]),
+    hi5=dict(cin_fn=dict(k=[0.15, 0.1, 0.25, 0.02])),
+)</code></pre>
+<p>Default build_fn is <code>hpv.calibration.build_sim</code> (<a href="../api/parameters.html#hpvsim.parameters.route_pars" title="0"><code>route_pars</code></a>); it accepts the flattened dotted keys and routes them.</p>
 <section id="methods" class="level4">
 <h4 class="anchored" data-anchor-id="methods">Methods</h4>
 <table class="caption-top table">
@@ -585,308 +613,259 @@ calib.plot()</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.calibrate">calibrate</a></td>
-<td>Actually perform calibration.</td>
-</tr>
-<tr class="even">
-<td><a href="#hpvsim.calibration.Calibration.get_full_pars">get_full_pars</a></td>
-<td>Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration</td>
-</tr>
-<tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.make_study">make_study</a></td>
-<td>Make a study, deleting one if it already exists</td>
-</tr>
-<tr class="even">
-<td><a href="#hpvsim.calibration.Calibration.parse_study">parse_study</a></td>
-<td>Parse the study into a data frame – called automatically</td>
-</tr>
-<tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.plot">plot</a></td>
-<td>Plot the calibration results</td>
-</tr>
-<tr class="even">
 <td><a href="#hpvsim.calibration.Calibration.remove_db">remove_db</a></td>
-<td>Remove the database file if keep_db is false and the path exists.</td>
-</tr>
-<tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.run_sim">run_sim</a></td>
-<td>Create and run a simulation</td>
+<td>Skip cleanup when <code>self.run_args.storage</code> isn’t a string URL</td>
 </tr>
 <tr class="even">
-<td><a href="#hpvsim.calibration.Calibration.run_trial">run_trial</a></td>
-<td>Define the objective for Optuna</td>
-</tr>
-<tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.run_workers">run_workers</a></td>
-<td>Run multiple workers in parallel</td>
-</tr>
-<tr class="even">
-<td><a href="#hpvsim.calibration.Calibration.sim_to_sample_pars">sim_to_sample_pars</a></td>
-<td>Convert sim pars to sample pars</td>
-</tr>
-<tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.to_json">to_json</a></td>
-<td>Convert the data to JSON.</td>
-</tr>
-<tr class="even">
-<td><a href="#hpvsim.calibration.Calibration.trial_pars_to_sim_pars">trial_pars_to_sim_pars</a></td>
-<td>Create genotype_pars and pars dicts from the trial parameters.</td>
-</tr>
-<tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.trial_to_sim_pars">trial_to_sim_pars</a></td>
-<td>Take in an optuna trial and sample from pars, after extracting them from the structure they’re provided in</td>
-</tr>
-<tr class="even">
-<td><a href="#hpvsim.calibration.Calibration.update_dict_pars">update_dict_pars</a></td>
-<td>Function to update parameters from nested dict to nested dict’s value</td>
-</tr>
-<tr class="odd">
-<td><a href="#hpvsim.calibration.Calibration.update_dict_pars_from_trial">update_dict_pars_from_trial</a></td>
-<td>Function to update parameters from nested dict to trial parameter’s value</td>
-</tr>
-<tr class="even">
-<td><a href="#hpvsim.calibration.Calibration.update_dict_pars_init_and_bounds">update_dict_pars_init_and_bounds</a></td>
-<td>Function to update initial parameters and parameter bounds from a trial pars dict</td>
+<td><a href="#hpvsim.calibration.Calibration.shrink">shrink</a></td>
+<td>Return a lightweight <a href="https://docs.sciris.org/api/sc_odict.html#sciris.sc_odict.objdict" title="0"><code>sc.objdict</code></a> with the top-<code>n_results</code></td>
 </tr>
 <tr class="odd">
 <td><a href="#hpvsim.calibration.Calibration.worker">worker</a></td>
-<td>Run a single worker</td>
+<td>Run a single worker.</td>
 </tr>
 </tbody>
 </table>
-<section id="hpvsim.calibration.Calibration.calibrate" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.calibrate">calibrate</h5>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.calibrate(</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    calib_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    genotype_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    hiv_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    verbose<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    load<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    tidyup<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Actually perform calibration.</p>
-<section id="parameters-1" class="level6 doc-section doc-section-parameters">
-<h6 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h6>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>calib_pars</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>if supplied, overwrite stored calib_pars</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="even">
-<td>verbose</td>
-<td><a href="https://docs.python.org/3/library/functions.html#bool">bool</a></td>
-<td>whether to print output from each trial</td>
-<td><a href="https://docs.python.org/3/library/constants.html#True" title="1"><code>True</code></a></td>
-</tr>
-<tr class="odd">
-<td>kwargs</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>if supplied, overwrite stored run_args (n_trials, n_workers, etc.)</td>
-<td><code>{}</code></td>
-</tr>
-</tbody>
-</table>
-</section>
-</section>
-<section id="hpvsim.calibration.Calibration.get_full_pars" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.get_full_pars">get_full_pars</h5>
-<div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.get_full_pars(</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    sim<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    calib_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    genotype_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    hiv_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration</p>
-</section>
-<section id="hpvsim.calibration.Calibration.make_study" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.make_study">make_study</h5>
-<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.make_study()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Make a study, deleting one if it already exists</p>
-</section>
-<section id="hpvsim.calibration.Calibration.parse_study" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.parse_study">parse_study</h5>
-<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.parse_study(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Parse the study into a data frame – called automatically</p>
-</section>
-<section id="hpvsim.calibration.Calibration.plot" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.plot">plot</h5>
-<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.plot(</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    res_to_plot<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    fig_args<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    axis_args<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    data_args<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    show_args<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    do_save<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    fig_path<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    do_show<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    plot_type<span class="op">=</span><span class="st">'sns.boxplot'</span>,</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Plot the calibration results</p>
-<section id="parameters-2" class="level6 doc-section doc-section-parameters">
-<h6 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-2">Parameters</h6>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>res_to_plot</td>
-<td><a href="https://docs.python.org/3/library/functions.html#int">int</a></td>
-<td>number of results to plot. if None, plot them all</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="even">
-<td>fig_args</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>passed to pl.figure()</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="odd">
-<td>axis_args</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>passed to pl.subplots_adjust()</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="even">
-<td>data_args</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>‘width’, ‘color’, and ‘offset’ arguments for the data</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="odd">
-<td>do_save</td>
-<td><a href="https://docs.python.org/3/library/functions.html#bool">bool</a></td>
-<td>whether to save</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="even">
-<td>fig_path</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#str">str</a> or <code>filepath</code></td>
-<td>filepath to save to</td>
-<td><a href="https://docs.python.org/3/library/constants.html#None" title="1"><code>None</code></a></td>
-</tr>
-<tr class="odd">
-<td>do_show</td>
-<td><a href="https://docs.python.org/3/library/functions.html#bool">bool</a></td>
-<td>whether to show the figure</td>
-<td><a href="https://docs.python.org/3/library/constants.html#True" title="1"><code>True</code></a></td>
-</tr>
-<tr class="even">
-<td>kwargs</td>
-<td><a href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></td>
-<td>passed to <code>hpv.options.with_style()</code>; see that function for choices</td>
-<td><code>{}</code></td>
-</tr>
-</tbody>
-</table>
-</section>
-</section>
 <section id="hpvsim.calibration.Calibration.remove_db" class="level5">
 <h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.remove_db">remove_db</h5>
-<div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.remove_db()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Remove the database file if keep_db is false and the path exists.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.remove_db()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Skip cleanup when <code>self.run_args.storage</code> isn’t a string URL (parent’s <code>'sqlite' in storage</code> check errors on a Storage object). Each hpv.Calibration gets its own tempdir per instance, so there’s no cross-run pollution to worry about.</p>
 </section>
-<section id="hpvsim.calibration.Calibration.run_sim" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.run_sim">run_sim</h5>
-<div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.run_sim(</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    calib_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    genotype_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    hiv_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    return_sim<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Create and run a simulation</p>
-</section>
-<section id="hpvsim.calibration.Calibration.run_trial" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.run_trial">run_trial</h5>
-<div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.run_trial(trial, save<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Define the objective for Optuna</p>
-</section>
-<section id="hpvsim.calibration.Calibration.run_workers" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.run_workers">run_workers</h5>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.run_workers()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Run multiple workers in parallel</p>
-</section>
-<section id="hpvsim.calibration.Calibration.sim_to_sample_pars" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.sim_to_sample_pars">sim_to_sample_pars</h5>
-<div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.sim_to_sample_pars()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Convert sim pars to sample pars</p>
-</section>
-<section id="hpvsim.calibration.Calibration.to_json" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.to_json">to_json</h5>
-<div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.to_json(filename<span class="op">=</span><span class="va">None</span>, indent<span class="op">=</span><span class="dv">2</span>, <span class="op">**</span>kwargs)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Convert the data to JSON.</p>
-</section>
-<section id="hpvsim.calibration.Calibration.trial_pars_to_sim_pars" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.trial_pars_to_sim_pars">trial_pars_to_sim_pars</h5>
-<div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.trial_pars_to_sim_pars(</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    trial_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    which_pars<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    return_full<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Create genotype_pars and pars dicts from the trial parameters. Note: not used during self.calibrate. Args: trial_pars (dict): dictionary of parameters from a single trial. If not provided, best parameters will be used return_full (bool): whether to return a unified par dict ready for use in a sim, or the sim pars and genotype pars separately</p>
-<p><strong>Example</strong>::</p>
-<pre><code>sim = hpv.Sim(genotypes=[16, 18])
-calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
-genotype_pars = dict(hpv16=dict(prog_time=[3, 3, 10]))
-calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars
-                    datafiles=['test_data/south_africa_hpv_data.xlsx',
-                               'test_data/south_africa_cancer_data.xlsx'],
-                    total_trials=10, n_workers=4)
-calib.calibrate()
-new_pars = calib.trial_pars_to_sim_pars() # Returns best parameters from calibration in a format ready for sim running
-sim.update_pars(new_pars)
-sim.run()</code></pre>
-</section>
-<section id="hpvsim.calibration.Calibration.trial_to_sim_pars" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.trial_to_sim_pars">trial_to_sim_pars</h5>
-<div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.trial_to_sim_pars(pardict<span class="op">=</span><span class="va">None</span>, trial<span class="op">=</span><span class="va">None</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Take in an optuna trial and sample from pars, after extracting them from the structure they’re provided in</p>
-</section>
-<section id="hpvsim.calibration.Calibration.update_dict_pars" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.update_dict_pars">update_dict_pars</h5>
-<div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.update_dict_pars(name_pars, value_pars)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Function to update parameters from nested dict to nested dict’s value</p>
-</section>
-<section id="hpvsim.calibration.Calibration.update_dict_pars_from_trial" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.update_dict_pars_from_trial">update_dict_pars_from_trial</h5>
-<div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.update_dict_pars_from_trial(name_pars, value_pars)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Function to update parameters from nested dict to trial parameter’s value</p>
-</section>
-<section id="hpvsim.calibration.Calibration.update_dict_pars_init_and_bounds" class="level5">
-<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.update_dict_pars_init_and_bounds">update_dict_pars_init_and_bounds</h5>
-<div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.update_dict_pars_init_and_bounds(</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    initial_pars,</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    par_bounds,</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    target_pars,</span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Function to update initial parameters and parameter bounds from a trial pars dict</p>
+<section id="hpvsim.calibration.Calibration.shrink" class="level5">
+<h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.shrink">shrink</h5>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.shrink(n_results<span class="op">=</span><span class="dv">100</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Return a lightweight <a href="https://docs.sciris.org/api/sc_odict.html#sciris.sc_odict.objdict" title="0"><code>sc.objdict</code></a> with the top-<code>n_results</code> trials (by mismatch) + the metadata needed to replot / rebuild sims.</p>
+<p>Use for committing calibration results to source control: a full 1000-5000-trial <code>calib.obj</code> is many MB (Optuna study, tempdir storage refs, per-trial state); the shrunken version drops all of that while remaining a drop-in for <a href="../api/plotting.html#hpvsim.plotting.plot_calibration" title="0"><code>hpv.plot_calibration</code></a> and <code>utils.run_top_n</code>.</p>
+<p>Preserved attributes (accessed by plotting/rebuild code paths): - <code>df</code> : top-N rows of the trial DataFrame, sorted by mismatch ascending. - <code>best_pars</code> : the best-fit par dict. - <code>eval_kw</code> : the eval kwargs (holds <code>data</code> for plotting). - <code>calib_pars</code> : the Optuna spec dict. - <code>build_fn</code> : how to reconstruct a sim from a par set. - <code>build_kw</code> : build_fn kwargs (defaults to <code>{}</code>). - <a href="../api/sim.html#hpvsim.sim" title="0"><code>sim</code></a> : base sim template.</p>
 </section>
 <section id="hpvsim.calibration.Calibration.worker" class="level5">
 <h5 class="anchored" data-anchor-id="hpvsim.calibration.Calibration.worker">worker</h5>
-<div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.worker()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Run a single worker</p>
-
-
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>calibration.Calibration.worker()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Run a single worker.</p>
+<p>Mirrors <code>stisim.Calibration.worker</code>: wraps <code>study.optimize</code> in a try/except so a single worker’s transient Optuna storage failure does not propagate through Optuna’s own error handler and trip its <code>assert False, 'Should not reach.'</code>, taking the whole run down. Upstream <a href="https://docs.starsim.org/api/calibration.html#starsim.calibration.Calibration.worker" title="0"><code>ss.Calibration.worker</code></a> calls <code>study.optimize</code> bare.</p>
 </section>
+</section>
+</section>
+</section>
+<section id="functions" class="level2">
+<h2 class="anchored" data-anchor-id="functions">Functions</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#hpvsim.calibration.compute_gof">compute_gof</a></td>
+<td>Goodness-of-fit between two arrays — normalized absolute error by default.</td>
+</tr>
+<tr class="even">
+<td><a href="#hpvsim.calibration.default_eval_fn">default_eval_fn</a></td>
+<td>Weighted sum of <code>compute_gof</code> across each column of <code>data</code>.</td>
+</tr>
+<tr class="odd">
+<td><a href="#hpvsim.calibration.make_calib_sims">make_calib_sims</a></td>
+<td>Rerun the top-<code>n</code> trials from a <a href="../api/calibration.html#hpvsim.calibration.Calibration" title="0"><code>hpv.Calibration</code></a> in parallel.</td>
+</tr>
+</tbody>
+</table>
+<section id="hpvsim.calibration.compute_gof" class="level3">
+<h3 class="anchored" data-anchor-id="hpvsim.calibration.compute_gof">compute_gof</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>calibration.compute_gof(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    actual,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    predicted,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    normalize<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    use_frac<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    use_squared<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    as_scalar<span class="op">=</span><span class="st">'none'</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    eps<span class="op">=</span><span class="fl">1e-09</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    skestimator<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    estimator<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">**</span>kwargs,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Goodness-of-fit between two arrays — normalized absolute error by default.</p>
+<p>Mean squared error is <code>normalize=False, use_squared=True, as_scalar='mean'</code>.</p>
+<section id="parameters" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>actual</td>
+<td></td>
+<td>array of observed (data) points.</td>
+<td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>predicted</td>
+<td></td>
+<td>array of model points; same shape as <code>actual</code>.</td>
+<td><em>required</em></td>
+</tr>
+<tr class="odd">
+<td>normalize</td>
+<td></td>
+<td>if True, divide errors by <code>max(\|actual\|)</code>.</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#True" title="1"><code>True</code></a></td>
+</tr>
+<tr class="even">
+<td>use_frac</td>
+<td></td>
+<td>if True, divide each error by <code>max(actual, predicted) + eps</code> instead of normalizing by the global max.</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#False" title="1"><code>False</code></a></td>
+</tr>
+<tr class="odd">
+<td>use_squared</td>
+<td></td>
+<td>if True, square the per-point errors.</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#False" title="1"><code>False</code></a></td>
+</tr>
+<tr class="even">
+<td>as_scalar</td>
+<td></td>
+<td>collapse to a scalar via <code>'sum'</code> / <code>'mean'</code> / <code>'median'</code>; <code>'none'</code> returns the per-point array.</td>
+<td><code>'none'</code></td>
+</tr>
+<tr class="odd">
+<td>eps</td>
+<td></td>
+<td>small constant guarding the <code>use_frac</code> denominator.</td>
+<td><code>1e-09</code></td>
+</tr>
+<tr class="even">
+<td>skestimator</td>
+<td></td>
+<td>scikit-learn metric name (e.g.&nbsp;<code>'mean_squared_error'</code>).</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="odd">
+<td>estimator</td>
+<td></td>
+<td>user-supplied callable <code>(actual, predicted, **kwargs)</code>.</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>kwargs</td>
+<td></td>
+<td>forwarded to the scikit-learn / custom estimator.</td>
+<td><code>{}</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="hpvsim.calibration.default_eval_fn" class="level3">
+<h3 class="anchored" data-anchor-id="hpvsim.calibration.default_eval_fn">default_eval_fn</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>calibration.default_eval_fn(sim, data, weights<span class="op">=</span><span class="va">None</span>, gof_kwargs<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Weighted sum of <code>compute_gof</code> across each column of <code>data</code>.</p>
+<p><code>data</code> is a wide DataFrame (index=‘t’, dot-scoped columns). For each column, sim-side values are extracted via <code>_extract_columns</code>, NaN cells in <code>data</code> are skipped, and per-column mismatches are weighted by <code>weights.get(column_name, 1.0)</code> before summing.</p>
+</section>
+<section id="hpvsim.calibration.make_calib_sims" class="level3">
+<h3 class="anchored" data-anchor-id="hpvsim.calibration.make_calib_sims">make_calib_sims</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>calibration.make_calib_sims(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    calib,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    n<span class="op">=</span><span class="dv">50</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    sim_kwargs<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    analyzers<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    extract_fn<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    n_workers<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Rerun the top-<code>n</code> trials from a <a href="../api/calibration.html#hpvsim.calibration.Calibration" title="0"><code>hpv.Calibration</code></a> in parallel.</p>
+<p>A <a href="../api/calibration.html#hpvsim.calibration.Calibration" title="0"><code>hpv.Calibration</code></a> stores per-trial <code>mismatch</code> + eval-column values, not per-trial sim results. To inspect any other result (e.g.&nbsp;the <code>asr_cancer_incidence</code> trajectory, or a custom by_age analyzer output), rerun the top-<code>n</code> best-fit trials with this helper and read <code>sim.results</code> / <code>sim.analyzers</code> from the returned sims.</p>
+<section id="parameters-1" class="level4 doc-section doc-section-parameters">
+<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>calib</td>
+<td></td>
+<td>hpv.Calibration (or the shrunk sc.objdict from <code>calib.shrink()</code> — both expose <code>df</code>, <code>calib_pars</code>, <code>build_fn</code>, <code>build_kw</code>, <a href="../api/sim.html#hpvsim.sim" title="0"><code>sim</code></a>).</td>
+<td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>n</td>
+<td><a href="https://docs.python.org/3/builtins/functions.html#int">int</a></td>
+<td>number of best-mismatch trials to rerun; clamped to <code>len(calib.df)</code>.</td>
+<td><code>50</code></td>
+</tr>
+<tr class="odd">
+<td>sim_kwargs</td>
+<td><a href="https://docs.python.org/3/builtins/stdtypes.html#dict">dict</a></td>
+<td>overrides applied to <code>sim.pars</code> before <code>build_fn</code> (e.g.&nbsp;<code>dict(stop=2045)</code> to project past the calibration window).</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>analyzers</td>
+<td></td>
+<td>zero-arg callable returning a fresh list of Analyzer instances (recommended so each subprocess gets its own state), OR a list of instances (deep-copied per worker). Appended to any analyzers the Calibration already attached to the base sim.</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="odd">
+<td>extract_fn</td>
+<td><a href="https://docs.python.org/3/builtins/functions.html#callable">callable</a></td>
+<td>if provided, worker returns <code>extract_fn(sim)</code> instead of the full sim. Strongly recommended — see the note below.</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+<tr class="even">
+<td>n_workers</td>
+<td><a href="https://docs.python.org/3/builtins/functions.html#int">int</a></td>
+<td>defaults to <code>min(n, cpu_count())</code>.</td>
+<td><a href="https://docs.python.org/3/builtins/constants.html#None" title="1"><code>None</code></a></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="returns" class="level4 doc-section doc-section-returns">
+<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 81%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td></td>
+<td></td>
+<td>list of length <code>min(n, len(calib.df))</code>: run sims if <code>extract_fn</code></td>
+</tr>
+<tr class="even">
+<td></td>
+<td></td>
+<td>is None, else the extract_fn outputs.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="note" class="level4 doc-section doc-section-note">
+<h4 class="doc-section doc-section-note anchored" data-anchor-id="note">Note</h4>
+<p>Full sims are memory-heavy (each holds people arrays, edge tables, results, analyzers). For <code>n=50</code> this can be many GB in the parent process after <a href="https://docs.sciris.org/api/sc_parallel.html#sciris.sc_parallel.parallelize" title="0"><code>sc.parallelize</code></a> pickles them back. Standard practice: pass an <code>extract_fn</code> that returns a small dict / DataFrame / array (use <a href="https://docs.starsim.org/api/results.html#starsim.results.Result.to_df" title="0"><code>ss.Result.to_df</code></a> or <a href="https://docs.starsim.org/api/results.html#starsim.results.Result.annualize" title="0"><code>ss.Result.annualize</code></a> for time-series results), then commit that extracted output rather than the raw sims.</p>
+
+
 </section>
 </section>
 </section>
@@ -894,380 +873,256 @@ sim.run()</code></pre>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
     }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const disableStylesheet = (stylesheets) => {
-    for (let i=0; i < stylesheets.length; i++) {
-      const stylesheet = stylesheets[i];
-      stylesheet.rel = 'prefetch';
-    }
-  }
-  const enableStylesheet = (stylesheets) => {
-    for (let i=0; i < stylesheets.length; i++) {
-      const stylesheet = stylesheets[i];
-      stylesheet.rel = 'stylesheet';
-    }
-  }
-  const manageTransitions = (selector, allowTransitions) => {
-    const els = window.document.querySelectorAll(selector);
-    for (let i=0; i < els.length; i++) {
-      const el = els[i];
-      if (allowTransitions) {
-        el.classList.remove('notransition');
-      } else {
-        el.classList.add('notransition');
-      }
-    }
-  }
-  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
-    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
-    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
-    let newTheme = '';
-    if(darkModeDefault) {
-      newTheme = isAlternate ? baseTheme : alternateTheme;
-    } else {
-      newTheme = isAlternate ? alternateTheme : baseTheme;
-    }
-    const changeGiscusTheme = () => {
-      // From: https://github.com/giscus/giscus/issues/336
-      const sendMessage = (message) => {
-        const iframe = document.querySelector('iframe.giscus-frame');
-        if (!iframe) return;
-        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
-      }
-      sendMessage({
-        setConfig: {
-          theme: newTheme
-        }
-      });
-    }
-    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
-    if (isGiscussLoaded) {
-      changeGiscusTheme();
-    }
-  }
-  const toggleColorMode = (alternate) => {
-    // Switch the stylesheets
-    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
-    manageTransitions('#quarto-margin-sidebar .nav-link', false);
-    if (alternate) {
-      enableStylesheet(alternateStylesheets);
-      for (const sheetNode of alternateStylesheets) {
-        if (sheetNode.id === "quarto-bootstrap") {
-          toggleBodyColorMode(sheetNode);
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
         }
       }
-    } else {
-      disableStylesheet(alternateStylesheets);
-      toggleBodyColorPrimary();
-    }
-    manageTransitions('#quarto-margin-sidebar .nav-link', true);
-    // Switch the toggles
-    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
-    for (let i=0; i < toggles.length; i++) {
-      const toggle = toggles[i];
-      if (toggle) {
-        if (alternate) {
-          toggle.classList.add("alternate");     
-        } else {
-          toggle.classList.remove("alternate");
-        }
-      }
-    }
-    // Hack to workaround the fact that safari doesn't
-    // properly recolor the scrollbar when toggling (#1455)
-    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
-      manageTransitions("body", false);
-      window.scrollTo(0, 1);
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-        manageTransitions("body", true);
-      }, 40);  
-    }
-  }
-  const isFileUrl = () => { 
-    return window.location.protocol === 'file:';
-  }
-  const hasAlternateSentinel = () => {  
-    let styleSentinel = getColorSchemeSentinel();
-    if (styleSentinel !== null) {
-      return styleSentinel === "alternate";
-    } else {
       return false;
     }
-  }
-  const setStyleSentinel = (alternate) => {
-    const value = alternate ? "alternate" : "default";
-    if (!isFileUrl()) {
-      window.localStorage.setItem("quarto-color-scheme", value);
-    } else {
-      localAlternateSentinel = value;
-    }
-  }
-  const getColorSchemeSentinel = () => {
-    if (!isFileUrl()) {
-      const storageValue = window.localStorage.getItem("quarto-color-scheme");
-      return storageValue != null ? storageValue : localAlternateSentinel;
-    } else {
-      return localAlternateSentinel;
-    }
-  }
-  const darkModeDefault = false;
-  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
-  // Dark / light mode switch
-  window.quartoToggleColorScheme = () => {
-    // Read the current dark / light value 
-    let toAlternate = !hasAlternateSentinel();
-    toggleColorMode(toAlternate);
-    setStyleSentinel(toAlternate);
-    toggleGiscusIfUsed(toAlternate, darkModeDefault);
-  };
-  // Ensure there is a toggle, if there isn't float one in the top right
-  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
-    const a = window.document.createElement('a');
-    a.classList.add('top-right');
-    a.classList.add('quarto-color-scheme-toggle');
-    a.href = "";
-    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
-    const i = window.document.createElement("i");
-    i.classList.add('bi');
-    a.appendChild(i);
-    window.document.body.appendChild(a);
-  }
-  // Switch to dark mode if need be
-  if (hasAlternateSentinel()) {
-    toggleColorMode(true);
-  } else {
-    toggleColorMode(false);
-  }
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
       }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
     }
-    return false;
-  }
-  const onCopySuccess = function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
-      }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  }
-  const getTextToCopy = function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
         }
       }
       return codeEl.innerText;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
-    text: getTextToCopy
-  });
-  clipboard.on('success', onCopySuccess);
-  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
-      text: getTextToCopy,
-      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-    clipboardModal.on('success', onCopySuccess);
-  }
-    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
-    var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp('/' + window.location.host + '/');
-    var isInternal = (href) => {
-        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-    // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
-    for (var i=0; i<links.length; i++) {
-      const link = links[i];
-      if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
-    }
-  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
-    const config = {
-      allowHTML: true,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start',
-    };
-    if (contentFn) {
-      config.content = contentFn;
-    }
-    if (onTriggerFn) {
-      config.onTrigger = onTriggerFn;
-    }
-    if (onUntriggerFn) {
-      config.onUntrigger = onUntriggerFn;
-    }
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
-    });
-  }
-  const xrefs = window.document.querySelectorAll('a.quarto-xref');
-  const processXRef = (id, note) => {
-    // Strip column container classes
-    const stripColumnClz = (el) => {
-      el.classList.remove("page-full", "page-columns");
-      if (el.children) {
-        for (const child of el.children) {
-          stripColumnClz(child);
-        }
-      }
-    }
-    stripColumnClz(note)
-    if (id === null || id.startsWith('sec-')) {
-      // Special case sections, only their first couple elements
-      const container = document.createElement("div");
-      if (note.children && note.children.length > 2) {
-        container.appendChild(note.children[0].cloneNode(true));
-        for (let i = 1; i < note.children.length; i++) {
-          const child = note.children[i];
-          if (child.tagName === "P" && child.innerText === "") {
-            continue;
-          } else {
-            container.appendChild(child.cloneNode(true));
-            break;
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
         }
-        if (window.Quarto?.typesetMath) {
-          window.Quarto.typesetMath(container);
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
         }
-        return container.innerHTML
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
       } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
         if (window.Quarto?.typesetMath) {
           window.Quarto.typesetMath(note);
         }
-        return note.innerHTML;
-      }
-    } else {
-      // Remove any anchor links if they are present
-      const anchorLink = note.querySelector('a.anchorjs-link');
-      if (anchorLink) {
-        anchorLink.remove();
-      }
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(note);
-      }
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
       }
     }
-  }
-  for (var i=0; i<xrefs.length; i++) {
-    const xref = xrefs[i];
-    tippyHover(xref, undefined, function(instance) {
-      instance.disable();
-      let url = xref.getAttribute('href');
-      let hash = undefined; 
-      if (url.startsWith('#')) {
-        hash = url;
-      } else {
-        try { hash = new URL(url).hash; } catch {}
-      }
-      if (hash) {
-        const id = hash.replace(/^#\/?/, "");
-        const note = window.document.getElementById(id);
-        if (note !== null) {
-          try {
-            const html = processXRef(id, note.cloneNode(true));
-            instance.setContent(html);
-          } finally {
-            instance.enable();
-            instance.show();
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
           }
         } else {
-          // See if we can fetch this
-          fetch(url.split('#')[0])
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
           .then(res => res.text())
           .then(html => {
             const parser = new DOMParser();
             const htmlDoc = parser.parseFromString(html, "text/html");
-            const note = htmlDoc.getElementById(id);
+            const note = htmlDoc.querySelector('main.content');
             if (note !== null) {
-              const html = processXRef(id, note);
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
               instance.setContent(html);
             } 
           }).finally(() => {
@@ -1275,194 +1130,170 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             instance.show();
           });
         }
-      } else {
-        // See if we can fetch a full url (with no hash to target)
-        // This is a special case and we should probably do some content thinning / targeting
-        fetch(url)
-        .then(res => res.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const htmlDoc = parser.parseFromString(html, "text/html");
-          const note = htmlDoc.querySelector('main.content');
-          if (note !== null) {
-            // This should only happen for chapter cross references
-            // (since there is no id in the URL)
-            // remove the first header
-            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
-              note.children[0].remove();
-            }
-            const html = processXRef(null, note);
-            instance.setContent(html);
-          } 
-        }).finally(() => {
-          instance.enable();
-          instance.show();
-        });
-      }
-    }, function(instance) {
-    });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            div.style.left = 0;
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-        // Handle positioning of the toggle
-    window.addEventListener(
-      "resize",
-      throttle(() => {
-        elRect = undefined;
-        if (selectedAnnoteEl) {
-          selectCodeLines(selectedAnnoteEl);
-        }
-      }, 10)
-    );
-    function throttle(fn, ms) {
-    let throttle = false;
-    let timer;
-      return (...args) => {
-        if(!throttle) { // first call gets through
-            fn.apply(this, args);
-            throttle = true;
-        } else { // all the others get throttled
-            if(timer) clearTimeout(timer); // cancel #2
-            timer = setTimeout(() => {
-              fn.apply(this, args);
-              timer = throttle = false;
-            }, ms);
-        }
-      };
-    }
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
-    }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
-          }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+      }, function(instance) {
       });
     }
-  }
-});
-</script>
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 <nav class="page-navigation">
   <div class="nav-page nav-page-previous">
-      <a href="../api/base.html" class="pagination-link" aria-label="base">
-        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">base</span>
+      <a href="../api/analyzers.html" class="pagination-link" aria-label="analyzers">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">analyzers</span>
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../api/defaults.html" class="pagination-link" aria-label="defaults">
-        <span class="nav-page-text">defaults</span> <i class="bi bi-arrow-right-short"></i>
+      <a href="../api/cross_genotype.html" class="pagination-link" aria-label="cross_genotype">
+        <span class="nav-page-text">cross_genotype</span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav>
@@ -1473,7 +1304,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p>Docs built for HPVsim v2.2.6 (2026-04-17).<br>© 2020–2026, Gates Foundation. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
+<p>Docs built for HPVsim v3.2.0 (2026-09-19).<br>© 2020–2026, Gates Foundation. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
 <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/starsimhub/hpvsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div>
     <div class="nav-footer-right">
       <ul class="footer-items list-unstyled">
