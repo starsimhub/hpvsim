@@ -82,7 +82,7 @@ website:
             - tutorials/tut_calibration.qmd
             - tutorials/tut_hiv.qmd
             - tutorials/tut_latency.qmd
-        - section: "**User guide**"
+        - section: "<strong>User guide</strong>"
           href: user-guide/index.qmd
           contents:
             - user-guide/natural-history.qmd
