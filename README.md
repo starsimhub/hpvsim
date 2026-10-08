@@ -62,6 +62,18 @@ Python path. The first time HPVsim is imported, it will automatically
 download the required data files (~30 MB). You can also download the
 data manually by running `hpvsim-download-data` from the terminal.
 
+### For users without Python
+
+If you don't already have Python set up, the [`install/`](install/) folder
+contains standalone installers that handle Miniconda and HPVsim in one step:
+
+- **Linux / macOS**:
+  `curl -fsSL https://raw.githubusercontent.com/starsimhub/hpvsim/main/install/install.sh | bash`
+- **Windows**: download [`install/install.bat`](install/install.bat) and
+  double-click it.
+
+See [`install/README.md`](install/README.md) for details.
+
 ## Usage and documentation
 
 Documentation is available at <https://docs.hpvsim.org>, including

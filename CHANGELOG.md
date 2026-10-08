@@ -1,5 +1,9 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
+## Version 3.2.1 (2026-10-08)
+
+**Cross-platform installers for users without Python.** `install/install.sh` (Linux/macOS) and `install/install.bat` (Windows) install Miniconda if it isn't already present and then `pip install hpvsim jupyter` into the base conda env. Intended for training-material audiences who shouldn't need to figure out Python setup first. See [`install/README.md`](install/README.md) for usage. No change to the Python package.
+
 ## Version 3.2.0 (2026-09-19)
 
 **Reimplement the therapeutic vaccine (`hpv.txvx`) as a treatment product with conferred immunity.** It subclasses `hpv.tx` again, clearing infections and lesions per the efficacy table and conferring severity immunity, rather than reducing susceptibility as a prophylactic.
