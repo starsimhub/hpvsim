@@ -1,19 +1,23 @@
-name: Publish HPVsim to PyPI (manual)
+name: Release HPVsim
 
+# Runs when a merge to main changes hpvsim/version.py. If that version has no
+# release yet: publishes to PyPI, then creates the GitHub release with the
+# installers attached. Done in one workflow because releases created with
+# GITHUB_TOKEN don't trigger other workflows. Keep this filename: PyPI's
+# trusted publisher is tied to it.
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    paths: [hpvsim/version.py]
+  workflow_dispatch:
 
 jobs:
-  build-and-publish:
-    name: Build and publish
+  release:
     runs-on: ubuntu-latest
 
     permissions:
       id-token: write
-      contents: read
+      contents: write
 
     environment:
       name: pypi
@@ -23,16 +27,46 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check for existing release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          eval "$(python -c "exec(open('hpvsim/version.py').read()); print(f'VERSION={__version__} DATE={__versiondate__}')")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "anchor=version-${VERSION//./}-$DATE" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already released; nothing to do"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Python
+        if: steps.version.outputs.new == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Install build backend
-        run: python -m pip install build
-
       - name: Build sdist and wheel
-        run: python -m build
+        if: steps.version.outputs.new == 'true'
+        run: |
+          python -m pip install build
+          python -m build
 
-      - name: Publish
+      - name: Publish to PyPI
+        if: steps.version.outputs.new == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+
+      - name: Create GitHub release with installers
+        if: steps.version.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ANCHOR: ${{ steps.version.outputs.anchor }}
+        run: |
+          gh release create "v$VERSION" install/install.bat install/install.sh \
+            --target "$GITHUB_SHA" --title "HPVsim $VERSION" \
+            --notes "See [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md#$ANCHOR) for the full release notes."
