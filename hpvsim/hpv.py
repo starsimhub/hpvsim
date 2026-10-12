@@ -488,7 +488,6 @@ class HPV(ss.Infection):
         """
         super().set_prognoses(uids, sources)
         ti = self.ti
-        p = self.pars
 
         first_uids = uids[self.ti_first_infection.isnan[uids]]
         self.ti_first_infection[first_uids] = ti
@@ -498,29 +497,55 @@ class HPV(ss.Infection):
         self.ti_infected[uids] = ti
         self.precin[uids] = True
 
-        # Clear stale schedules from a prior infection.
+        # Clear stale schedules from a prior infection. ti_reactivation is a
+        # per-latency-cycle event timestamp; clearing it on re-infection keeps
+        # the (ti_reactivation - ti_latent) duration bound to the current cycle
+        # rather than carrying a stale value from a prior cycle.
         self.ti_clearance[uids] = np.nan
         self.ti_cin[uids] = np.nan
         self.ti_cancerous[uids] = np.nan
         self.ti_cancer_detection[uids] = np.nan
         self.ti_dead_cancer[uids] = np.nan
+        self.ti_reactivation[uids] = np.nan
         self.undetected_cancerous[uids] = False
         self.to_latent[uids] = False
         self.latent[uids] = False
 
-        female_all = self.sim.people.female[uids]
-        # rel_sev is shared across genotypes via CrossImmunity, sampled on first touch.
+        rel_sev_uids = self._current_rel_sev(uids, ensure_cross=True)
+        sev_imm_uids = self.sev_imm[uids]
+        self._draw_full_trajectory(uids, rel_sev_uids, sev_imm_uids, grow_fine=True)
+
+    def _current_rel_sev(self, uids, *, ensure_cross):
+        """Combined severity multiplier (cross-genotype * HIV) for uids at the
+        current step. ``ensure_cross=True`` samples CrossImmunity.rel_sev on
+        first touch; refresh paths pass False because the agent is already
+        infected and has a cross-genotype rel_sev drawn."""
         cross = self._cross_immunity_connector()
         if cross is not None:
-            cross.ensure_rel_sev(uids)
+            if ensure_cross:
+                cross.ensure_rel_sev(uids)
             rel_sev_uids = cross.rel_sev[uids]
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
-        # HIV co-infection scales progression severity (gated no-op when no HIV).
         hivc = self._hiv_module()
         if hivc is not None:
             rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
-        sev_imm_uids = self.sev_imm[uids]
+        return rel_sev_uids
+
+    def _draw_full_trajectory(self, uids, rel_sev_uids, sev_imm_uids, *, grow_fine):
+        """Draw dur_precin, p(CIN), dur_cin, p(cancer) and stamp the ti_*
+        timestamps for ``uids``. Precondition: callers have cleared
+        ti_clearance/ti_cin/ti_cancerous/ti_cancer_detection/ti_dead_cancer
+        and reset undetected_cancerous/to_latent for ``uids``.
+
+        ``grow_fine`` toggles multiscale fine-agent amplification at CIN
+        onset. ``refresh_prognoses`` passes False: the base agent already
+        exists in the population, and growing new fine clones on every
+        refresh would double-count the trajectory under multiscale.
+        """
+        ti = self.ti
+        p = self.pars
+        female_all = self.sim.people.female[uids]
 
         # 1. Precin durations: females get sample * (1 - sev_imm), males get
         #    dur_inf_male with no immunity reduction. rel_sev applies separately.
@@ -614,9 +639,128 @@ class HPV(ss.Infection):
                 )
             )
 
-        # 6. Multiscale: grow real fine cancer agents.
-        self._grow_fine_agents(cin_uids, cancer_uids, dur_cin, age_mod,
-                               rel_sev_cin, sev_imm_uids[cin_mask], dt_yr)
+        if grow_fine:
+            # Multiscale: grow real fine cancer agents.
+            self._grow_fine_agents(cin_uids, cancer_uids, dur_cin, age_mod,
+                                   rel_sev_cin, sev_imm_uids[cin_mask], dt_yr)
+
+    def _draw_cin_outcome(self, uids, rel_sev_uids, cin_start_ti):
+        """Re-draw dur_cin and p(cancer) for agents already in or scheduled
+        for CIN. ``cin_start_ti`` is a per-agent anchor timestep: pass the
+        existing ti_cin for precin agents whose CIN entry is still ahead;
+        pass the current ti for agents already in CIN, treating remaining
+        time as a fresh dur_cin clock from now. Multiscale fine agents are
+        not grown here -- they already exist from the original infection.
+        """
+        if len(uids) == 0:
+            return
+        p = self.pars
+        dt_yr = self.t.dt_year
+
+        self.ti_clearance[uids] = np.nan
+        self.ti_cancerous[uids] = np.nan
+        self.ti_cancer_detection[uids] = np.nan
+        self.ti_dead_cancer[uids] = np.nan
+        self.undetected_cancerous[uids] = False
+        self.to_latent[uids] = False
+
+        dur_cin = p.dur_cin.rvs(uids)
+        ages = self.sim.people.age[uids]
+        age_mod = _age_risk_ramp(ages, p.age_risk)
+        dur_cin = dur_cin * age_mod
+
+        p_cancer = compute_severity(dur_cin * dt_yr,
+                                      rel_sev=rel_sev_uids, pars=p.cancer_fn)
+        self._cancer_bern.set(p=p_cancer)
+        cancer_draw = self._cancer_bern.rvs(uids)
+        cancer_uids = uids[cancer_draw]
+        nocancer_uids = uids[~cancer_draw]
+        anchor = np.asarray(cin_start_ti, dtype=np.int64)
+
+        if len(nocancer_uids):
+            rounded = self._randround(
+                dur_cin[~cancer_draw], nocancer_uids, self._round_clear_cin_bern,
+            )
+            self.ti_clearance[nocancer_uids] = anchor[~cancer_draw] + rounded
+            self._roll_latency(nocancer_uids)
+
+        if len(cancer_uids):
+            rounded = self._randround(
+                dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+            )
+            self.ti_cancerous[cancer_uids] = anchor[cancer_draw] + rounded
+            dur_undetected = p.dur_undetected.rvs(cancer_uids)
+            self.ti_cancer_detection[cancer_uids] = (
+                self.ti_cancerous[cancer_uids] + self._randround(
+                    dur_undetected, cancer_uids, self._round_detection_bern,
+                )
+            )
+            dur_cancer = p.dur_cancer.rvs(cancer_uids)
+            self.ti_dead_cancer[cancer_uids] = (
+                self.ti_cancerous[cancer_uids] + self._randround(
+                    dur_cancer, cancer_uids, self._round_dead_bern,
+                )
+            )
+
+    def refresh_prognoses(self, uids):
+        """Re-draw the still-future portion of HPV trajectory for agents
+        whose severity multiplier has changed since infection -- typically
+        HIV seroconversion or CD4 crossing the lo/hi/upper strata. Preserves
+        past events; skips agents whose cancer onset is already scheduled.
+
+        Dispatches to three cases by current stage:
+          - precin, no CIN scheduled: full re-draw from the current step.
+          - precin, CIN scheduled in the future: re-draw dur_cin + p(cancer),
+            keeping ti_cin where it is.
+          - already in CIN: re-draw dur_cin + p(cancer) with a fresh clock
+            from the current step (remaining time as a new dur_cin draw).
+        Multiscale fine agents are not amplified on refresh.
+        """
+        if len(uids) == 0:
+            return
+
+        female = self.sim.people.female[uids]
+        eligible = (
+            female
+            & self.infected[uids]
+            & ~self.cancerous[uids]
+            & self.ti_cancerous.isnan[uids]
+        )
+        uids = uids[eligible]
+        if len(uids) == 0:
+            return
+
+        rel_sev_uids = self._current_rel_sev(uids, ensure_cross=False)
+        sev_imm_uids = self.sev_imm[uids]
+        ti = self.ti
+
+        in_cin = self.cin[uids]
+        cin_scheduled = (~self.ti_cin.isnan[uids]) & (~in_cin)
+        precin_fresh = (~cin_scheduled) & (~in_cin)
+
+        if precin_fresh.any():
+            a = uids[precin_fresh]
+            self.ti_clearance[a] = np.nan
+            self.ti_cin[a] = np.nan
+            self.ti_cancerous[a] = np.nan
+            self.ti_cancer_detection[a] = np.nan
+            self.ti_dead_cancer[a] = np.nan
+            self.undetected_cancerous[a] = False
+            self.to_latent[a] = False
+            self._draw_full_trajectory(
+                a, rel_sev_uids[precin_fresh], sev_imm_uids[precin_fresh],
+                grow_fine=False,
+            )
+
+        if cin_scheduled.any():
+            b = uids[cin_scheduled]
+            self._draw_cin_outcome(b, rel_sev_uids[cin_scheduled],
+                                    np.asarray(self.ti_cin[b]))
+
+        if in_cin.any():
+            c = uids[in_cin]
+            self._draw_cin_outcome(c, rel_sev_uids[in_cin],
+                                    np.full(len(c), ti))
 
     def _grow_fine_agents(self, cin_uids, cancer_uids, dur_cin, age_mod,
                           rel_sev_cin, sev_imm_cin, dt_yr):
@@ -788,6 +932,11 @@ class HPV(ss.Infection):
                 self.latent[to_latent_uids] = True
                 self.ti_latent[to_latent_uids] = ti
                 self.to_latent[to_latent_uids] = False
+                # Entering a fresh latency cycle wipes any ti_reactivation
+                # carried over from the previous cycle, keeping the
+                # (ti_reactivation - ti_latent) difference non-negative when
+                # consumed downstream.
+                self.ti_reactivation[to_latent_uids] = np.nan
 
             # Females only. sero_prob gates the first clearance; repeats always
             # take the running max.
@@ -845,12 +994,14 @@ class HPV(ss.Infection):
             reactivated = self._reactivation_bern.filter(latent_uids)
             if len(reactivated):
                 self.latent[reactivated] = False
-                self.ti_reactivation[reactivated] = ti
                 # Fresh trajectory; immunity carries over. set_prognoses bumps
                 # new_infections unconditionally, so back it out here.
                 ppl = self.sim.people
                 n_react = ppl.scale_flows(reactivated)
                 self.set_prognoses(reactivated)
+                # Stamp ti_reactivation AFTER set_prognoses, which clears all
+                # per-cycle event timestamps including ti_reactivation itself.
+                self.ti_reactivation[reactivated] = ti
                 self.results.new_infections[ti] -= n_react
                 self.results.new_reactivations[ti] = n_react
 

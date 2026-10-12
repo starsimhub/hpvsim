@@ -1,5 +1,13 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
+## Version 3.3.0 (unreleased)
+
+**HIV-dependent HPV trajectories now update when CD4 crosses a stratum boundary.** The CD4-based `hiv_rel_sev` multiplier was previously read once at HPV infection and baked into the trajectory, so a woman who seroconverted mid-infection, dropped a CD4 stratum on untreated HIV, or rebounded on ART kept her original (and typically wrong) trajectory for the rest of that infection. `hpv.HPV` now exposes `refresh_prognoses(uids)`, which re-draws the still-future portion of the trajectory for a subset of active infections (preserving ti_cin if already in the past, keeping cancer-scheduled trajectories untouched), and `hpv.HIV.step_state` fires it for exactly the agents whose stratum changed each step — within-stratum CD4 drift stays a no-op. This restores the v2 `update_hpv_progs` hook that was lost in the port.
+
+*Regression information*: HPV cancer burden in HIV-aware sims (`hpv.HIV_transmit`, `hpv.HIV_incidence`, `model_hiv=`) shifts, more at high HIV prevalence and when a non-trivial fraction of HPV infections span a CD4 stratum change. HIV-free sims are unaffected. Recalibrate any HPV-HIV co-infection parameter set.
+
+**Fixes.** `ti_reactivation` was carrying over across latency cycles -- an agent who reactivated once and then entered a fresh latency cycle kept the earlier reactivation timestamp indefinitely, so `ti_reactivation - ti_latent` could go negative. Entering a new latency cycle now clears it, and the reactivation handler stamps it after `set_prognoses` rather than before.
+
 ## Version 3.2.0 (2026-09-19)
 
 **Reimplement the therapeutic vaccine (`hpv.txvx`) as a treatment product with conferred immunity.** It subclasses `hpv.tx` again, clearing infections and lesions per the efficacy table and conferring severity immunity, rather than reducing susceptibility as a prophylactic.
