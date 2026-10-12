@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HPVsim installer for Linux and macOS.
-# Installs Miniconda (if needed) and pip-installs hpvsim + jupyter.
+# Installs Miniforge (if needed) and pip-installs hpvsim + jupyter.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/starsimhub/hpvsim/main/install/install.sh | bash
@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-MINICONDA_DIR="${HOME}/miniconda3"
+MINIFORGE_DIR="${HOME}/miniforge3"
 
 detect_installer() {
     local os arch
@@ -26,32 +26,32 @@ detect_installer() {
         *)
             echo "Unsupported CPU architecture: $(uname -m)" >&2; exit 1 ;;
     esac
-    echo "Miniconda3-latest-${os}-${arch}.sh"
+    echo "Miniforge3-${os}-${arch}.sh"
 }
 
 find_conda() {
     if command -v conda >/dev/null 2>&1; then
         command -v conda
-    elif [ -x "${MINICONDA_DIR}/bin/conda" ]; then
-        echo "${MINICONDA_DIR}/bin/conda"
+    elif [ -x "${MINIFORGE_DIR}/bin/conda" ]; then
+        echo "${MINIFORGE_DIR}/bin/conda"
     fi
 }
 
-install_miniconda() {
-    local installer url tmpfile
+install_miniforge() {
+    local installer url tmpdir
     installer="$(detect_installer)"
-    url="https://repo.anaconda.com/miniconda/${installer}"
-    tmpfile="$(mktemp -t miniconda.XXXXXX)"
+    url="https://github.com/conda-forge/miniforge/releases/latest/download/${installer}"
+    tmpdir="$(mktemp -d)"  # Miniforge's installer requires its filename to end in .sh
 
     echo ">>> Downloading ${url}"
-    curl -fsSL "${url}" -o "${tmpfile}"
+    curl -fsSL "${url}" -o "${tmpdir}/${installer}"
 
-    echo ">>> Installing Miniconda to ${MINICONDA_DIR}"
-    bash "${tmpfile}" -b -p "${MINICONDA_DIR}"
-    rm -f "${tmpfile}"
+    echo ">>> Installing Miniforge to ${MINIFORGE_DIR}"
+    bash "${tmpdir}/${installer}" -b -p "${MINIFORGE_DIR}"
+    rm -rf "${tmpdir}"
 
     echo ">>> Initializing conda for bash and zsh"
-    "${MINICONDA_DIR}/bin/conda" init bash zsh >/dev/null || true
+    "${MINIFORGE_DIR}/bin/conda" init bash zsh >/dev/null || true
 }
 
 main() {
@@ -60,8 +60,8 @@ main() {
     local conda
     conda="$(find_conda || true)"
     if [ -z "${conda}" ]; then
-        install_miniconda
-        conda="${MINICONDA_DIR}/bin/conda"
+        install_miniforge
+        conda="${MINIFORGE_DIR}/bin/conda"
     else
         echo ">>> Found existing conda at: ${conda}"
     fi

@@ -1,6 +1,6 @@
 @echo off
 REM HPVsim installer for Windows.
-REM Installs Miniconda (if needed) and pip-installs hpvsim + jupyter.
+REM Installs Miniforge (if needed) and pip-installs hpvsim + jupyter.
 REM
 REM Usage: double-click, or run from Command Prompt:
 REM    install.bat
@@ -9,23 +9,23 @@ setlocal enabledelayedexpansion
 
 echo === HPVsim installer ===
 
-set "MINICONDA_DIR=%USERPROFILE%\Miniconda3"
+set "MINIFORGE_DIR=%USERPROFILE%\miniforge3"
 set "CONDA_EXE="
 
-REM Prefer conda already on PATH, otherwise look in the default Miniconda location.
+REM Prefer conda already on PATH, otherwise look in the default Miniforge location.
 where conda >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
     for /f "delims=" %%i in ('where conda') do (
         if not defined CONDA_EXE set "CONDA_EXE=%%i"
     )
     echo ^>^>^> Found existing conda at: !CONDA_EXE!
-) else if exist "%MINICONDA_DIR%\Scripts\conda.exe" (
-    set "CONDA_EXE=%MINICONDA_DIR%\Scripts\conda.exe"
-    echo ^>^>^> Found existing Miniconda at: %MINICONDA_DIR%
+) else if exist "%MINIFORGE_DIR%\Scripts\conda.exe" (
+    set "CONDA_EXE=%MINIFORGE_DIR%\Scripts\conda.exe"
+    echo ^>^>^> Found existing Miniforge at: %MINIFORGE_DIR%
 ) else (
-    call :install_miniconda
+    call :install_miniforge
     if errorlevel 1 exit /b 1
-    set "CONDA_EXE=%MINICONDA_DIR%\Scripts\conda.exe"
+    set "CONDA_EXE=%MINIFORGE_DIR%\Scripts\conda.exe"
 )
 
 echo ^>^>^> Installing hpvsim and jupyter into the base conda env
@@ -45,14 +45,14 @@ echo.
 pause
 exit /b 0
 
-:install_miniconda
-set "INSTALLER=%TEMP%\Miniconda3-latest-Windows-x86_64.exe"
-set "URL=https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe"
+:install_miniforge
+set "INSTALLER=%TEMP%\Miniforge3-Windows-x86_64.exe"
+set "URL=https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-x86_64.exe"
 echo ^>^>^> Downloading %URL%
 powershell -NoProfile -Command "Invoke-WebRequest -Uri '%URL%' -OutFile '%INSTALLER%'"
 if errorlevel 1 exit /b 1
-echo ^>^>^> Installing Miniconda to %MINICONDA_DIR%
-start /wait "" "%INSTALLER%" /InstallationType=JustMe /RegisterPython=1 /AddToPath=1 /S /D=%MINICONDA_DIR%
+echo ^>^>^> Installing Miniforge to %MINIFORGE_DIR%
+start /wait "" "%INSTALLER%" /InstallationType=JustMe /RegisterPython=1 /AddToPath=1 /S /D=%MINIFORGE_DIR%
 if errorlevel 1 exit /b 1
 del "%INSTALLER%" >nul 2>nul
 exit /b 0
