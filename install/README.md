@@ -12,13 +12,13 @@ If you already manage your own Python environment, you don't need these — just
 One-liner (recommended):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/starsimhub/hpvsim/main/install/install.sh | bash
+curl -LsSf https://hpvsim.org/install.sh | sh
 ```
 
 Or download and run `install.sh`:
 
 ```bash
-bash install.sh
+sh install.sh
 ```
 
 Open a new terminal afterwards so `conda` is on your PATH.

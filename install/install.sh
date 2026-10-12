@@ -1,13 +1,13 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # HPVsim installer for Linux and macOS.
 # Installs Miniforge (if needed) and pip-installs hpvsim + jupyter.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/starsimhub/hpvsim/main/install/install.sh | bash
+#   curl -LsSf https://hpvsim.org/install.sh | sh
 # or:
-#   bash install.sh
+#   sh install.sh
 
-set -euo pipefail
+set -eu
 
 MINIFORGE_DIR="${HOME}/miniforge3"
 
@@ -47,7 +47,7 @@ install_miniforge() {
     curl -fsSL "${url}" -o "${tmpdir}/${installer}"
 
     echo ">>> Installing Miniforge to ${MINIFORGE_DIR}"
-    bash "${tmpdir}/${installer}" -b -p "${MINIFORGE_DIR}"
+    sh "${tmpdir}/${installer}" -b -p "${MINIFORGE_DIR}"
     rm -rf "${tmpdir}"
 
     echo ">>> Initializing conda for bash and zsh"

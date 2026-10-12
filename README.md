@@ -69,7 +69,7 @@ contains standalone installers that handle Miniforge (conda-forge) and HPVsim
 in one step:
 
 - **Linux / macOS**:
-  `curl -fsSL https://raw.githubusercontent.com/starsimhub/hpvsim/main/install/install.sh | bash`
+  `curl -LsSf https://hpvsim.org/install.sh | sh`
 - **Windows**: download [`install/install.bat`](install/install.bat) and
   double-click it.
 
