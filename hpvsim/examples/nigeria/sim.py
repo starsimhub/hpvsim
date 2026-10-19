@@ -15,7 +15,7 @@ def make_sim(**kwargs):
     """Return an unrun canonical Nigeria hpv.Sim.
 
     Defaults: ``n_agents=20_000``, ``start=1990``, ``stop=2020``,
-    ``dt=0.25``, all four HPV genotypes, ``ms_agent_ratio=100``.
+    ``dt=0.25``, all four HPV genotypes.
     """
     pars = dict(
         location='nigeria',
@@ -24,7 +24,6 @@ def make_sim(**kwargs):
         stop=2020,
         dt=0.25,
         genotypes=[16, 18, 'hi5', 'ohr'],
-        ms_agent_ratio=100,
     )
     pars.update(kwargs)
     return hpv.Sim(**pars)

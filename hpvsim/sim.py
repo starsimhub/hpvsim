@@ -1,318 +1,230 @@
-"""HPVsim convenience Sim wrapper.
+"""
+HPVsim simulation
 
-``hpv.Sim(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'])`` instantiates
-the default stack — one HPV disease module per genotype, multi-layer
-SexualNetwork, ss.Births + ss.Deaths + AgeMigration demographics, ss.People
-with location-specific age pyramid, plus a CrossImmunity connector and an
-HPVTotal analyzer — and forwards to ``ss.Sim``.
+``hpv.Sim(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'])`` builds the default model: one
+declared HPV disease per genotype, the sexual network, births, deaths and migration for the
+location, cross-genotype immunity, and results over all genotypes (``sim.results.all_hpv``).
 
-``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
-modules are added after the auto-defaults (CrossImmunity, the
-``_ExclusiveSeeder`` when ``init_seeding='exclusive'``, and the HPVTotal
-analyzer). Other slots (``diseases``, ``networks``, ``demographics``,
-``people``) retain override semantics. ``diseases=`` is mutually exclusive
-with ``genotypes=``. See ``Sim.__init__`` for the full argument set.
+``connectors=`` and ``analyzers=`` add to the defaults; ``diseases=`` (HPV genotypes, or other
+diseases such as HIV), ``networks=``, ``demographics=`` and ``people=`` replace them.
 """
 
+import warnings
 import numpy as np
 import sciris as sc
 import starsim as ss
-import hpvsim as hpv
 
-# stisim and the HIV classes are imported lazily in __init__ (optional dependency).
-from . import misc
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration, AnnualBirths, Births
+from .hiv import HIV, HIV_incidence, ART
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
-from .seeding import _ExclusiveSeeder
+from .parameters import SimPars, get_genotype_pars
+from .products import products_in
+from .seeding import init_prevs
+
+
+__all__ = ['Sim']
 
 
 class Sim(ss.Sim):
-    """HPVsim simulation.
-
-    The final sim year is ``stop`` (Starsim's name). ``end`` is accepted as a
-    deprecated v2 alias — if supplied it overrides ``stop`` and warns.
+    """
+    HPVsim simulation
 
     Args:
-      init_seeding (str, default ``'exclusive'``):
-        ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
-        curve as the total HPV prevalence, then exactly one genotype
-        assigned per infected agent. No co-infection at initialisation.
-        ``'independent'`` — each genotype draws from its own per-genotype
-        ``init_prev`` curve independently; co-infection at initialisation is
-        possible.
+        location (str): a country, for its population, births, deaths and migration; None (default) for uniform ages 0-60 and no demography
+        genotypes (list): the genotypes, e.g. [16, 18, 'hi5', 'ohr'] (default [16])
+        genotype_pars (dict): parameters by genotype, e.g. {'hpv16': dict(cin_fn=dict(k=0.4))}
+        init_seeding (str): 'exclusive' (default; the total prevalence curve shared between genotypes) or 'independent' (each genotype's own curve)
+        init_hpv_dist (dict): with 'exclusive', the share of each genotype (default equal)
+        n_agents (int): the number of agents
+        start, stop (float): the first and last years
+        dt (float): the step, in years
+        total_pop (float): the population the agents represent (default: the location's)
+        model_hiv (bool/str): add HIV: True or 'transmission' (network-transmitted `hpv.HIV`), or 'incidence' (from hiv_data)
+        hiv_data (dict/str): for model_hiv='incidence': {'incidence', 'art_coverage', 'init_prev'}, or a folder (see `hpv.data.load_hiv_data`)
+        hiv_pars (dict): parameters of the HIV disease
+        nw_pars (dict): parameters of the sexual network
+        imm_pars (dict): parameters of the cross-genotype immunity (see `hpv.CrossImmunity`)
+        v2_compat_demographics (bool): annual birth pulses and whole-year ages, as in HPVsim 2
+        pars (dict): parameters of the sim or of the modules, by name
+        kwargs (dict): as pars, or the modules (`diseases=`, `interventions=`, ...)
 
-      init_hpv_dist (dict or None, default ``None``):
-        Only used when ``init_seeding='exclusive'``. If ``None``, genotype
-        assignment is uniform. If a dict, keys are canonical genotype names
-        (e.g. ``{'hpv16': 0.6, 'hpv18': 0.2, 'hi5': 0.1, 'ohr': 0.1}``) and
-        values are weights; normalised internally.
-
-      model_hiv (True, ``'incidence'``, ``'transmission'``, or ``None``):
-        Adds HIV co-infection. ``'incidence'`` (the default under ``True``)
-        imposes a per-(age,sex,year) incidence curve
-        (``hpv.HIV_incidence``) plus a coverage-based ``sti.ART``
-        intervention (ART data is mandatory in this mode);
-        ``'transmission'`` drives HIV via network transmission instead
-        (``hpv.HIV_transmit``) with no auto-added ART. ``hiv_data=``
-        supplies the input data (a folder path or a dict with
-        ``{'incidence', 'art_coverage', 'init_prev'}``); ``hiv_pars=``
-        overrides the constructed HIV disease's pars. Mutually exclusive
-        with supplying your own HIV-family disease in ``diseases=``.
-
-      v2_compat_demographics (bool, default ``False``):
-        Forces discrete integer-age demographics for bit-for-bit
-        compatibility with the v2 discrete-cohort convention. Activates
-        annual-pulse births (``hpv.AnnualBirths``), disables migration
-        jitter, and floors initial ages to integers. Not recommended for
-        new work — the continuous-age default is preferred.
+    Examples:
+        ```python
+        sim = hpv.Sim(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'], start=1980, stop=2030)
+        sim.run()
+        sim.results.all_hpv.asr_cancer_incidence
+        ```
     """
 
-    def __init__(self, location=None, genotypes=None, genotype_pars=None,
-                 init_seeding='exclusive', init_hpv_dist=None,
-                 n_agents=10_000, start=1990, stop=2060, dt=0.25,
-                 total_pop=None, ms_agent_ratio=1, pars=None, v2_compat_demographics=False,
-                 end=None, datafolder=None, model_hiv=None, hiv_data=None, hiv_pars=None,
-                 nw_pars=None, imm_pars=None,
-                 **kwargs):
-        # Legacy v2 alias; ``end`` wins over ``stop`` when supplied.
+    def __init__(self, location=None, genotypes=None, genotype_pars=None, init_seeding='exclusive', init_hpv_dist=None,
+                 n_agents=10_000, start=1990, stop=2060, dt=0.25, total_pop=None, ms_agent_ratio=1, pars=None,
+                 v2_compat_demographics=False, end=None, datafolder=None, model_hiv=None, hiv_data=None, hiv_pars=None,
+                 nw_pars=None, imm_pars=None, **kwargs):
         if end is not None:
-            ss.warn("hpv.Sim: `end` is a deprecated alias for `stop`; use `stop=` instead.")
+            ss.warn('hpv.Sim: `end` is a deprecated alias for `stop`; use `stop=` instead.')
             stop = end
-        # location is a construction-time argument, consumed below before the
-        # sim's parameter set exists, so it can't be routed like a normal par.
-        # Accept it from pars= anyway (pars= is the documented way to pass
-        # parameters) by intercepting it here; a bare location= wins, matching
-        # the sc.mergedicts(pars, kwargs) precedence used further down.
-        pars = sc.mergedicts(pars)  # Copy, so the caller's dict isn't mutated.
+        if ms_agent_ratio != 1:
+            raise NotImplementedError('ms_agent_ratio > 1 (multiscale cancer agents) is not ported to Starsim 4')
+        pars = sc.mergedicts(pars, kwargs)
         location = sc.ifelse(location, pars.pop('location', None))
-        # location=None: uniform ages, no vitals, no auto pop scaling.
+        modules = {key: sc.tolist(pars.pop(key, None)) for key in ['diseases', 'connectors', 'analyzers', 'interventions', 'networks', 'demographics']}
+        people = pars.pop('people', None)
+
+        # Population
+        country = None
         if location is None:
-            country = None
-            ss.warn(
-                'hpv.Sim: no location supplied; using uniform ages 0-60, no '
-                'births/deaths/migration, location-agnostic sexual-network '
-                'defaults, pop_scale=1. Pass location= or demographics= to '
-                'model a real population, or call hpv.demo() for a canonical '
-                'Nigeria sim.'
-            )
+            ss.warn('hpv.Sim: no location supplied; using uniform ages 0-60, no births/deaths/migration, and pop_scale=1. '
+                    'Pass location= or demographics= to model a real population, or call hpv.demo() for a canonical Nigeria sim.')
         else:
-            country = hpv.load_country(location, year=int(start), datafolder=datafolder)
+            country = load_country(location, year=int(start), datafolder=datafolder)
             if total_pop is None:
                 total_pop = country['age_data']['value'].sum()
-        people = kwargs.pop('people', None)
-        copy_inputs = kwargs.pop('copy_inputs', True)
-        sim_data = kwargs.pop('data', None)
+        age_data = None if country is None else country['age_data']
         if people is None:
-            age_data = country['age_data'] if country is not None else None
-            people = ss.People(n_agents, age_data=age_data,
-                               extra_states=[ss.BoolArr('fine', default=False)])
+            people = ss.People(n_agents, age_data=age_data if age_data is not None else ss.uniform(0, 60))
 
-        user_diseases = sc.tolist(kwargs.pop('diseases', None))
-        user_connectors = sc.tolist(kwargs.pop('connectors', None))
-        user_analyzers = sc.tolist(kwargs.pop('analyzers', None))
-        user_interventions = sc.tolist(kwargs.pop('interventions', None))
+        # Parameters: of the sim, or of the modules, routed by name
+        sim_keys = set(SimPars().keys()) - {'location'}
+        sim_pars = {k: pars.pop(k) for k in list(pars) if k in sim_keys}
+        hpv_keys = set(get_genotype_pars('hpv16').keys()) | {'cin_fn', 'cancer_fn'}
+        hpv_pars = {k: pars.pop(k) for k in list(pars) if k in hpv_keys}
+        imm_pars = sc.mergedicts(imm_pars, {k: pars.pop(k) for k in list(pars) if k in CrossImmunity.defaults})
+        net_pars = sc.mergedicts(None if country is None else country['network_pars'], nw_pars, {k: pars.pop(k) for k in list(pars) if k in SexualNetwork().pars})
+        scoped = {k: pars.pop(k) for k in list(pars) if k in {'hpv16', 'hpv18', 'hi5', 'ohr', 'hiv'}}
+        if pars:
+            raise ValueError(f'hpv.Sim: unrecognized parameter(s) {sorted(pars)}')
 
-        # Partition diseases=: HPV instances vs everything else (e.g. HIV).
-        hpv_instances = [d for d in user_diseases if isinstance(d, HPV)]
-        other_diseases = [d for d in user_diseases if not isinstance(d, HPV)]
+        # Genotypes
+        diseases = modules['diseases']
+        hpvs = [d for d in diseases if isinstance(d, HPV)]
+        others = [d for d in diseases if not isinstance(d, HPV)]
+        if hpvs and genotypes is not None:
+            raise ValueError('Specify HPV via genotypes= or HPV instances in diseases=, not both.')
+        if not hpvs:
+            keys = [_normalize_genotype(g) for g in (genotypes if genotypes is not None else [16])]
+            if init_hpv_dist is not None and set(init_hpv_dist) != set(keys):
+                raise ValueError(f'init_hpv_dist keys {sorted(init_hpv_dist)} do not match the genotypes {sorted(keys)}')
+            prevs = init_prevs(keys, init_seeding=init_seeding, init_hpv_dist=init_hpv_dist, age_data=age_data)
+            gpars = sc.mergedicts(genotype_pars)
+            hpvs = [HPV(k, genotypes=keys, pars=sc.mergedicts(dict(init_prev=prevs[k]), hpv_pars, gpars.get(k), scoped.get(k))) for k in keys]
+        elif hpv_pars or genotype_pars:
+            raise ValueError('hpv.Sim: give genotype parameters to your HPV instances directly')
+        keys = [h.genotype for h in hpvs]
 
-        if hpv_instances and genotypes is not None:
-            raise ValueError(
-                'Specify HPV via genotypes= or HPV instances in diseases=, not both.'
-            )
-
-        # Autoconstruct HIV and ART if model_hiv=True.
+        # HIV
+        hiv = next((d for d in others if isinstance(d, HIV)), None)
         auto_interventions = []
         if model_hiv:
-            sti = misc.import_stisim()
-            from .hiv import HIV_incidence, HIV_transmit
-            if any(isinstance(d, sti.HIV) for d in other_diseases):
-                raise ValueError(
-                    'model_hiv= is mutually exclusive with supplying your own HIV '
-                    'disease in diseases= -- use diseases= alone in that case.'
-                )
-            mode = 'incidence' if model_hiv is True else model_hiv
-            if mode not in ('incidence', 'transmission'):
-                raise ValueError(f"model_hiv must be True, 'incidence', or 'transmission'; got {model_hiv!r}")
-            data = hiv_data
-            if data is not None and not isinstance(data, dict):
-                from .data.hiv import load_hiv_data
-                data = load_hiv_data(data)
-            if mode == 'incidence':
-                # Require both incidence and ART.
+            if hiv is not None:
+                raise ValueError('model_hiv= is mutually exclusive with supplying your own HIV disease in diseases=')
+            mode = 'transmission' if model_hiv is True else model_hiv
+            hiv_pars = sc.mergedicts(hiv_pars, scoped.get('hiv'))
+            if mode == 'transmission':
+                hiv = HIV(pars=hiv_pars)
+            elif mode == 'incidence':
+                data = hiv_data
+                if data is not None and not isinstance(data, dict):
+                    from .data.hiv import load_hiv_data
+                    data = load_hiv_data(data)
                 missing = [k for k in ('incidence', 'art_coverage') if not data or k not in data]
                 if missing:
-                    raise ValueError(
-                        f"model_hiv='incidence' (or True) requires hiv_data with {missing}"
-                    )
-                hiv_disease = HIV_incidence(incidence=data['incidence'],
-                                             init_prev_data=data.get('init_prev'), pars=hiv_pars)
-                if not any(isinstance(iv, sti.ART) for iv in user_interventions):
+                    raise ValueError(f"model_hiv='incidence' requires hiv_data with {missing}")
+                if data.get('init_prev') is not None:
+                    hiv_pars = sc.mergedicts(dict(init_prev=data['init_prev']), hiv_pars)
+                hiv = HIV_incidence(incidence=data['incidence'], pars=hiv_pars)
+                if not any(getattr(iv, 'name', None) == 'art' for iv in modules['interventions']):
                     from .data.hiv import reshape_art_coverage
-                    auto_interventions.append(sti.ART(coverage=reshape_art_coverage(data['art_coverage'])))
+                    auto_interventions.append(ART(hiv, coverage=_art_by_year(reshape_art_coverage(data['art_coverage']))))
             else:
-                hiv_disease = HIV_transmit(init_prev_data=(data.get('init_prev') if data else None),
-                                            pars=hiv_pars)
-            other_diseases = other_diseases + [hiv_disease]
+                raise ValueError(f"model_hiv must be True, 'transmission', or 'incidence'; got {model_hiv!r}")
+            others.append(hiv)
 
-        if init_seeding not in ('exclusive', 'independent'):
-            raise ValueError(
-                f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}"
-            )
-
-        # Combine user-provided connectors with the CrossImmunity default.
-        user_cross = [c for c in user_connectors if isinstance(c, CrossImmunity)]
-        user_connectors = [c for c in user_connectors
-                           if not isinstance(c, CrossImmunity)]
+        # Connectors: immunity across genotypes, each genotype's own modifiers, HIV's effects
+        user_cross = [c for c in modules['connectors'] if isinstance(c, CrossImmunity)]
+        connectors = [c for c in modules['connectors'] if not isinstance(c, CrossImmunity)]
         if user_cross and imm_pars:
-            raise ValueError(
-                'imm_pars= is mutually exclusive with supplying your own '
-                'CrossImmunity in connectors= -- pass pars= to your instance directly.'
-            )
-        auto_connectors = [user_cross[0] if user_cross else CrossImmunity(pars=imm_pars)]
+            raise ValueError('imm_pars= is mutually exclusive with supplying your own CrossImmunity in connectors=')
+        cross = user_cross[0] if user_cross else CrossImmunity(pars=imm_pars)
+        mods = cross.modifiers(hpvs) + [m for h in hpvs for m in h.modifiers()]
+        if hiv is not None:
+            mods += hiv.effects(hpvs)
+        connectors = mods + connectors
 
-        if hpv_instances:
-            hpv_diseases = hpv_instances  # override path; these manage their own init_prev
-        else:
-            # Default to single-genotype HPV16 if neither supplied.
-            keys = (tuple(hpv._normalize_genotype(g) for g in genotypes)
-                    if genotypes is not None else ('hpv16',))
-            gpars_overrides = genotype_pars or {}
+        # Network, demographics, analyzers, interventions
+        networks = modules['networks'] or [SexualNetwork(**net_pars)]
+        if modules['networks'] and nw_pars:
+            raise ValueError('nw_pars= is mutually exclusive with supplying your own networks=')
+        demographics = modules['demographics']
+        if not demographics and country is not None:
+            death_rate = country['death_rate']
+            death_rate = death_rate[(death_rate['Time'] >= int(start) - 1) & (death_rate['Time'] <= int(stop) + 1)]
+            births = AnnualBirths if v2_compat_demographics else Births
+            demographics = [births(birth_rate=country['birth_rate']), ss.Deaths(death_rate=death_rate), AgeMigration(v2_compat=v2_compat_demographics)]
+        if demographics:
+            demographics = list(demographics) + [_NewAgentImmunity()]
+        analyzers = [HPVTotal()] + modules['analyzers']
+        interventions = auto_interventions + modules['interventions']
+        for product in products_in(interventions): # Products act on the sim's genotypes, unless they were given others
+            product.set_genotypes(keys)
+        for iv in interventions: # Starsim 3's dynamic parameters as modifiers
+            if isinstance(iv, ss.modify):
+                interventions.remove(iv)
+                connectors.append(iv)
 
-            # Validate init_hpv_dist keys if provided.
-            if init_hpv_dist is not None:
-                if not isinstance(init_hpv_dist, dict):
-                    raise ValueError(
-                        f'init_hpv_dist must be a dict or None; got {type(init_hpv_dist)}'
-                    )
-                dist_keys = set(init_hpv_dist.keys())
-                sim_keys = set(keys)
-                if dist_keys != sim_keys:
-                    raise ValueError(
-                        f'init_hpv_dist keys {sorted(dist_keys)} do not match '
-                        f'resolved genotype keys {sorted(sim_keys)}'
-                    )
-
-            hpv_diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
-                                **gpars_overrides.get(k, {})) for k in keys]
-            if init_seeding == 'exclusive':
-                # One Bernoulli per agent for any HPV, then one genotype each.
-                self._seeder = hpv._ExclusiveSeeder(
-                    genotype_keys=keys, init_hpv_dist=init_hpv_dist
-                )
-                for d, k in zip(hpv_diseases, keys):
-                    d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
-                # Registered so the seeder's Dists get the standard init lifecycle.
-                auto_connectors.append(self._seeder)
-
-        diseases = hpv_diseases + other_diseases
-        auto_analyzers = [HPVTotal()]
-        connectors = auto_connectors + user_connectors
-
-        networks = kwargs.pop('networks', None)
-        if networks is None:
-            # Network calibration is location-agnostic; these are NetworkPars() defaults.
-            network_pars = country['network_pars'] if country is not None else {}
-            if nw_pars:
-                network_pars = sc.mergedicts(network_pars, nw_pars)
-            networks = [hpv.SexualNetwork(**network_pars)]
-        elif nw_pars:
-            raise ValueError(
-                'nw_pars= is mutually exclusive with supplying your own '
-                'networks= -- pass pars= to your instance directly.'
-            )
-        demographics = kwargs.pop('demographics', None)
-        if demographics is None:
-            if country is None:
-                demographics = []  # bare Sim: no births/deaths/migration
-            else:
-                births_cls = hpv.AnnualBirths if v2_compat_demographics else hpv.Births
-                # Trim the ~1950-2100 table to the sim window (+/-1yr interp pad).
-                death_rate = country['death_rate']
-                death_rate = death_rate[
-                    (death_rate['Time'] >= int(start) - 1)
-                    & (death_rate['Time'] <= int(stop) + 1)
-                ]
-                demographics = [
-                    births_cls(birth_rate=country['birth_rate']),
-                    ss.Deaths(death_rate=death_rate),
-                    hpv.AgeMigration(v2_compat=v2_compat_demographics),
-                ]
-
-        analyzers = auto_analyzers + user_analyzers
-        interventions = auto_interventions + user_interventions
-
-        # AgeMigration.init_pre reads sim.location to load country data.
-        self.location = location.lower() if location is not None else None
-        # Stored for use in init() to discretize initial ages.
+        self.location = None if location is None else location.lower()
         self._v2_compat_demographics = v2_compat_demographics
-
-        # Sim-level keys go to super() so pre-init state picks them up; module-level
-        # keys are routed after via route_pars. pars= and bare kwargs are equivalent.
-        merged = sc.mergedicts(pars, kwargs)
-        kwargs = {}
-        sim_par_keys = set(hpv.SimPars().keys()) - {'location'}
-        sim_pars = {k: v for k, v in merged.items() if k in sim_par_keys}
-        mod_pars = {k: v for k, v in merged.items() if k not in sim_par_keys}
-
         super().__init__(
-            start=ss.years(start),
-            stop=ss.years(stop),
-            dt=ss.years(dt),
-            people=people,
-            diseases=diseases,
-            connectors=connectors,
-            networks=networks,
-            demographics=demographics,
-            analyzers=analyzers,
-            interventions=interventions,
-            pars=sim_pars,
-            total_pop=total_pop,
-            copy_inputs=copy_inputs,
-            data=sim_data,
-            **kwargs,
+            start=start, stop=stop, dt=dt, unit='year',
+            people=people, diseases=hpvs + others, connectors=connectors, networks=networks, demographics=demographics,
+            analyzers=analyzers, interventions=interventions, total_pop=total_pop, pars=sim_pars,
         )
-        if mod_pars:
-            from .parameters import route_pars
-            route_pars(self, mod_pars, verbose=False)
+        return
 
     def init(self, **kwargs):
-        """Initialize the sim, then discretize initial ages if v2_compat_demographics is set.
-
-        ``ss.People.init_vals()`` samples ages continuously from the UN
-        year-band histogram (each agent lands uniformly within its year bin,
-        e.g. an agent in the "age 5" bin gets a float in [5, 6)). When
-        ``v2_compat_demographics=True``, floor all initial agent ages to
-        integers after sampling so the starting cohort lands at exact
-        integer ages.
-
-        Note: ``super().init()`` runs ``SexualNetwork.init_post``, which
-        pre-forms one batch of partnerships using debut ages sampled against
-        the continuous initial-age distribution. The integer-age floor below
-        runs after that pre-form, so the very first pair graph reflects
-        continuous ages while every subsequent step sees integer ages; this
-        one-off transient at initialisation is negligible.
-        """
-        super().init(**kwargs)
+        """ Initialize; with v2_compat_demographics, whole-year initial ages """
+        with warnings.catch_warnings(): # TODO(v4-rs): each genotype's treatment transitions are undriven until a product names them (W209)
+            warnings.filterwarnings('ignore', message='W209 UndrivenTransition: "(hpv16|hpv18|hi5|ohr)\\.treat_')
+            super().init(**kwargs)
         if self._v2_compat_demographics:
             uids = self.people.auids
             self.people.age.raw[uids] = np.floor(self.people.age.raw[uids])
         return self
 
-    def shrink(self, inplace=True, full=True, size_limit=None, base_size=30, die=True):
-        """Shrink the sim for saving; skips the per-module size check by default.
+    def init_dists(self):
+        """ TODO(v4-rs): engines' distributions hold the sim before the search, which then finds every distribution again through them (port_requests HPVsim #1) """
+        for mod in self.modules:
+            for dist in getattr(getattr(mod, 'engine', None), 'dists', {}).values():
+                dist.sim = None
+        return super().init_dists()
 
-        Identical to ``ss.Sim.shrink`` except ``size_limit`` defaults to None
-        rather than 1.0. The CrossImmunity connector and HPVTotal analyzer each
-        hold references to the shared disease modules; starsim's per-module size
-        budget counts those referenced modules against them and raises on a
-        multi-genotype sim, even though ``sc.save`` serializes the disease
-        modules once and the actual file is small (~1 MB). Dist and
-        back-reference shrinking still run — only the (double-counting) size
-        check is disabled. Pass ``size_limit=1.0`` to restore it.
-        """
-        return super().shrink(inplace=inplace, full=full, size_limit=size_limit,
-                              base_size=base_size, die=die)
+    @property
+    def genotypes(self):
+        """ The HPV genotype diseases """
+        return [d for d in self.diseases.values() if isinstance(d, HPV)]
+
+
+class _NewAgentImmunity(ss.Demographics):
+    """
+    TODO(v4-rs): when people are added, the arrays grow past the agents in use, with NaN; a cross-immunity modifier
+    reads every slot, and E212 sees the NaN (port_requests HPVsim #11). Unused slots get no immunity (0).
+    """
+    def __init__(self, **kwargs):
+        super().__init__(name='new_agent_immunity', **kwargs)
+        return
+
+    def step(self):
+        for h in self.sim.diseases.values():
+            if isinstance(h, HPV):
+                for key in ['nab', 'cell']:
+                    raw = h[key].raw
+                    raw[np.isnan(raw)] = 0.0
+        return
+
+
+def _art_by_year(art):
+    """ ART coverage by year, averaged over ages and sexes, as {year: share} """
+    df = art.groupby('year')['coverage'].mean()
+    return {float(y): float(v) for y, v in df.items()}

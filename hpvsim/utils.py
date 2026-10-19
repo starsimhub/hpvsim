@@ -100,21 +100,12 @@ def indef_int_logf2(x, k, x_infl, ttc=25, y_max=1):
 def intlogf2(upper, k, x_infl, ttc=25, y_max=1):
     '''
     Integral of logf2 between 0 and the limit given by upper
+
+    NumPy only (no indexing), so it also works on Starsim expressions, e.g. of a clock
     '''
-    # Find the upper limits not including the part past time to cancer
-    exceeding_ttc_inds = (upper > ttc).nonzero()
-    lims_to_find = np.minimum(ttc, upper)
-
-    # Take the integral
-    val_at_0 = indef_int_logf2(0, k, x_infl, ttc)
-    val_at_lim = indef_int_logf2(lims_to_find, k, x_infl, ttc)
-    integral = val_at_lim - val_at_0
-
-    # Deal with those whose duration of infection exceeds the time to cancer
-    excess_integral = upper[exceeding_ttc_inds] - ttc
-    integral[exceeding_ttc_inds] += excess_integral
-
-    return integral
+    lims = np.minimum(ttc, upper) # The part before the time to cancer
+    integral = indef_int_logf2(lims, k, x_infl, ttc, y_max) - indef_int_logf2(0, k, x_infl, ttc, y_max)
+    return integral + np.maximum(upper - ttc, 0) # Past the time to cancer, the integrand is 1
 
 
 # --- Severity / progression dispatch ---------------------------------- #

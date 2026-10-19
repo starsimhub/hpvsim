@@ -1,723 +1,246 @@
-"""HPV-specific Starsim interventions.
-
-Contains the prophylactic vaccination intervention API:
-``hpv.BaseVaccination`` (a subclass of ``ss.BaseVaccination`` that
-accepts ``age_range`` / ``sex`` / ``eligibility`` constructor args and
-composes them into a single Starsim eligibility callable) and the
-``hpv.routine_vx`` / ``hpv.campaign_vx`` leaf classes that combine it
-with Starsim's RoutineDelivery / CampaignDelivery.
-
-Also provides screening (routine_screening / campaign_screening), triage
-(routine_triage / campaign_triage), treatment, dynamic_pars, and the
-txvx family (BaseTxVx / routine_txvx / campaign_txvx / linked_txvx).
 """
-from collections import defaultdict
+HPV interventions with HPVsim's names, as Starsim 4 deliveries
 
+Each function returns an ``ss.vaccinate``, ``ss.screen``, or ``ss.treat``, so anything those take can
+be given too (``capacity=``, ``queue=``, ``repeat=``, ``priority=``, ``on_result=``, ...).
+
+Algorithms are trees of follow-ups: a triage or treatment is given as ``on_positive=`` (or
+``on_result=``) of the screen it follows, instead of an ``eligibility=`` function reading the
+screen's ``outcomes``::
+
+    ablation = hpv.treat_num(product='ablation', prob=0.9, max_capacity=100)
+    via = hpv.routine_triage(product='via', prob=0.9, on_positive=ablation)
+    screen = hpv.routine_screening(product='hpv', prob=0.2, start_year=2025, age_range=(30, 50), on_positive=via)
+
+Routine delivery at an annual probability (``prob``) is a rate among those eligible at every step
+(``coverage=ss.probperyear(prob)``, ``repeat=True``), as in HPVsim 3; a campaign (``years=``) offers
+the product once to everyone eligible in each of those years.
+"""
 import numpy as np
+import sciris as sc
 import starsim as ss
 
-from hpvsim.products import vx as _vx
-from hpvsim.utils import any_genotype_cancer
+from . import products as hpp
 
 __all__ = [
-    'BaseVaccination', 'routine_vx', 'campaign_vx',
-    'BaseTest', 'BaseScreening', 'BaseTriage',
+    'routine_vx', 'campaign_vx',
     'routine_screening', 'campaign_screening',
     'routine_triage', 'campaign_triage',
-    'BaseTreatment', 'treat_num', 'treat_delay',
-    'BaseTxVx', 'routine_txvx', 'campaign_txvx', 'linked_txvx',
-    'dynamic_pars',
+    'treat_num', 'treat_delay',
+    'routine_txvx', 'campaign_txvx', 'linked_txvx',
+    'dynamic_pars', 'any_cancer',
 ]
+
+ppl = ss.people
 
 
 def _cast_sex(sex):
-    """Cast sex input into a set of allowed sex ints (0=F, 1=M).
-
-    Accepts:
-      - None: no sex filter (returns None)
-      - 'f' / 'm': single sex
-      - 'fm' / 'mf': both sexes (equivalent to None)
-      - 0 / 1 (int): single sex by int convention
-      - list of 'f'/'m'/0/1: union of sexes
-
-    Anything else raises ValueError. A both-sexes request (None, 'fm',
-    ['f','m'], [0,1]) applies no sex restriction at all.
-    """
+    """ 'f', 'm', 'fm', 0, 1, or a list of them, as a set of 0 (female) and 1 (male); None for both """
     if sex is None:
         return None
     if isinstance(sex, str):
-        if len(sex) == 0:
-            raise ValueError("sex string must not be empty; pass None for 'no sex filter'")
         out = set()
         for char in sex:
-            if char == 'f':
-                out.add(0)
-            elif char == 'm':
-                out.add(1)
-            else:
-                raise ValueError(f"sex string must contain only 'f' and 'm', got {sex!r}")
-        return out
+            if char not in 'fm':
+                raise ValueError(f"sex must contain only 'f' and 'm', not {sex!r}")
+            out.add(0 if char == 'f' else 1)
+        return out or None
     if isinstance(sex, (list, tuple, set, np.ndarray)):
-        if len(sex) == 0:
-            raise ValueError("sex list must not be empty; pass None for 'no sex filter'")
         out = set()
         for s in sex:
             out |= _cast_sex(s)
         return out
-    try:
-        s_int = int(sex)
-    except (TypeError, ValueError):
-        raise ValueError(f"sex must be 'f', 'm', 0, 1, or a list thereof, got {sex!r}")
-    if s_int not in (0, 1):
-        raise ValueError(f"sex int must be 0 or 1, got {sex!r}")
-    return {s_int}
+    if int(sex) not in (0, 1):
+        raise ValueError(f'sex must be 0 or 1, not {sex!r}')
+    return {int(sex)}
 
 
-def _as_boolarr(extra_result, people):
-    """Coerce an eligibility-callback return value into a BoolArr.
-
-    Starsim eligibility callbacks may return either a BoolArr/BoolState or
-    an ss.uids. We need a BoolArr so we can intersect with our own conditions
-    via ``&``. Clone people.alive (same shape, same linkage) all-False and
-    fill True at the returned uids.
+def any_cancer(genotypes=None):
     """
-    if isinstance(extra_result, ss.BoolArr):
-        return extra_result
-    # Assume ss.uids or array-like of ints — build a blank BoolArr from alive
-    out = people.alive.asnew()
-    out.raw[:] = False
-    out[extra_result] = True
+    Having cancer of any genotype, as a condition: of the genotypes given, or (as a function of the sim, so agents only) of all in the sim
+
+    Args:
+        genotypes (list): the genotype diseases, by name
+    """
+    if genotypes is not None:
+        return ss.any(ss.state(f'{g}.X') for g in genotypes)
+    return _any_cancer
+
+
+def _no_cancer(sim):
+    """ Who is alive with no cancer of any genotype """
+    auids = sim.people.auids
+    return auids[~np.isin(auids, _any_cancer(sim))]
+
+
+def _any_cancer(sim):
+    """ Who has cancer of any genotype in the sim """
+    from .hpv import HPV
+    return ss.uids.concatenate([d.X.uids for d in sim.diseases.values() if isinstance(d, HPV)]).unique()
+
+
+def _eligible(age_range=None, sex=None, eligibility=None, debut_age=None, extra=None):
+    """ Who is eligible, as a condition: an age range [lo, hi), a sex, a minimum age, and any further condition (or a function of the sim) """
+    conds = []
+    if age_range is not None:
+        lo, hi = age_range
+        conds += [ppl.age >= lo, ppl.age < hi]
+    if debut_age is not None:
+        conds.append(ppl.age >= debut_age)
+    sexes = _cast_sex(sex)
+    if sexes is not None and len(sexes) == 1:
+        conds.append(ppl.female if 0 in sexes else ~ppl.female)
+    if extra is not None:
+        conds.append(extra)
+    if eligibility is not None: # A condition, or a function of the sim (which makes the model agent-based)
+        conds.append(eligibility)
+    if not conds:
+        return None
+    out = conds[0]
+    for c in conds[1:]:
+        out = out & c if isinstance(out, ss.Cond) or isinstance(c, ss.Cond) else ss.conditions.as_cond(out) & c
     return out
 
 
-def _apply_age_sex(cond, people, age_range, sex_set):
-    """Intersect ``cond`` with the age-range and sex restrictions.
+def _timing(start_year=None, end_year=None, years=None):
+    return dict(start=start_year, stop=end_year, years=None if years is None else sc.tolist(years))
 
-    Age bounds are half-open, ``[age_range[0], age_range[1])`` — the same
-    convention for every intervention family (vaccination, screening,
-    treatment, txvx). A both-sexes request (``sex_set`` None or containing
-    both 0 and 1) applies no sex restriction at all.
+
+def _rate(prob):
+    if isinstance(prob, (list, tuple, np.ndarray)) or isinstance(prob, dict):
+        raise NotImplementedError('A probability that varies by year is not supported yet as a rate (TODO(v4-rs): ss.probperyear(ss.timeseries(...)))')
+    return ss.probperyear(prob)
+
+
+def _product(product, cls):
+    return cls(name=product) if isinstance(product, str) else product
+
+
+def routine_vx(product=None, prob=None, age_range=None, sex='f', eligibility=None, start_year=None, end_year=None, years=None, name=None, **kwargs):
     """
-    if age_range is not None:
-        lo, hi = age_range
-        cond = cond & (people.age >= lo) & (people.age < hi)
-    if sex_set is not None and len(sex_set) == 1:
-        (s,) = sex_set
-        # Starsim has no numeric sex array; map int -> BoolArr.
-        cond = cond & (people.female if s == 0 else people.male)
-    return cond
+    Routine prophylactic vaccination: an annual probability among those eligible, every step
 
+    Args:
+        product (str/hpv.vx): 'bivalent', 'quadrivalent', 'nonavalent', or a product
+        prob (float): annual probability of vaccination among those eligible
+        age_range (tuple): ages [lo, hi)
+        sex (str): 'f' (default), 'm', or 'fm'
+        eligibility (Cond/func): who else must hold; a function of the sim makes it agents only
+        start_year, end_year (float): when it runs
+        kwargs (dict): passed to `ss.vaccinate` (e.g. `dose=`)
 
-# Products are Starsim modules too, registered on sim.people under their own
-# name, so an intervention sharing that name dies at sim.init(). These are the
-# default module names of the HPV product classes; an explicitly named product
-# (e.g. hpv.dx(name='via')) reserves that name instead.
-_RESERVED_PRODUCT_NAMES = ('vx', 'dx', 'tx', 'txvx', 'radiation')
-
-
-def _check_name_collision(intervention):
-    """Raise a clear error if the intervention's name is its product's name.
-
-    Without this, ``sim.init()`` fails much later with an opaque
-    ``AttributeError: Module <name> already added`` from People.add_module.
+    Examples:
+        ```python
+        vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=(9, 10), start_year=2020)
+        ```
     """
-    product = getattr(intervention, 'product', None)
-    product_name = getattr(product, 'name', None)
-    name = intervention.name
-    if product_name is not None and name == product_name:
-        raise ValueError(
-            f'Intervention name {name!r} is reserved: its product '
-            f'({type(product).__name__}) is itself a module registered on '
-            f'sim.people under the name {name!r}, so both would claim it and '
-            f'sim.init() would fail. Rename the intervention, e.g. '
-            f'name={name + "_program"!r}. Reserved names are the product '
-            f'module names {_RESERVED_PRODUCT_NAMES}, plus any explicit '
-            f"product name (hpv.dx(name='via') reserves 'via')."
-        )
+    return ss.vaccinate(_product(product, hpp.vx), coverage=_rate(prob), eligible=_eligible(age_range, sex, eligibility),
+                        **_timing(start_year, end_year), name=name, **kwargs)
 
 
-def _compose_vaccine_eligibility(age_range, sex, extra):
-    """Compose age/sex/eligibility targeting into a Starsim eligibility callable.
+def campaign_vx(product=None, prob=None, years=None, age_range=None, sex='f', eligibility=None, name=None, **kwargs):
+    """ A vaccination campaign: in each of `years`, everyone eligible is offered it, and a share `prob` are vaccinated """
+    return ss.vaccinate(_product(product, hpp.vx), coverage=prob, eligible=_eligible(age_range, sex, eligibility), years=sc.tolist(years), name=name, **kwargs)
 
-    Returns ``elig(sim) -> ss.uids`` that intersects:
-      - sim.people.alive
-      - sim.people.age in [age_range[0], age_range[1]) if age_range is set
-      - sim.people.sex matches sex if sex is set to a single sex
-      - extra(sim) if extra is provided (callable returning BoolArr or uids)
+
+def routine_screening(product=None, prob=None, age_range=None, sex='f', eligibility=None, debut_age=None, start_year=None, end_year=None, years=None, name=None, **kwargs):
     """
-    sex_set = _cast_sex(sex)
+    Routine screening: an annual probability among those eligible, every step
 
-    def elig(sim):
-        cond = _apply_age_sex(sim.people.alive, sim.people, age_range, sex_set)
-        if extra is not None:
-            cond = cond & _as_boolarr(extra(sim), sim.people)
-        return cond.uids
+    Args:
+        product (str/hpv.dx): e.g. 'hpv', 'via', 'lbc', or a product
+        prob (float): annual probability of being screened among those eligible
+        age_range (tuple): ages [lo, hi)
+        sex (str): 'f' (default), 'm', or 'fm'
+        eligibility (Cond/func): who else must hold
+        debut_age (float): a minimum age
+        kwargs (dict): passed to `ss.screen`: `on_positive=`, `on_negative=`, `on_result=`, `repeat=` (e.g. `ss.years(5)`), ...
 
-    return elig
-
-
-def _compose_screening_eligibility(age_range, sex, extra, debut_age):
-    """Compose screening eligibility into a Starsim callable.
-
-    Extends ``_compose_vaccine_eligibility`` with an optional ``debut_age`` lower-
-    bound on ``sim.people.age``. When ``debut_age`` is None, semantics are
-    identical to ``_compose_vaccine_eligibility``.
-
-    Returns ``elig(sim) -> ss.uids`` intersecting:
-      - sim.people.alive
-      - sim.people.female / male (per _cast_sex(sex))
-      - sim.people.age in [age_range[0], age_range[1]) if set
-      - sim.people.age >= debut_age if set
-      - extra(sim) if provided
+    Examples:
+        ```python
+        screen = hpv.routine_screening(product='hpv', prob=0.2, age_range=(30, 50), start_year=2025, repeat=ss.years(5),
+                                       on_positive=hpv.treat_num(product='ablation', prob=0.9))
+        ```
     """
-    sex_set = _cast_sex(sex)
-
-    def elig(sim):
-        cond = _apply_age_sex(sim.people.alive, sim.people, age_range, sex_set)
-        if debut_age is not None:
-            cond = cond & (sim.people.age >= debut_age)
-        if extra is not None:
-            cond = cond & _as_boolarr(extra(sim), sim.people)
-        return cond.uids
-
-    return elig
+    kwargs.setdefault('repeat', True)
+    return ss.screen(_product(product, hpp.dx), coverage=_rate(prob), eligible=_eligible(age_range, sex, eligibility, debut_age),
+                     **_timing(start_year, end_year), name=name, **kwargs)
 
 
-class BaseVaccination(ss.BaseVaccination):
-    """HPV-specific prophylactic vaccination base.
+def campaign_screening(product=None, prob=None, years=None, age_range=None, sex='f', eligibility=None, debut_age=None, name=None, **kwargs):
+    """ A screening campaign: in each of `years`, a share `prob` of those eligible are screened """
+    return ss.screen(_product(product, hpp.dx), coverage=prob, eligible=_eligible(age_range, sex, eligibility, debut_age), years=sc.tolist(years), name=name, **kwargs)
 
-    Wraps Starsim's ``ss.BaseVaccination`` to add ``age_range`` / ``sex`` /
-    ``eligibility`` constructor args. These compose into a single Starsim
-    eligibility callable. The originals are stored on the instance for
-    introspection (e.g. by_age consumption).
 
-    Also overrides ``_parse_product_str`` so that
-    ``routine_vx(product='bivalent', ...)`` resolves through
-    ``hpv.vx(name='bivalent')``.
+def routine_triage(product=None, prob=None, age_range=None, sex=None, eligibility=None, name=None, **kwargs):
     """
+    A triage test, given as a follow-up (`on_positive=`, `on_result=`) of a screen: a share `prob` of those sent to it come
 
-    def __init__(self, *args, age_range=None, sex='f', eligibility=None,
-                 **kwargs):
-        composed = _compose_vaccine_eligibility(age_range, sex, eligibility)
-        super().__init__(*args, eligibility=composed, **kwargs)
-        # Raw constructor args, preserved for introspection.
-        self.age_range = age_range
-        self.sex_raw = sex
-        self.sex = _cast_sex(sex)
-        self.eligibility_raw = eligibility
-        _check_name_collision(self)
-
-    def _parse_product_str(self, product):
-        """Resolve a string product name through hpv.vx default lookup."""
-        return _vx(name=product)
-
-    def init_results(self):
-        """Dose time series, mirroring the screening/treatment results.
-
-        ``new_vaccinated`` counts first doses only; ``new_doses`` counts every
-        dose. Both are ``scale=True``, so they come out in real-population
-        units. The ``cum_*`` pair is filled in :meth:`finalize_results`.
-        """
-        super().init_results()
-        self.define_results(
-            ss.Result('new_vaccinated',  dtype=int,   scale=True, label='Number newly vaccinated'),
-            ss.Result('new_doses',       dtype=int,   scale=True, label='Number of doses administered'),
-            ss.Result('cum_vaccinated',  dtype=float, scale=True, label='Cumulative number vaccinated'),
-            ss.Result('cum_doses',       dtype=float, scale=True, label='Cumulative doses administered'),
-        )
-
-    def step(self):
-        accept_uids = super().step()
-        if len(accept_uids):
-            # super().step() already bumped n_doses, so ==1 marks a first dose.
-            first = accept_uids[self.n_doses[accept_uids] == 1]
-            self.results['new_vaccinated'][self.ti] += len(first)
-            self.results['new_doses'][self.ti] += len(accept_uids)
-        return accept_uids
-
-    def finalize_results(self):
-        # super() scales the per-step counts by pop_scale first, so the cumsums
-        # inherit the scaling (same pattern as hpv.HPV.finalize_results).
-        super().finalize_results()
-        res = self.results
-        res['cum_vaccinated'][:] = np.cumsum(res['new_vaccinated'])
-        res['cum_doses'][:] = np.cumsum(res['new_doses'])
-
-
-class routine_vx(BaseVaccination, ss.RoutineDelivery):
-    """Routine prophylactic HPV vaccination."""
-    pass
-
-
-class campaign_vx(BaseVaccination, ss.CampaignDelivery):
-    """Campaign-style prophylactic HPV vaccination."""
-    pass
-
-
-class BaseTest(ss.BaseTest):
-    """HPV-specific test/screening base.
-
-    Adds age_range / sex / eligibility / debut_age kwargs, composed into a
-    single Starsim eligibility callable via _compose_screening_eligibility.
-    Overrides _parse_product_str so routine_screening(product='via', ...)
-    resolves through hpv.dx(name='via').
+    Args:
+        product (str/hpv.dx): e.g. 'via', 'colposcopy', 'tx_assigner'
+        prob (float): the share of those sent who come
+        kwargs (dict): passed to `ss.screen`: its own `on_positive=`, `on_result=`, ...
     """
-
-    def __init__(self, *args, age_range=None, sex='f', eligibility=None,
-                 debut_age=None, **kwargs):
-        composed = _compose_screening_eligibility(age_range, sex, eligibility, debut_age)
-        super().__init__(*args, eligibility=composed, **kwargs)
-        self.age_range = age_range
-        self.sex_raw = sex
-        self.sex = _cast_sex(sex)
-        self.eligibility_raw = eligibility
-        self.debut_age = debut_age
-        _check_name_collision(self)
-
-    def _parse_product_str(self, product):
-        from hpvsim.products import dx as _dx
-        return _dx(name=product)
+    return ss.screen(_product(product, hpp.dx), coverage=prob, eligible=_eligible(age_range, sex, eligibility), name=name, **kwargs)
 
 
-class BaseScreening(BaseTest, ss.BaseScreening):
-    """HPV-specific BaseScreening.
+campaign_triage = routine_triage
 
-    Two differences from ``ss.BaseScreening``:
 
-    - Records ``new_dx`` through :meth:`_count_diagnosed` instead of the
-      upstream hardcoded ``self.outcomes['positive']``, which KeyErrors
-      for products whose result hierarchy uses other labels (cytology's
-      ``ascus``/``abnormal``, or ``hpv_type``'s ``positive_1618`` /
-      ``positive_ohr``) when they are used as a *primary* screen. Behaviour
-      for ``via``/``hpv`` (which do define ``'positive'``) is unchanged.
-    - Renames the shipped ``n_screened`` / ``n_dx`` results to
-      ``new_screens`` / ``new_dx``. Both are per-step flows, and the
-      ``n_``-prefixed names collide with the ``ss.Result.annualize``
-      heuristic which reads ``n_*`` as a stock (averaged over sub-steps)
-      rather than a flow (summed). The ``new_*`` names sum correctly.
+def _tx_eligible(product, age_range, sex, eligibility, genotypes=None):
+    """ Treatments for lesions are for people with no cancer of any genotype; radiation is for people with cancer """
+    cancer = any_cancer(genotypes)
+    if isinstance(product, hpp.radiation):
+        extra = cancer
+    else:
+        extra = ~cancer if isinstance(cancer, ss.Cond) else _no_cancer
+    return _eligible(age_range, sex, eligibility, extra=extra)
+
+
+def treat_num(product=None, prob=None, max_capacity=None, age_range=None, sex='f', eligibility=None, genotypes=None, name=None, **kwargs):
     """
+    Treatment, usually as a follow-up of a test: a share `prob` of those sent are treated, up to `max_capacity` a step
 
-    # Result labels that do not represent a positive diagnosis.
-    _NEGATIVE_OUTCOMES = ('negative', 'normal', 'inadequate')
+    Those over capacity wait (first come, first served) and leave the queue if they are no longer eligible,
+    as in HPVsim 3; give `queue=ss.years(1)` for the longest wait, or `queue=False` to drop them.
 
-    def init_results(self):
-        super().init_results()
-        # Drop the upstream stock-named results; replace with flow-named ones.
-        for stale in ('n_screened', 'n_dx'):
-            if stale in self.results:
-                del self.results[stale]
-        self.define_results(
-            ss.Result('new_screens', dtype=int, scale=True, label='Number screened'),
-            ss.Result('new_dx', dtype=int, scale=True, label='Number diagnosed'),
-        )
-
-    def step(self):
-        sim = self.sim
-        accept_uids = ss.uids()
-        if sim.ti in self.timepoints:
-            accept_uids = self.deliver()
-            if len(accept_uids):
-                self.screened[accept_uids] = True
-                self.screens[accept_uids] += 1
-                self.ti_screened[accept_uids] = sim.ti
-                self.results['new_screens'][sim.ti] = len(accept_uids)
-                self.results['new_dx'][sim.ti] = self._count_diagnosed()
-        return accept_uids
-
-    def _count_diagnosed(self):
-        """Number diagnosed this step.
-
-        Uses the ``'positive'`` outcome when the product defines one; otherwise
-        counts every screened agent whose result was not negative/normal/
-        inadequate (deduplicated across genotype-specific positive labels).
-        """
-        outcomes = self.outcomes
-        if 'positive' in outcomes:
-            return len(outcomes['positive'])
-        dx = np.array([], dtype=int)
-        for key, uids in outcomes.items():
-            if key not in self._NEGATIVE_OUTCOMES:
-                dx = np.union1d(dx, np.asarray(uids))
-        return len(dx)
-
-
-class BaseTriage(BaseTest, ss.BaseTriage):
-    """HPV-specific BaseTriage.
-
-    Overrides ss.BaseTriage.step to use integer-ti membership (the same
-    pattern ss.BaseScreening uses correctly). Upstream Starsim 3.3.4 has
-    a TODO on its triage step using `sim.t in timepoints` which silently
-    fails under quarterly dt because sim.t is a freq object, not an int.
-
-    Also mirrors ss.BaseScreening's per-step bookkeeping: records screened,
-    screens, and ti_screened so that downstream eligibility callbacks (and
-    test assertions) can inspect who was triaged.
+    Args:
+        product (str/hpv.tx/hpv.radiation): 'ablation', 'excision', 'radiation', or a product
+        prob (float): the share treated
+        max_capacity (float): the most treated in a step (None for no limit)
+        genotypes (list): the genotypes (for who has cancer; default all four)
+        kwargs (dict): passed to `ss.treat`
     """
-
-    def step(self):
-        self.outcomes = {k: ss.uids() for k in self.product.hierarchy}
-        accept_uids = ss.uids()
-        # timepoints are sim-ti indices, so the schedule gate uses sim.ti;
-        # module-owned state below uses self.ti.
-        if self.sim.ti in self.timepoints:
-            accept_uids = self.deliver()
-            if len(accept_uids):
-                self.screened[accept_uids] = True
-                self.screens[accept_uids] += 1
-                self.ti_screened[accept_uids] = self.ti
-        return accept_uids
+    product = hpp.radiation() if product == 'radiation' else _product(product, hpp.tx)
+    if max_capacity is not None:
+        kwargs.setdefault('queue', True)
+    return ss.treat(product, coverage=prob, capacity=max_capacity, eligible=_tx_eligible(product, age_range, sex, eligibility, genotypes), name=name, **kwargs)
 
 
-class routine_screening(BaseScreening, ss.RoutineDelivery):
-    """Routine HPV screening."""
-    pass
+def treat_delay(*args, **kwargs):
+    """ Not ported: give the test the delay (`ss.Test(delay=...)`), or queue the treatment (`queue=`) """
+    raise NotImplementedError('hpv.treat_delay is not ported to Starsim 4: give the test before it a delay (hpv.dx(..., delay=ss.months(6))) or use treat_num(queue=...)')
 
 
-class campaign_screening(BaseScreening, ss.CampaignDelivery):
-    """Campaign HPV screening."""
-    pass
+def routine_txvx(product='txvx1', prob=None, age_range=None, sex='f', eligibility=None, start_year=None, end_year=None, genotypes=None, name=None, **kwargs):
+    """ Routine therapeutic vaccination: an annual probability among those eligible (with no cancer), every step """
+    product = _product(product, hpp.txvx)
+    kwargs.setdefault('repeat', True)
+    return ss.treat(product, coverage=_rate(prob), eligible=_tx_eligible(product, age_range, sex, eligibility, genotypes), **_timing(start_year, end_year), name=name, **kwargs)
 
 
-class routine_triage(BaseTriage, ss.RoutineDelivery):
-    """Routine HPV triage."""
-    pass
+def campaign_txvx(product='txvx1', prob=None, years=None, age_range=None, sex='f', eligibility=None, genotypes=None, name=None, **kwargs):
+    """ A therapeutic vaccination campaign """
+    product = _product(product, hpp.txvx)
+    return ss.treat(product, coverage=prob, eligible=_tx_eligible(product, age_range, sex, eligibility, genotypes), years=sc.tolist(years), name=name, **kwargs)
 
 
-class campaign_triage(BaseTriage, ss.CampaignDelivery):
-    """Campaign HPV triage."""
-    pass
+def linked_txvx(product='txvx1', prob=None, age_range=None, sex='f', eligibility=None, genotypes=None, name=None, **kwargs):
+    """ Therapeutic vaccination as a follow-up (`on_positive=`, `on_result=`) of a test """
+    product = _product(product, hpp.txvx)
+    return ss.treat(product, coverage=prob, eligible=_tx_eligible(product, age_range, sex, eligibility, genotypes), name=name, **kwargs)
 
 
-class BaseTreatment(ss.BaseTreatment):
-    """HPV-specific treatment base.
-
-    Adds:
-    - age_range / sex / eligibility kwargs
-    - HPV-specific eligibility: female + alive + cancer-status-matched
-      (cancer treatments require any-genotype cancerous; non-cancer
-      treatments require no cancerous on any genotype)
-    - Per-intervention state: cin_treated / cin_treatments / ti_cin_treated
-      for CIN treatments, cancer_treated / etc. for cancer treatments
-
-    The `treat_cancer` flag is derived at __init__ time from whether the
-    product is an `hpv.radiation` instance.
-    """
-
-    def __init__(self, *args, age_range=None, sex='f', eligibility=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.age_range = age_range
-        # Late import to avoid circular
-        from hpvsim.products import radiation as _radiation
-        self.treat_cancer = isinstance(self.product, _radiation)
-        self.sex_raw = sex
-        self.sex = _cast_sex(sex)
-        self.eligibility_user = eligibility
-        self.define_states(
-            ss.BoolArr('cin_treated'),
-            ss.FloatArr('cin_treatments', default=0),
-            ss.FloatArr('ti_cin_treated'),
-            ss.BoolArr('cancer_treated'),
-            ss.FloatArr('cancer_treatments', default=0),
-            ss.FloatArr('ti_cancer_treated'),
-        )
-        _check_name_collision(self)
-
-    def _parse_product_str(self, product):
-        from hpvsim.products import tx as _tx
-        return _tx(name=product)
-
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('new_cin_treated',    dtype=int, scale=True, label='Number first-CIN-treated'),
-            ss.Result('new_cancer_treated', dtype=int, scale=True, label='Number first-cancer-treated'),
-            # Total procedures per step, including repeats -- program volume,
-            # vs new_cin_treated / new_cancer_treated which are unique-agent-first counts.
-            ss.Result('new_treatments',     dtype=int, scale=True, label='Number of treatments delivered'),
-        )
-
-    def check_eligibility(self):
-        """Alive + sex + age_range ``[lo, hi)`` + cancer-status match."""
-        sim = self.sim
-        cond = _apply_age_sex(sim.people.alive, sim.people, self.age_range, self.sex)
-        any_cancer = any_genotype_cancer(sim)
-        cond = cond & (any_cancer if self.treat_cancer else ~any_cancer)
-        if self.eligibility_user is not None:
-            cond = cond & _as_boolarr(self.eligibility_user(sim), sim.people)
-        return cond.uids
-
-    def step(self):
-        """Reset per-step outcomes before delegating to the treatment step."""
-        self.outcomes = {'successful': ss.uids(), 'unsuccessful': ss.uids()}
-        return super().step()
-
-
-class treat_num(BaseTreatment, ss.treat_num):
-    """Treat a fixed number of HPV+CIN+ agents each step (or all eligible if max_capacity=None)."""
-
-    def step(self):
-        treat_uids = super().step()
-        if len(treat_uids):
-            self.results['new_treatments'][self.ti] += len(treat_uids)
-            if self.treat_cancer:
-                new = treat_uids[~self.cancer_treated[treat_uids]]
-                self.cancer_treated[treat_uids] = True
-                self.cancer_treatments[treat_uids] += 1
-                self.ti_cancer_treated[treat_uids] = self.ti
-                self.results['new_cancer_treated'][self.ti] += len(new)
-            else:
-                new = treat_uids[~self.cin_treated[treat_uids]]
-                self.cin_treated[treat_uids] = True
-                self.cin_treatments[treat_uids] += 1
-                self.ti_cin_treated[treat_uids] = self.ti
-                self.results['new_cin_treated'][self.ti] += len(new)
-        return treat_uids
-
-
-class treat_delay(BaseTreatment):
-    """Treat HPV+CIN+ agents after a fixed delay.
-
-    On each step:
-      1. Newly-eligible accepters are enqueued at `due_ti = self.ti +
-         round(delay / dt)`.
-      2. Agents whose due_ti is the current ti are treated.
-
-    delay is in years. Scheduler keys are integer ti so timing is exact
-    under any dt; the round() picks the nearest integer step for
-    non-integer (delay / dt) ratios.
-    """
-
-    def __init__(self, delay=None, **kwargs):
-        super().__init__(**kwargs)
-        self.delay = delay or 0
-        self.scheduler = defaultdict(list)
-
-    def add_to_schedule(self):
-        accept = self.get_accept_inds()
-        if len(accept):
-            due_ti = self.ti + int(round(self.delay / self.t.dt_year))
-            self.scheduler[due_ti].extend(int(u) for u in accept)
-
-    def get_candidates(self):
-        return ss.uids(self.scheduler.pop(self.ti, []))
-
-    def step(self):
-        self.add_to_schedule()
-        treat_uids = super().step()
-        # super().step() only calls product.administer, so do the bookkeeping here.
-        if len(treat_uids):
-            self.results['new_treatments'][self.ti] += len(treat_uids)
-            if self.treat_cancer:
-                new = treat_uids[~self.cancer_treated[treat_uids]]
-                self.cancer_treated[treat_uids] = True
-                self.cancer_treatments[treat_uids] += 1
-                self.ti_cancer_treated[treat_uids] = self.ti
-                self.results['new_cancer_treated'][self.ti] += len(new)
-            else:
-                new = treat_uids[~self.cin_treated[treat_uids]]
-                self.cin_treated[treat_uids] = True
-                self.cin_treatments[treat_uids] += 1
-                self.ti_cin_treated[treat_uids] = self.ti
-                self.results['new_cin_treated'][self.ti] += len(new)
-        return treat_uids
-
-
-class BaseTxVx(BaseTreatment):
-    """HPV therapeutic vaccination base.
-
-    Extends BaseTreatment with txvx-specific per-intervention state:
-    tx_vaccinated / txvx_doses / ti_tx_vaccinated.
-
-    Note: BaseTxVx inherits the cin_treated / cancer_treated / etc. states
-    from BaseTreatment. These remain all-zero on txvx interventions
-    (radiation never matches, no CIN treatment happens here). They're a
-    small memory + introspection cost in exchange for keeping the
-    BaseTreatment state-definition path single-sourced.
-
-    Delivery clears infection/lesions and confers severity immunity via
-    hpv.txvx.administer (a treatment product). The intervention's own dose
-    counters track program-level uptake.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.define_states(
-            ss.BoolArr('tx_vaccinated'),
-            ss.FloatArr('txvx_doses', default=0),
-            ss.FloatArr('ti_tx_vaccinated'),
-        )
-
-    def _parse_product_str(self, product):
-        from hpvsim.products import txvx as _txvx
-        return _txvx(name=product)
-
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('new_tx_vaccinated', dtype=int, scale=True, label='Number first-txvx-vaccinated'),
-            ss.Result('new_txvx_doses',    dtype=int, scale=True, label='Number txvx doses administered'),
-        )
-
-    def check_eligibility(self):
-        """TxVx eligibility — alive + sex + age range ``[lo, hi)`` + cancer-free.
-
-        Overrides BaseTreatment.check_eligibility to hard-gate on the
-        cancer-free arm regardless of the inherited treat_cancer flag.
-        Therapeutic vaccines are never given to cancer patients (radiation
-        is for that path); a non-radiation txvx product on a routine_txvx
-        would still set treat_cancer=False through the BaseTreatment init,
-        but pinning the cancer-free condition here makes the semantics
-        explicit and resilient to product-type confusion.
-
-        Sex follows ``sex=`` (default ``'f'``) rather than being hardcoded to
-        female, so ``sex=['f','m']`` really does include men.
-        """
-        sim = self.sim
-        cond = _apply_age_sex(sim.people.alive, sim.people, self.age_range, self.sex)
-        # Never treat cancer agents
-        any_cancer = any_genotype_cancer(sim)
-        cond = cond & ~any_cancer
-        if self.eligibility_user is not None:
-            cond = cond & _as_boolarr(self.eligibility_user(sim), sim.people)
-        return cond.uids
-
-    def deliver(self):
-        """One-step delivery — finds accepters, administers, bumps counters."""
-        accept_uids = self.get_accept_inds()
-        if len(accept_uids):
-            self.product.administer(accept_uids)
-            new = accept_uids[~self.tx_vaccinated[accept_uids]]
-            self.tx_vaccinated[accept_uids] = True
-            self.txvx_doses[accept_uids] += 1
-            self.ti_tx_vaccinated[accept_uids] = self.ti
-            self.results['new_tx_vaccinated'][self.ti] += len(new)
-            self.results['new_txvx_doses'][self.ti] += len(accept_uids)
-        return accept_uids
-
-    def step(self):
-        # Default: scheduled delivery via RoutineDelivery/CampaignDelivery's timepoints
-        if self.sim.ti in self.timepoints:
-            return self.deliver()
-        return ss.uids()
-
-
-class routine_txvx(BaseTxVx, ss.RoutineDelivery):
-    """Routine therapeutic vaccination."""
-    pass
-
-
-class campaign_txvx(BaseTxVx, ss.CampaignDelivery):
-    """Campaign therapeutic vaccination."""
-    pass
-
-
-class linked_txvx(BaseTxVx):
-    """Therapeutic vaccination linked to another intervention's outcomes.
-
-    Has no own timeline. Fires every step; eligibility= callback (required)
-    determines who actually receives the dose. Typical usage:
-
-        linked = hpv.linked_txvx(
-            product='txvx1', prob=0.6,
-            eligibility=lambda s: s.interventions['colpo'].outcomes['lsil'],
-        )
-    """
-
-    def __init__(self, *args, eligibility=None, **kwargs):
-        if eligibility is None:
-            raise ValueError(
-                "linked_txvx requires eligibility= "
-                "(typically a screen.outcomes['positive'] callback)"
-            )
-        super().__init__(*args, eligibility=eligibility, **kwargs)
-        # No own schedule: self.step() overrides BaseTxVx.step entirely.
-        self.timepoints = None
-
-    def step(self):
-        return self.deliver()
-
-
-class dynamic_pars(ss.Intervention):
-    """Time-varying parameter editor.
-
-    pars: dict mapping dotted-path strings to {'years': [...], 'vals': [...]}
-    schedules. Each step, the resolved parameter is set to the interpolated
-    (default) or stepwise (interpolate=False) value for the current year.
-
-    Dotted-path resolution order: sim.diseases > sim.interventions > sim.pars.
-    Schedule keys are epoch years (e.g. 2020, 2030) — `np.interp` clamps to
-    the first / last value outside the schedule.
-    """
-
-    def __init__(self, pars=None, interpolate=True, **kwargs):
-        super().__init__(**kwargs)
-        self.par_schedules = pars or {}
-        self.interpolate = interpolate
-
-    def step(self):
-        year = self.sim.t.now('year')
-        for dotted_path, schedule in self.par_schedules.items():
-            years = np.asarray(schedule['years'], dtype=float)
-            vals = np.asarray(schedule['vals'], dtype=float)
-            if self.interpolate:
-                val = float(np.interp(year, years, vals))
-            else:
-                idx = int(np.searchsorted(years, year, side='right')) - 1
-                if idx < 0:
-                    continue
-                val = float(vals[idx])
-            self._set_dotted(self.sim, dotted_path, val)
-
-    @staticmethod
-    def _set_dotted(sim, dotted_path, value):
-        """Resolve a dotted-path string against (sim.diseases, sim.interventions, sim.pars) and set it.
-
-        Top-level segment is looked up in:
-          1. sim.diseases (by key)         e.g. 'hpv16.beta' -> sim.diseases['hpv16'].pars.beta
-          2. sim.interventions (by name)   e.g. 'screen.prob' -> sim.interventions['screen'].prob
-          3. sim.pars (by key)             e.g. 'rand_seed' -> sim.pars.rand_seed
-        Diseases and interventions require at least one tail segment (the attribute
-        to set on the resolved module). sim.pars accepts a single segment (set
-        directly on sim.pars). Raises KeyError if the head doesn't resolve anywhere.
-        """
-        parts = dotted_path.split('.')
-        head, tail = parts[0], parts[1:]
-
-        if head in sim.diseases:
-            if not tail:
-                raise KeyError(
-                    f'Path {dotted_path!r}: missing attribute name after disease '
-                    f'key {head!r}.'
-                )
-            # Navigate into the disease module's .pars by default.
-            target = sim.diseases[head].pars
-            for seg in tail[:-1]:
-                target = getattr(target, seg)
-            setattr(target, tail[-1], value)
-            return
-
-        if head in sim.interventions:
-            if not tail:
-                raise KeyError(
-                    f'Path {dotted_path!r}: missing attribute name after '
-                    f'intervention name {head!r}.'
-                )
-            target = sim.interventions[head]
-            for seg in tail[:-1]:
-                target = getattr(target, seg)
-            setattr(target, tail[-1], value)
-            return
-
-        # Fall back to sim.pars.
-        if not hasattr(sim.pars, head):
-            raise KeyError(
-                f'Cannot resolve dotted path {dotted_path!r}: head segment '
-                f'{head!r} is not a sim.diseases / sim.interventions / sim.pars key.'
-            )
-        if not tail:
-            setattr(sim.pars, head, value)
-            return
-        target = getattr(sim.pars, head)
-        for seg in tail[:-1]:
-            target = getattr(target, seg)
-        setattr(target, tail[-1], value)
+def dynamic_pars(*args, **kwargs):
+    """ Not ported: a parameter that varies in time is an `ss.timeseries`, or an `ss.modify(..., when=)` """
+    raise NotImplementedError('hpv.dynamic_pars is not ported to Starsim 4: give the parameter as an ss.timeseries, or use ss.modify(target, multiply=ss.timeseries(...))')

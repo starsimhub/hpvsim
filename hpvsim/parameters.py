@@ -14,6 +14,7 @@ import sciris as sc
 import starsim as ss
 
 from . import misc
+from .seeding import mean_init_prev
 
 
 __all__ = ['SimPars', 'GenotypePars', 'NetworkPars', 'get_genotype_pars',
@@ -171,23 +172,32 @@ class GenotypePars(ss.Pars):
                 f'GenotypePars supports {GENOTYPE_KEYS}; got {genotype!r}.'
             )
         d = _GENOTYPE_DEFAULTS[genotype]
-        self.genotype = genotype
+        self.init_prev = _INIT_PREV_MEAN[genotype]
         self.beta = d['beta']
         self.dur_precin = _lognorm_yr(d['dur_precin_yr'])
         self.dur_cin = _lognorm_yr(d['dur_cin_yr'])
         self.dur_cancer = _lognorm_yr(d['dur_cancer_yr'])
         self.dur_inf_male = _lognorm_yr(d['dur_inf_male_yr'])
+        self.dur_undetected = ss.lognorm_ex(mean=ss.years(1), std=ss.years(1))
         self.cin_fn = ss.Pars(d['cin_fn'])
         self.cancer_fn = ss.Pars(d['cancer_fn'])
         self.imm_init = ss.uniform(low=0.5, high=0.95)
         self.cell_imm_init = ss.uniform(low=0.3, high=0.9)
+        self.rel_sev_dist = ss.normal(loc=1.0, scale=0.2) # Of each woman's relative severity, a trait; its absolute value is used
         self.age_risk = ss.Pars(d['age_risk'])
         self.rel_beta = d['rel_beta']
         self.sero_prob = d['sero_prob']
         self.transf2m = d['transf2m']
         self.transm2f = d['transm2f']
+        self.hpv_control_prob = 0.0 # Probability a clearing woman enters latency instead
+        self.hpv_reactivation = ss.peryear(0.025) # Reactivation from latency
+        self.ms_agent_ratio = 1 # Multiscale is not ported: must be 1
         self.update(kwargs)
         return
+
+
+# Initial prevalence of each genotype: the mean of its age-banded curve over uniform ages 0-60 (see seeding.py)
+_INIT_PREV_MEAN = {g: mean_init_prev(g) for g in GENOTYPE_KEYS}
 
 
 def get_genotype_pars(genotype='hpv16'):
@@ -347,97 +357,62 @@ def expanddict(flat):
 
 
 def par_registry():
-    """Category -> par-name-set (built lazily; lightweight).
-
-    No 'hiv' category: HIV's pars overlap HPV's on 'beta'/'init_prev' (both
-    inherited from stisim's BaseSTIPars), so a bare-key broadcast would
-    silently also flip on HIV transmission (e.g. bare beta= turning on
-    hiv.pars.beta from its 0 default). The scoped hiv=dict(...) form in
-    route_pars does NOT consult this registry -- it dispatches directly by
-    instance name -- so scoped/hiv_pars= routing is unaffected.
     """
-    from .hpv import HPV
+    Category -> parameter names: 'sim', 'hpv' (each genotype's, including the dict forms
+    cin_fn/cancer_fn), 'connector' (cross-genotype immunity), and 'network'
+
+    No 'hiv' category: HIV's parameters overlap HPV's (init_prev), so a bare key would also change HIV;
+    scope them as hiv=dict(...).
+    """
     from .cross_genotype import CrossImmunity
     from .network import SexualNetwork
-    hpv_keys = set()
-    for g in GENOTYPE_KEYS:
-        hpv_keys.update(HPV(g).pars.keys())
-    # 'location' excluded: it is a construction-time argument absent from
-    # sim.pars, so broadcasting it would raise. hpv.Sim.__init__ intercepts
-    # pars=dict(location=...) before routing, so users never hit this.
+    hpv_keys = set(GenotypePars('hpv16').keys()) | {'cin_fn', 'cancer_fn'}
     return {'sim': set(SimPars().keys()) - {'location'}, 'hpv': hpv_keys,
-            'connector': set(CrossImmunity().pars.keys()),
-            'network': set(SexualNetwork().pars.keys())}
+            'connector': set(CrossImmunity.defaults), 'network': set(SexualNetwork().pars.keys())}
 
 
 def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
-    """Route a nested ``{key: value}`` dict of overrides onto sim's modules.
+    """
+    Set parameters by name on a sim's modules (for calibration and scenarios)
 
-    A top-level key is either:
-      - Scoped: matches a live HPV genotype's name, the HIV disease's name
-        (``'hiv'``), or ``cross_immunity``/``network`` (aliases
-        ``crossimmunity``/``sexualnetwork``). Routed to that instance's pars
-        via ONE ``instance.pars.update(value)`` call -- starsim's own
-        ``Pars.update()`` handles arbitrarily nested overrides natively
-        (merging into ``ss.Pars``-typed sub-pars, calling ``.set()`` on
-        ``Dist`` leaves, preserving ``TimePar`` units). Applied AFTER
-        broadcast keys, so a scoped override always wins regardless of
-        input dict ordering.
-      - A bare registry key: broadcast to every matching category (sim,
-        hpv, hiv, connector, network) via ``instance.pars.update({key: value})``.
-        Applied FIRST.
-      - ``calib_pars`` (flat dotted) is converted to nested via
-        ``expanddict`` before anything else runs.
+    A top-level key is either a module (a genotype such as 'hpv16', 'hiv', or 'network'), whose value
+    is a dict of its parameters, or a bare parameter name, set on every module that has it. Scoped keys
+    are applied after bare ones, so they win. ``calib_pars`` (flat, dotted: 'hpv16.cin_fn.k') is expanded
+    first; Optuna specs (dicts with 'value') are unwrapped.
+
+    Cross-genotype immunity is part of the model's structure in Starsim 4 (its modifiers are built with
+    the sim), so its parameters are given to hpv.Sim (imm_pars=), not routed onto a built sim.
     """
     from .hpv import HPV
-    from .cross_genotype import CrossImmunity
+    from .hiv import HIV
     from .network import SexualNetwork
-
-    hiv_cls = misc.hiv_class()
-    disease_types = (HPV,) if hiv_cls is None else (HPV, hiv_cls)
 
     raw = calib_pars if calib_pars is not None else (pars or {})
     if not raw:
         return sim
-    # calib_pars trial dicts are Optuna specs; unwrap to the sampled value.
-    raw = {k: (v['value'] if isinstance(v, dict) and 'value' in v else v)
-           for k, v in raw.items()}
+    raw = {k: (v['value'] if isinstance(v, dict) and 'value' in v else v) for k, v in raw.items()}
     nested = expanddict(raw)
-
-    if hasattr(sim, 'diseases') and sim.diseases is not None:
-        diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, disease_types)}
-        connectors = [c for c in sim.connectors.values() if isinstance(c, CrossImmunity)]
-        networks = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
-    else:
-        diseases = {d.name: d for d in sc.tolist(sim.pars.get('diseases'))
-                    if isinstance(d, disease_types)}
-        connectors = [c for c in sc.tolist(sim.pars.get('connectors'))
-                      if isinstance(c, CrossImmunity)]
-        networks = [n for n in sc.tolist(sim.pars.get('networks'))
-                    if isinstance(n, SexualNetwork)]
-
+    built = getattr(sim, 'diseases', None) is not None and len(getattr(sim, 'diseases', [])) > 0
+    diseases = sim.diseases.values() if built else sc.tolist(sim.pars.get('diseases'))
+    hpvs = {d.name: d for d in diseases if isinstance(d, HPV)}
+    hivs = {d.name: d for d in diseases if isinstance(d, HIV)}
+    networks = [n for n in (sim.networks.values() if built else sc.tolist(sim.pars.get('networks'))) if isinstance(n, SexualNetwork)]
     registry = par_registry()
-    # Split each top-level key into one of three buckets:
-    #   scoped    -- key names a module present in this sim (e.g. 'hpv16',
-    #                'hiv', 'network'); the value is dispatched to that module.
-    #   broadcast -- key is a parameter name (e.g. 'beta', 'n_agents'); the
-    #                value is written to every module that owns that name.
-    #   absent    -- key names a module that could exist in an hpvsim run
-    #                (any genotype, or 'hiv') but isn't in this particular
-    #                sim; skip with a warning instead of raising, so one
-    #                calibrated pars dict can drive a whole scenario sweep.
-    optional_scopes = set(GENOTYPE_KEYS) | {'hiv'}
+
+    def set_hpv(d, vals):
+        d.set_pars({k: v for k, v in vals.items()})
+
+    optional = set(GENOTYPE_KEYS) | {'hiv'}
     scoped, broadcast, absent = {}, {}, []
     for key, value in nested.items():
-        if key in diseases or key in ('cross_immunity', 'crossimmunity', 'network', 'sexualnetwork'):
+        if key in hpvs or key in hivs or key in ('network', 'sexualnetwork', 'cross_immunity', 'crossimmunity'):
             scoped[key] = value
-        elif key in optional_scopes:
+        elif key in optional:
             absent.append(key)
         else:
             broadcast[key] = value
     if absent:
-        misc.warn(f'route_pars: no module for {sorted(absent)} in this sim; '
-                  f'those overrides were skipped.')
+        misc.warn(f'route_pars: no module for {sorted(absent)} in this sim; those overrides were skipped.')
 
     unmatched = {}
     for key, value in broadcast.items():
@@ -445,24 +420,14 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
         if not cats:
             unmatched[key] = value
             continue
-        if len(cats) > 1 and verbose:
-            print(f'route_pars: {key!r} broadcast to {cats}')
         for cat in cats:
             if cat == 'sim':
                 sim.pars.update({key: value})
             elif cat == 'hpv':
-                for d in diseases.values():
-                    if isinstance(d, HPV):
-                        d.pars.update({key: value})
-            elif cat == 'hiv':
-                for d in diseases.values():
-                    if hiv_cls is not None and isinstance(d, hiv_cls):
-                        d.pars.update({key: value})
+                for d in hpvs.values():
+                    set_hpv(d, {key: value})
             elif cat == 'connector':
-                if not connectors:
-                    raise ValueError(f'route_pars: {key!r} needs a CrossImmunity connector.')
-                for c in connectors:
-                    c.pars.update({key: value})
+                raise ValueError(f'route_pars: {key!r} is a parameter of the cross-genotype immunity; give it to hpv.Sim (imm_pars=)')
             elif cat == 'network':
                 if not networks:
                     raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
@@ -470,14 +435,13 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
                     n.pars.update({key: value})
 
     for key, value in scoped.items():
-        if key in diseases:
-            diseases[key].pars.update(value)
+        if key in hpvs:
+            set_hpv(hpvs[key], value)
+        elif key in hivs:
+            hivs[key].set_pars(value)
         elif key in ('cross_immunity', 'crossimmunity'):
-            if not connectors:
-                raise ValueError(f'route_pars: {key!r} needs a CrossImmunity connector.')
-            for c in connectors:
-                c.pars.update(value)
-        elif key in ('network', 'sexualnetwork'):
+            raise ValueError('route_pars: cross-immunity parameters are given to hpv.Sim (imm_pars=), not routed onto a built sim')
+        else:
             if not networks:
                 raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
             for n in networks:
@@ -485,5 +449,4 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
 
     if unmatched and strict:
         raise ValueError(f'route_pars: unrecognized par(s): {sorted(unmatched)}')
-
     return sim
