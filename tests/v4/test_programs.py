@@ -75,7 +75,6 @@ def test_vaccine():
     return sim
 
 
-@pytest.mark.xfail(strict=True, raises=ss.ClockOutsideDomain, reason='UPSTREAM: with births, the antibodies of new agents are NaN, and the cross-immunity modifier raises E212')
 def test_routine_vx():
     sc.heading('Routine two-dose vaccination of girls at 9, with births: the second dose 6 months after the first, and fewer infections')
     vx = hpv.vaccine('bivalent', genos, doses=[0.8, 1.0])
@@ -106,6 +105,22 @@ def test_screen_treat():
     cin = lambda s: s.results.hpv.n_CIN[100:].mean()
     print(f'CIN {cin(sim):.0f} vs {cin(base):.0f}; cancers {cancers(sim)} vs {cancers(base)}')
     assert cin(sim) < 0.95*cin(base) and cancers(sim) < cancers(base) # Seeds 1-3: 0.87-0.90, and 33-38 cancers against 45-50
+    return sim
+
+
+def test_by_age():
+    sc.heading('Two algorithms by age (VIA under 30, HPV DNA with VIA triage from 30), one treatment clinic with a capacity and a queue')
+    clinic = ss.Resource(ss.peryear(20))
+    via, ablation = hpv.diagnostic('via', genos), hpv.treatment('ablation', genos) # One of each, shared: two products with one name are an error
+    young = hpv.screen_treat(via, None, ablation, genos, age=(25, 30), start=2010, coverage=ss.probperyear(0.5), uses=clinic, queue=ss.years(1), name='young')
+    old = hpv.screen_treat('hpv', via, ablation, genos, age=(30, 50), start=2010, coverage=ss.probperyear(0.5), uses=clinic, queue=ss.years(1), name='old')
+    sim = make(young + old, stop=2020).run()
+    r = sim.results
+    treated = r.young_treatment.delivered + r.old_treatment.delivered
+    print(f'Treated {treated.sum():.0f}; most in a step {treated.max():.0f}; lost to capacity {r.young_treatment.lost_capacity.sum() + r.old_treatment.lost_capacity.sum():.0f}')
+    assert treated.max() <= 20/4 + 1 and (r.young_treatment.waiting + r.old_treatment.waiting).max() > 0 # A quarter's capacity, as agents
+    assert r.young_treatment.delivered.sum() <= r.young_screening.positive.sum() # Each treated once, from the queue
+    assert r.old_screening.delivered.sum() > 0 and r.young_screening.delivered.sum() > 0
     return sim
 
 

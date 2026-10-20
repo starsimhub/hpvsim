@@ -37,7 +37,8 @@ def routine_vx(product='bivalent', genotypes=('hpv16', 'hpv18'), age=9, coverage
 
 
 def screen_treat(primary='hpv', triage='via', treat='ablation', genotypes=('hpv16', 'hpv18'), age=(30, 50),
-                 interval=ss.years(5), coverage=ss.probperyear(0.2), start=None, triage_coverage=1.0, treat_coverage=1.0):
+                 interval=ss.years(5), coverage=ss.probperyear(0.2), start=None, triage_coverage=1.0, treat_coverage=1.0,
+                 uses=None, queue=None, name=None):
     """
     A screen-and-treat algorithm: women of screening age screened at most once per interval, those positive
     triaged (optionally), and those positive at triage treated
@@ -56,20 +57,24 @@ def screen_treat(primary='hpv', triage='via', treat='ablation', genotypes=('hpv1
         start (float): the year screening starts
         triage_coverage (float): the share of those positive at screening who come for triage
         treat_coverage (float): the share of those to treat who are treated
+        uses (ss.Resource): a capacity that treatment uses, e.g. a clinic shared with another algorithm
+        queue (bool/dur): whether those not treated for lack of capacity wait, and for how long (see `ss.treat`)
+        name (str): a prefix for the names of the steps, e.g. 'young' for 'young_screening', to run several algorithms (e.g. by age)
 
     Returns:
         A list of deliveries: screening, triage (if any), and treatment, named so
     """
+    named = lambda step: step if name is None else f'{name}_{step}'
     test = diagnostic(primary, genotypes) if isinstance(primary, str) else primary
     women = ss.ppl.female & (ss.ppl.age >= age[0]) & (ss.ppl.age < age[1])
-    screening = ss.screen(test, who=women & (test.since >= interval), coverage=coverage, start=start, name='screening')
+    screening = ss.screen(test, who=women & (test.since >= interval), coverage=coverage, start=start, name=named('screening'))
     steps = [screening]
     to_treat = screening.positive
     if triage is not None:
         tri = diagnostic(triage, genotypes) if isinstance(triage, str) else triage
-        triaging = ss.screen(tri, who=screening.positive, coverage=triage_coverage, name='triage')
+        triaging = ss.screen(tri, who=screening.positive, coverage=triage_coverage, name=named('triage'))
         steps.append(triaging)
         to_treat = triaging.positive
     tx = treatment(treat, genotypes) if isinstance(treat, str) else treat
-    steps.append(ss.treat(tx, who=to_treat, coverage=treat_coverage, name='treatment'))
+    steps.append(ss.treat(tx, who=to_treat, coverage=treat_coverage, uses=uses, queue=queue, name=named('treatment')))
     return steps
