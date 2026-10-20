@@ -12,3 +12,4 @@ from .utils import logf2, intlogf2
 from .genotypes import *
 from .products import *
 from .interventions import *
+from .seeding import *

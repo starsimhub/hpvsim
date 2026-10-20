@@ -62,6 +62,18 @@ def test_family():
     return sim
 
 
+def test_seeding():
+    sc.heading('Seeding the family from HPVsim\'s curve by age and sex, one genotype per person seeded')
+    sim = ss.Sim(diseases=hpv.genotypes(['hpv16', 'hpv18'], init_prev=hpv.init_prev()), networks=ss.MFNet(), n_agents=40_000, start=1990, stop=1991, **kw).init()
+    d, ppl = sim.diseases, sim.people
+    held = np.array([d[g].P.raw for g in ['hpv16', 'hpv18']])
+    age, female = ppl.age.raw, ppl.female.raw
+    for lo, hi, f, m in [(0, 12, 0, 0), (17, 24, 0.70, 0.60), (24, 34, 0.25, 0.25), (44, 64, 0.01, 0.01)]:
+        band = (age >= lo) & (age < hi) & ppl.alive.raw
+        assert np.isclose(held.any(0)[band & female].mean(), f, atol=0.03) and np.isclose(held.any(0)[band & ~female].mean(), m, atol=0.03), (lo, hi)
+    assert held.all(0).sum() == 0
+
+
 def cohort_cancers(**kwargs):
     sim = ss.Sim(diseases=hpv.genotype('hpv18', init_prev=1.0, beta=0, **kwargs), networks=ss.MFNet(), n_agents=40_000, start=2000, stop=2060, **kw).run()
     return sim.results.hpv18['cin.CA'].sum()

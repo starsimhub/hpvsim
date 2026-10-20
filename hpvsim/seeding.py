@@ -1,18 +1,13 @@
 """
-Initial HPV prevalence
+Initial HPV prevalence by age and sex, from HPVsim's curves
 
-HPVsim 3 seeds each agent from age- and sex-banded curves. Starsim 4 seeds a declared disease
-with one share per group, so here each genotype's initial prevalence is the mean of its curve over
-the starting population (TODO(v4-rs): seed by the curves once init_prev takes a property of people
-that is not a stratification).
-
-    'exclusive'    the 'total' curve, shared between the genotypes (equally, or by init_hpv_dist)
-    'independent'  each genotype's own curve
+`hpv.genotypes(init_prev=hpv.init_prev())` seeds the family from the curve over all genotypes, each
+person seeded getting one genotype (HPVsim's 'exclusive' seeding).
 """
 
 import numpy as np
 
-__all__ = ['init_prev_curves', 'mean_init_prev', 'init_prevs']
+__all__ = ['init_prev']
 
 # Initial HPV prevalence by age bracket (inclusive lower bounds, last extends to 150) and sex
 _INIT_HPV_PREV_AGE_BRACKETS = np.array([12, 17, 24, 34, 44, 64, 80, 150])
@@ -38,39 +33,16 @@ _INIT_PREV = {
 _INIT_PREV['hpv16'] = _INIT_PREV['total']
 
 
-def init_prev_curves(key):
-    """ The (female, male) prevalence curves of a genotype, or of 'total', by age bracket """
-    c = _INIT_PREV[key]
-    return c['f'], c['m']
-
-
-def mean_init_prev(key, age_data=None):
+def init_prev(key='total'):
     """
-    The mean of a prevalence curve over a population
+    The share of each person infected at the start, by age and sex, as a function of the sim and the people
 
     Args:
-        key (str): a genotype, or 'total'
-        age_data (DataFrame): columns [age, value], the population by single year of age; None for uniform ages 0-60
+        key (str): 'total' (any genotype), or a genotype's own curve ('hpv16', 'hpv18', 'hi5', 'ohr')
     """
-    if age_data is None:
-        ages, weights = np.arange(60) + 0.5, np.ones(60)
-    else:
-        ages = np.asarray(age_data['age'], dtype=float) + 0.5
-        weights = np.asarray(age_data['value'], dtype=float)
-    idx = np.clip(np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, ages, side='right'), 0, 7)
-    f, m = init_prev_curves(key)
-    prev = (f[idx] + m[idx]) / 2
-    return float((prev * weights).sum() / weights.sum())
-
-
-def init_prevs(keys, init_seeding='exclusive', init_hpv_dist=None, age_data=None):
-    """ The initial prevalence of each genotype, as {genotype: share} """
-    keys = list(keys)
-    if init_seeding == 'independent':
-        return {k: mean_init_prev(k, age_data) for k in keys}
-    elif init_seeding == 'exclusive':
-        total = mean_init_prev('total', age_data)
-        w = np.ones(len(keys)) if init_hpv_dist is None else np.array([init_hpv_dist[k] for k in keys], dtype=float)
-        w = w / w.sum()
-        return {k: total * wk for k, wk in zip(keys, w)}
-    raise ValueError(f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}")
+    curves = _INIT_PREV[key]
+    def prev(sim, uids):
+        ppl = sim.people
+        idx = np.clip(np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, ppl.age[uids], side='right'), 0, len(_INIT_HPV_PREV_AGE_BRACKETS) - 1)
+        return np.where(ppl.female[uids], curves['f'][idx], curves['m'][idx])
+    return prev
