@@ -90,15 +90,13 @@ def cohort_cancers(**kwargs):
     return sim.results.hpv18['cin.CA'].sum()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason='UPSTREAM: a dwell distribution times an attribute (dur_cin*ramp) is drawn from another distribution, even when the attribute is 1')
 def test_age_risk_dwell():
     sc.heading('age_risk: a ramp that is 1 for everyone changes nothing')
     plain, ramp = cohort_cancers(age_risk=1), cohort_cancers(age_risk=1 + 1e-9)
     print(f'Cancers {ramp} with the ramp, against {plain} without')
-    assert np.isclose(ramp, plain, rtol=0.08) # Seeds 1-3: 18% fewer
+    assert np.isclose(ramp, plain, rtol=0.08)
 
 
-@pytest.mark.xfail(strict=True, raises=ss.DuplicateDeclaration, reason='UPSTREAM: the auto-named dwell of precin is dur_precin, the name of the parameter in it')
 def test_severity_immunity():
     sc.heading('Severity immunity from cell-mediated immunity: shorter infections, so fewer CIN')
     def make(sev):

@@ -99,11 +99,11 @@ def genotype(name='hpv16', init_prev=None, sev_from=None, **kwargs):
     # Severity immunity, as at infection, shortens the infection; age at CIN onset lengthens CIN
     infection = ss.transmission('S -> P', beta=ss.peract(m2f=p.beta*p.transm2f, f2m=p.beta), source=P + CIN)
     sev_from = sc.mergedicts(sev_from)
-    sev = ss.attr(np.minimum(sum(w*ss.state(f'{g}.cell') for g, w in sev_from.items()), 0.999), on=infection, init=0) if sev_from else 0
-    precin = ss.Transition(P, [CIN, S], p=[p_cin, None], dur=p.dur_precin*(1 - sev) if sev_from else p.dur_precin, where=ss.ppl.female)
+    sev = ss.attr(np.clip(sum(w*ss.state(f'{g}.cell') for g, w in sev_from.items()), 0, 0.999), on=infection, init=0) if sev_from else 0
+    precin = ss.Transition(P, [CIN, S], p=[p_cin, None], dur=p.dur_precin*(1 - sev), where=ss.ppl.female)
     age_cin = ss.attr(ss.ppl.age, on=precin.to(CIN))
     ramp = 1 + (p.age_risk - 1)*np.clip((age_cin - p.age_risk_start)/(p.age_risk_end - p.age_risk_start), 0, 1)
-    cin = ss.Transition(CIN, [CA, S], p=[p_cancer, None], dur=p.dur_cin*ramp if p.age_risk.value != 1 else p.dur_cin) # UPSTREAM: a dwell scaled by an attribute is drawn wrongly, so not scaled when it need not be
+    cin = ss.Transition(CIN, [CA, S], p=[p_cancer, None], dur=p.dur_cin*ramp)
     cure = ss.Transition(P + CIN, S, undriven=True)
     cleared = precin.to(S) | cin.to(S) | cure.to(S)
     extra = dict(sev=sev) if sev_from else {}
@@ -115,8 +115,7 @@ def genotype(name='hpv16', init_prev=None, sev_from=None, **kwargs):
         cin       = cin,
         death     = CA >> ss.null @ p.dur_cancer,
         cure      = cure,
-        nab       = ss.attr(p.imm_init*ss.bernoulli(p.sero_prob.value), # UPSTREAM: a Dist with an ss.par parameter cannot be drawn in an ss.attr (agents.py:775)
-                             on=cleared, combine='max', init=0),
+        nab       = ss.attr(p.imm_init*ss.bernoulli(p.sero_prob), on=cleared, combine='max', init=0),
         cell      = ss.attr(p.cell_imm_init, on=cleared, combine='max', init=0),
         age_cin   = age_cin,
         infected  = P + CIN,
@@ -126,7 +125,7 @@ def genotype(name='hpv16', init_prev=None, sev_from=None, **kwargs):
     )
 
 
-def genotypes(names=('hpv16', 'hpv18'), init_prev=0.1, split=None, pars=None, sev_matrix=None):
+def genotypes(names=('hpv16', 'hpv18'), init_prev=0.1, split=None, pars=None, sev_matrix='default'):
     """
     Several genotypes, as a family: one cancer per woman, joint seeding, and results over all of them (`sim.results.hpv`)
 
@@ -135,12 +134,12 @@ def genotypes(names=('hpv16', 'hpv18'), init_prev=0.1, split=None, pars=None, se
         init_prev (float/func): the share of people infected at the start, each with one genotype
         split (list): the share of each genotype among those infected at the start (default equal)
         pars (dict): parameter values by genotype, e.g. `dict(hpv16=dict(cin_k=0.35))`
-        sev_matrix (array): protection against severity from cell-mediated immunity, rows the genotype protected, columns the genotype that gave it ('default' for HPVsim's, `cross_matrix(names, med=0.5, high=0.7)`); None (for now the default) for none
+        sev_matrix (array): protection against severity from cell-mediated immunity, rows the genotype protected, columns the genotype that gave it (default HPVsim's, `cross_matrix(names, med=0.5, high=0.7)`); None for none
 
     Cross-immunity is not part of the family: add `hpv.cross_immunity(family)` to the sim's connectors.
     """
     pars = sc.mergedicts(pars)
-    names = list(names) # UPSTREAM: sev_matrix='default' is not the default while a dwell scaled by an attribute is drawn wrongly, and its auto-named slot clashes with dur_precin
+    names = list(names)
     m = cross_matrix(names, med=0.5, high=0.7) if isinstance(sev_matrix, str) else sev_matrix
     sev_from = lambda i: None if m is None else {g: m[i][j] for j, g in enumerate(names) if m[i][j]}
     members = [genotype(name, sev_from=sev_from(i), **pars.get(name, {})) for i, name in enumerate(names)]
@@ -149,7 +148,7 @@ def genotypes(names=('hpv16', 'hpv18'), init_prev=0.1, split=None, pars=None, se
 
 def cross_matrix(names, own=0.9, med=0.3, high=0.5, full_own=('hpv16', 'hpv18'), high_pairs=(('hpv16', 'hpv18'),)):
     """ HPVsim's protection matrix from antibodies, with rows the genotype protected against and columns the genotype that gave them """
-    names = list(names) # UPSTREAM: sev_matrix='default' is not the default while a dwell scaled by an attribute is drawn wrongly, and its auto-named slot clashes with dur_precin
+    names = list(names)
     m = np.full((len(names), len(names)), med)
     for i, a in enumerate(names):
         for j, b in enumerate(names):
