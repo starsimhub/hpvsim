@@ -75,6 +75,21 @@ def test_vaccine():
     return sim
 
 
+@pytest.mark.xfail(strict=True, raises=ss.ClockOutsideDomain, reason='UPSTREAM: with births, the antibodies of new agents are NaN, and the cross-immunity modifier raises E212')
+def test_routine_vx():
+    sc.heading('Routine two-dose vaccination of girls at 9, with births: the second dose 6 months after the first, and fewer infections')
+    vx = hpv.vaccine('bivalent', genos, doses=[0.8, 1.0])
+    demog = lambda: [ss.Births(birth_rate=25), ss.Deaths(death_rate=10)]
+    base = make(demographics=demog()).run()
+    sim = make(hpv.routine_vx(vx, genos, start=2000), demographics=demog()).run()
+    r = sim.results
+    d1, d2 = r.routine_vx.delivered, r.routine_vx_next.delivered
+    first = int(np.flatnonzero(d1)[0])
+    assert d2[:first + 2].sum() == 0 and np.isclose(d2.sum(), 0.9*d1[:-2].sum(), rtol=0.1)
+    late = slice(-40, None)
+    assert r.hpv16.infection[late].sum() < base.results.hpv16.infection[late].sum()
+
+
 def test_screen_treat():
     sc.heading('Screen, triage, and treat (HPV DNA, VIA, ablation): the steps follow each other, and lesions and cancers fall')
     base = make().run()
