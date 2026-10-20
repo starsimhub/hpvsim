@@ -10,3 +10,5 @@ algorithms. The other modules (network, demographics, HIV, analyzers, calibratio
 from .version import __version__, __versiondate__, __license__
 from .utils import logf2, intlogf2
 from .genotypes import *
+from .products import *
+from .interventions import *
