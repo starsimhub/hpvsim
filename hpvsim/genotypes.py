@@ -18,8 +18,11 @@ Transitions:
     death      CA -> (dead)    after dur_cancer
     cure       P, CIN -> S     undriven: moved only by treatments
 
-Clearance by women (naturally or by treatment) draws antibodies (`nab`), kept as a running maximum
-and gated by seroconversion; `cross_immunity()` turns them into protection against each genotype.
+Clearance by women (naturally or by treatment) draws antibodies (`nab`, gated by seroconversion)
+and cell-mediated immunity (`cell`), each kept as a running maximum. `cross_immunity()` turns the
+antibodies into protection against infection with each genotype; the cell-mediated immunity of the
+genotypes (`sev_from=`) shortens a new infection (`sev`, set at infection), as in HPVsim. A woman's
+time in CIN is longer the older she was when it began (`age_risk`, from `age_cin`).
 """
 
 import numpy as np
@@ -50,6 +53,10 @@ def genotype_pars(name):
         transform_prob = 1.5e-3,
         imm_init     = ss.uniform(0.5, 0.95),
         sero_prob    = 0.6,
+        cell_imm_init = ss.uniform(0.3, 0.9),
+        age_risk     = 2.0,               # The multiple of dur_cin for CIN that begins at age_risk_end or older
+        age_risk_start = 30,              # The age from which it rises linearly from 1
+        age_risk_end = 50,
     )
     own = dict(
         hpv16 = dict(dur_precin=lognorm(3, 9), dur_cin=lognorm(5, 20), cin_k=0.3, transform_prob=2e-3, sero_prob=0.75),
@@ -62,13 +69,14 @@ def genotype_pars(name):
     return sc.mergedicts(shared, own[name])
 
 
-def genotype(name='hpv16', init_prev=None, **kwargs):
+def genotype(name='hpv16', init_prev=None, sev_from=None, **kwargs):
     """
     One HPV genotype, as a declared disease
 
     Args:
         name (str): 'hpv16', 'hpv18', 'hi5', or 'ohr', whose defaults are used (see `genotype_pars()`)
         init_prev (float): the share infected at the start, for a genotype on its own (in a family, the family seeds)
+        sev_from (dict): the protection against severity from the cell-mediated immunity of each genotype (including this one), e.g. `dict(hpv16=0.7, hpv18=0.5)`; none by default
         kwargs (dict): parameter values, e.g. `cin_k=0.35`
 
     Examples:
@@ -88,26 +96,37 @@ def genotype(name='hpv16', init_prev=None, **kwargs):
     dysp = intlogf2(CIN.time/yr, p.cin_k, p.x_infl, ttc=p.ttc)
     p_cancer = 1 - (1 - p.transform_prob)**(dysp**2)
 
-    precin = ss.Transition(P, [CIN, S], p=[p_cin, None], dur=p.dur_precin, where=ss.ppl.female)
-    cin = ss.Transition(CIN, [CA, S], p=[p_cancer, None], dur=p.dur_cin)
+    # Severity immunity, as at infection, shortens the infection; age at CIN onset lengthens CIN
+    infection = ss.transmission('S -> P', beta=ss.peract(m2f=p.beta*p.transm2f, f2m=p.beta), source=P + CIN)
+    sev_from = sc.mergedicts(sev_from)
+    sev = ss.attr(np.minimum(sum(w*ss.state(f'{g}.cell') for g, w in sev_from.items()), 0.999), on=infection, init=0) if sev_from else 0
+    precin = ss.Transition(P, [CIN, S], p=[p_cin, None], dur=p.dur_precin*(1 - sev) if sev_from else p.dur_precin, where=ss.ppl.female)
+    age_cin = ss.attr(ss.ppl.age, on=precin.to(CIN))
+    ramp = 1 + (p.age_risk - 1)*np.clip((age_cin - p.age_risk_start)/(p.age_risk_end - p.age_risk_start), 0, 1)
+    cin = ss.Transition(CIN, [CA, S], p=[p_cancer, None], dur=p.dur_cin*ramp if p.age_risk.value != 1 else p.dur_cin) # UPSTREAM: a dwell scaled by an attribute is drawn wrongly, so not scaled when it need not be
     cure = ss.Transition(P + CIN, S, undriven=True)
+    cleared = precin.to(S) | cin.to(S) | cure.to(S)
+    extra = dict(sev=sev) if sev_from else {}
     return ss.Disease(S, P, CIN, CA,
         Z         = ss.State(people=True),
-        infection = ss.transmission('S -> P', beta=ss.peract(m2f=p.beta*p.transm2f, f2m=p.beta), source=P + CIN),
+        infection = infection,
         precin    = precin,
         clear_m   = ss.Transition(P, S, dur=p.dur_inf_male, where=ss.ppl.male),
         cin       = cin,
         death     = CA >> ss.null @ p.dur_cancer,
         cure      = cure,
         nab       = ss.attr(p.imm_init*ss.bernoulli(p.sero_prob.value), # UPSTREAM: a Dist with an ss.par parameter cannot be drawn in an ss.attr (agents.py:775)
-                             on=precin.to(S) | cin.to(S) | cure.to(S), combine='max', init=0),
+                             on=cleared, combine='max', init=0),
+        cell      = ss.attr(p.cell_imm_init, on=cleared, combine='max', init=0),
+        age_cin   = age_cin,
         infected  = P + CIN,
         init_prev = init_prev,
         name      = name,
+        **extra,
     )
 
 
-def genotypes(names=('hpv16', 'hpv18'), init_prev=0.1, split=None, pars=None):
+def genotypes(names=('hpv16', 'hpv18'), init_prev=0.1, split=None, pars=None, sev_matrix=None):
     """
     Several genotypes, as a family: one cancer per woman, joint seeding, and results over all of them (`sim.results.hpv`)
 
@@ -116,17 +135,21 @@ def genotypes(names=('hpv16', 'hpv18'), init_prev=0.1, split=None, pars=None):
         init_prev (float/func): the share of people infected at the start, each with one genotype
         split (list): the share of each genotype among those infected at the start (default equal)
         pars (dict): parameter values by genotype, e.g. `dict(hpv16=dict(cin_k=0.35))`
+        sev_matrix (array): protection against severity from cell-mediated immunity, rows the genotype protected, columns the genotype that gave it ('default' for HPVsim's, `cross_matrix(names, med=0.5, high=0.7)`); None (for now the default) for none
 
     Cross-immunity is not part of the family: add `hpv.cross_immunity(family)` to the sim's connectors.
     """
     pars = sc.mergedicts(pars)
-    members = [genotype(name, **pars.get(name, {})) for name in names]
+    names = list(names) # UPSTREAM: sev_matrix='default' is not the default while a dwell scaled by an attribute is drawn wrongly, and its auto-named slot clashes with dur_precin
+    m = cross_matrix(names, med=0.5, high=0.7) if isinstance(sev_matrix, str) else sev_matrix
+    sev_from = lambda i: None if m is None else {g: m[i][j] for j, g in enumerate(names) if m[i][j]}
+    members = [genotype(name, sev_from=sev_from(i), **pars.get(name, {})) for i, name in enumerate(names)]
     return ss.Strains('hpv', members, init_prev=init_prev, split=split, exclusive='CA')
 
 
 def cross_matrix(names, own=0.9, med=0.3, high=0.5, full_own=('hpv16', 'hpv18'), high_pairs=(('hpv16', 'hpv18'),)):
     """ HPVsim's protection matrix from antibodies, with rows the genotype protected against and columns the genotype that gave them """
-    names = list(names)
+    names = list(names) # UPSTREAM: sev_matrix='default' is not the default while a dwell scaled by an attribute is drawn wrongly, and its auto-named slot clashes with dur_precin
     m = np.full((len(names), len(names)), med)
     for i, a in enumerate(names):
         for j, b in enumerate(names):

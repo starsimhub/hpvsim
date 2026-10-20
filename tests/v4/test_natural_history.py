@@ -29,7 +29,7 @@ def expected_cohort(name, horizon, n=2_000_000, seed=1):
 def test_cohort(name):
     sc.heading(f'A cohort of women newly infected with {name}: progression to CIN and cancer as in HPVsim')
     horizon = 60
-    sim = ss.Sim(diseases=hpv.genotype(name, init_prev=1.0, beta=0), networks=ss.MFNet(), n_agents=40_000, start=2000, stop=2000 + horizon, **kw)
+    sim = ss.Sim(diseases=hpv.genotype(name, init_prev=1.0, beta=0, age_risk=1), networks=ss.MFNet(), n_agents=40_000, start=2000, stop=2000 + horizon, **kw)
     sim.init()
     women, men = sim.people.female.sum(), sim.people.male.sum()
     sim.run()
@@ -60,6 +60,29 @@ def test_family():
     for g in ['hpv16', 'hpv18']:
         assert r[g].infection.sum() < 0.95*none.results[g].infection.sum()
     return sim
+
+
+def cohort_cancers(**kwargs):
+    sim = ss.Sim(diseases=hpv.genotype('hpv18', init_prev=1.0, beta=0, **kwargs), networks=ss.MFNet(), n_agents=40_000, start=2000, stop=2060, **kw).run()
+    return sim.results.hpv18['cin.CA'].sum()
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason='UPSTREAM: a dwell distribution times an attribute (dur_cin*ramp) is drawn from another distribution, even when the attribute is 1')
+def test_age_risk_dwell():
+    sc.heading('age_risk: a ramp that is 1 for everyone changes nothing')
+    plain, ramp = cohort_cancers(age_risk=1), cohort_cancers(age_risk=1 + 1e-9)
+    print(f'Cancers {ramp} with the ramp, against {plain} without')
+    assert np.isclose(ramp, plain, rtol=0.08) # Seeds 1-3: 18% fewer
+
+
+@pytest.mark.xfail(strict=True, raises=ss.DuplicateDeclaration, reason='UPSTREAM: the auto-named dwell of precin is dur_precin, the name of the parameter in it')
+def test_severity_immunity():
+    sc.heading('Severity immunity from cell-mediated immunity: shorter infections, so fewer CIN')
+    def make(sev):
+        fam = hpv.genotypes(['hpv16', 'hpv18'], init_prev=0.15, sev_matrix=sev)
+        return ss.Sim(diseases=fam, networks=ss.MFNet(), n_agents=10_000, start=1990, stop=2030, use_aging=True, **kw).run()
+    sim, none = make('default'), make(None)
+    assert sim.results.hpv['precin'].sum() > 0 and sim.results.hpv.n_CIN.sum() < none.results.hpv.n_CIN.sum()
 
 
 @pytest.mark.xfail(strict=True, raises=ss.CapabilityError, reason='UPSTREAM: clocks (P.time in p=) are agents only (Starsim B1), so the natural history has no ODE')
