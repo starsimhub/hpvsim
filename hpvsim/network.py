@@ -93,6 +93,8 @@ class SexualNetwork(ss.SexualNetwork):
         p_per_act = self.edges.beta[inds] * disease_beta
         return 1 - (1 - p_per_act) ** self.edges.acts[inds]
 
+    sides = dict(m='male', f='female') # So a beta per act names its directions, ss.peract(m2f=..., f2m=...)
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.define_pars(**NetworkPars())

@@ -74,6 +74,17 @@ def test_seeding():
     assert held.all(0).sum() == 0
 
 
+def test_network():
+    sc.heading('On HPVsim\'s sexual network: male-to-female transmission stronger than female-to-male means more infections of women')
+    def ratio(m2f):
+        fam = hpv.genotypes(['hpv16'], init_prev=hpv.init_prev(), pars=dict(hpv16=dict(beta=0.02, transm2f=m2f)))
+        sim = ss.Sim(diseases=fam, networks=hpv.SexualNetwork(), stratify=dict(sex=['female', 'male']), n_agents=10_000, start=1990, stop=2000, use_aging=True, **kw).run()
+        women, men = sim.results.hpv16.infection.by('sex').values.sum(axis=0)
+        print(f'transm2f {m2f}: infections of women {women:.0f}, of men {men:.0f}')
+        return women/men
+    assert ratio(4.0) > 2*ratio(0.25)
+
+
 def cohort_cancers(**kwargs):
     sim = ss.Sim(diseases=hpv.genotype('hpv18', init_prev=1.0, beta=0, **kwargs), networks=ss.MFNet(), n_agents=40_000, start=2000, stop=2060, **kw).run()
     return sim.results.hpv18['cin.CA'].sum()
