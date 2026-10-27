@@ -1,5 +1,11 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
+## Unreleased (Starsim 4)
+
+**HIV is STIsim's, as it is; its effects on HPV are a connector.** STIsim's HIV is now declared (states and transitions), so HPVsim no longer subclasses it. `hpv.HIVEffects` (added by `hpv.Sim` whenever the sim has HIV, a bare `sti.HIV` included) holds the CD4-stratified effects and the HPV results by HIV status; `hpv.HIV_transmit()` is STIsim's HIV with HPVsim's defaults (it transmits on `hpv.SexualNetwork`, which STIsim's HIV now names among its sexual networks); `hpv.HIV_incidence` is STIsim's HIV with one more transition, infection at the rate of the curve. Diagnosis is an `sti.HIVTest` that `hpv.Sim(model_hiv=...)` adds, rather than code in the HIV module. STIsim now counts each agent by its weight under multiscale, so HPVsim no longer recomputes its results.
+
+*Regression information*: the effect parameters (`rel_sus_lo`, ..., `cd4_upper`) move from `sim.diseases.hiv.pars` to `sim.connectors.hiv_effects.pars` (`hiv_effects=dict(...)` in `pars=`; `hiv_pars=` still takes them); `hpv_prevalence_with_hiv`/`_no_hiv` move from `sim.results.hiv` to `sim.results.hiv_effects`; `hpv.HIV` is gone; a sim given its own HIV module now gets the effects on HPV, and needs a testing intervention for diagnosis. HIV's own dynamics change as STIsim's declared HIV does (see STIsim's changelog).
+
 ## Version 3.2.1 (2026-10-08)
 
 **Cross-platform installers for users without Python.** `install/install.sh` (Linux/macOS) and `install/install.bat` (Windows) install Miniforge (conda-forge) if it isn't already present and then `pip install hpvsim jupyter` into the base conda env. Intended for training-material audiences who shouldn't need to figure out Python setup first. See [`install/README.md`](install/README.md) for usage. No change to the Python package.

@@ -84,7 +84,7 @@ def test_plot_sim_default_four_panels_and_requires_age_results(rich_sim):
 def test_plot_sim_default_raises_when_age_results_lacks_keys():
     # by_age present but recording neither 'cancers' nor a prevalence key.
     edges = np.array([0., 50., 100.])
-    ar = hpv.by_age('n_cancerous', edges=edges)
+    ar = hpv.by_age('cancerous', edges=edges)
     sim = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=2000, stop=2006,
                   dt=1.0, n_agents=200, rand_seed=1, analyzers=[ar])
     sim.run()
@@ -98,8 +98,7 @@ def test_plot_intervention_impact_averted_identity():
                    stop=2015, dt=1.0, n_agents=300, rand_seed=1)
     base.run()
     # Scenario with routine vaccination from 2000.
-    vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 10],
-                        start_year=2000)
+    vx = ss.vaccinate(hpv.vx('bivalent'), where=ss.ppl.female, at_age=9, coverage=0.9, start=2000)
     scen = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
                    stop=2015, dt=1.0, n_agents=300, rand_seed=1, interventions=[vx])
     scen.run()
@@ -130,8 +129,7 @@ def test_plot_intervention_impact_multisim_smoke():
         msim.run(parallel=False)  # 4 tiny sims: process startup costs more than the runs
         return msim
     base = make_msim([1, 2])
-    vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 10],
-                        start_year=2000)
+    vx = ss.vaccinate(hpv.vx('bivalent'), where=ss.ppl.female, at_age=9, coverage=0.9, start=2000)
     scen = make_msim([1, 2], interventions=[vx])
     fig = hpv.plot_intervention_impact(base, scen, key='cum_cancers')
     assert len(fig.axes) == 2

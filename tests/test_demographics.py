@@ -27,7 +27,7 @@ def test_age_migration_runs_without_error():
         demographics=[hpv.AgeMigration()],
     )
     sim.run()
-    assert int(sim.results['n_alive'][-1]) > 0
+    assert int(sim.results['alive'][-1]) > 0
 
 
 def test_age_migration_pulls_pyramid_toward_target():

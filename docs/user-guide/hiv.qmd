@@ -10,11 +10,11 @@ HIV support is an optional install: `pip install hpvsim[hiv]`, which adds STIsim
 
 The choice is whether HIV is an input or an outcome.
 
-`hpv.HIV_incidence` imposes a known epidemic. You supply a table of `[age, sex, year, incidence]`, and each timestep susceptible agents acquire HIV at the rate their age band, sex and calendar year specify, so prevalence follows your data rather than emerging from behavior. This suits most country work: national HIV estimates already exist and reproducing them is not the point of the analysis. Every new case is diagnosed and made ART-eligible at once, so `sti.ART(coverage=...)` drives treatment with no testing cascade to configure.
+`hpv.HIV_incidence` imposes a known epidemic. You supply a table of `[age, sex, year, incidence]`, and each timestep susceptible agents acquire HIV at the rate their age band, sex and calendar year specify, so prevalence follows your data rather than emerging from behavior. This suits most country work: national HIV estimates already exist and reproducing them is not the point of the analysis. With `hpv.Sim(model_hiv=...)`, an `sti.HIVTest` diagnoses every case each step and makes it ART-eligible, so `sti.ART(coverage=...)` drives treatment with no testing cascade to configure. Both are STIsim's `sti.HIV`: `hpv.HIV_incidence` adds one transition (`acquisition`, at the curve's rate), and `hpv.HIV_transmit()` is STIsim's HIV with HPVsim's defaults.
 
 `hpv.HIV_transmit` spreads HIV along the same sexual network as HPV, governed by `beta_m2f` (0.0035 per act) and `rel_beta_f2m` (0.5). Use it when HIV prevalence has to respond to behavior or to an HIV intervention. It is harder to calibrate — two epidemics to fit — and brings no ART program of its own.
 
-`hpv.Sim(model_hiv=True)` builds the incidence version and its ART intervention; `model_hiv='transmission'` builds the transmitting version. `hiv_data=` supplies the data, `hiv_pars=` the parameters. Passing your own HIV module in `diseases=` also works; combining both raises an error. A bare `sti.HIV` from STIsim runs, but carries none of the effects below.
+`hpv.Sim(model_hiv=True)` builds the incidence version and its ART intervention; `model_hiv='transmission'` builds the transmitting version. `hiv_data=` supplies the data, `hiv_pars=` the parameters (of HIV, and of its effects below). Passing your own HIV module in `diseases=` also works, a bare `sti.HIV` from STIsim included; combining both raises an error.
 
 ## What HIV does to HPV
 
@@ -26,13 +26,13 @@ The effects are stratified by CD4 count, in three bands:
 | 200–500 (`_hi`) | 2.2 | 1.2 | 0.76 | 1.0 |
 | < 200 (`cd4_threshold`, `_lo`) | 2.2 | 1.5 | 0.36 | 1.0 |
 
-All four factors live on the HIV module — `sim.diseases.hiv.pars.rel_sev_lo` and so on — because HIV owns the CD4 count they are stratified on.
+All four factors live on `hpv.HIVEffects`, a connector that `hpv.Sim` adds whenever the sim has HIV — `sim.connectors.hiv_effects.pars.rel_sev_lo` and so on (`hiv_effects=dict(...)` in `pars=`, or pass your own `hpv.HIVEffects(...)` in `connectors=`). It reads HIV's `infected` and `cd4`, and uses STIsim's HIV as it is.
 
 Women with a CD4 count of 500 or more get no effect at all. That band covers the newly infected, whose CD4 starts around 594, and women whose count has recovered on treatment. Effective ART therefore removes the HPV penalty by moving women out of the affected strata, which is how treatment scale-up shows up in cancer projections.
 
 `rel_sus` multiplies susceptibility to every genotype each timestep. `rel_sev` stretches the progression timescale when a new infection's trajectory is drawn. `rel_imm` scales down the immunity conferred by clearing an infection **and** by a vaccine dose. `rel_reactivation` multiplies the latent reactivation hazard; its default of 1.0 is a placeholder, not a measured value, so set it deliberately if you model latency.
 
-Results come stratified by HIV status: `hpv_prevalence_with_hiv` and `hpv_prevalence_no_hiv` under `sim.results.hiv`, and `new_cancers_with_hiv`, `new_cancers_no_hiv`, `cancer_incidence_with_hiv`, `cancer_incidence_no_hiv` and `cancer_rate_ratio` under `sim.results.all_hpv`. HIV runs on a quarterly clock whatever `dt` you give the sim; the cancer stratification is computed on the sim's clock, so no cancer is counted twice.
+Results come stratified by HIV status: `hpv_prevalence_with_hiv` and `hpv_prevalence_no_hiv` under `sim.results.hiv_effects`, and `new_cancers_with_hiv`, `new_cancers_no_hiv`, `cancer_incidence_with_hiv`, `cancer_incidence_no_hiv` and `cancer_rate_ratio` under `sim.results.all_hpv`. HIV runs on a quarterly clock whatever `dt` you give the sim; the cancer stratification is computed on the sim's clock, so no cancer is counted twice.
 
 ## Getting national HIV data in
 

@@ -68,6 +68,6 @@ Within the `nigeria_inputs` dictionary there are different kinds of inputs: `loc
 
 ## See also
 
-- [Calibration](calibration.qmd), which uses the same nested form for `calib_pars`
+- [Calibration](calibration.qmd), which uses the same nested form for the parameters to fit
 - [Migrating from v2](../migration.qmd) for the v2 parameter names
 - [`hpv.SimPars`, `hpv.GenotypePars`, `hpv.NetworkPars`, `hpv.route_pars`](../api/parameters.qmd)

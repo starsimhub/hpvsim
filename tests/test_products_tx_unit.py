@@ -14,12 +14,12 @@ def _four_genotype_sim():
 
 
 def _attach_tx_and_init(sim, tx_instance):
-    """Attach the tx product to a stub treat_num and init the sim.
+    """Attach the tx product to a stub delivery and init the sim.
 
     Returns the LIVE post-init copy of the product (Starsim deep-copies
     constructor inputs).
     """
-    sim.pars['interventions'] = [hpv.treat_num(product=tx_instance, prob=0.0)]
+    sim.pars['interventions'] = [ss.Delivery(tx_instance, coverage=0.0)]
     sim.init()
     return sim.interventions[0].product
 
@@ -37,16 +37,16 @@ def test_tx_ablation_flips_cin_to_false():
     uids = sim.people.alive.uids[:3]
     sim.diseases['hpv16'].cin[uids] = True
     out = t.administer(uids)
-    assert 'successful' in out and 'unsuccessful' in out
-    succ = out['successful']
+    assert set(out) == {'cured', 'failed', 'unneeded'}
+    succ = out['cured']
     if len(succ):
         assert np.all(~sim.diseases['hpv16'].cin[succ])
         assert np.allclose(sim.diseases['hpv16'].ti_clearance[succ], sim.ti + 1)
 
 
-def test_tx_zero_efficacy_row_means_zero_successful():
+def test_tx_zero_efficacy_row_means_zero_cured():
     """ablation row for cancerous has efficacy=0; cancerous-only agents must
-    all be classified unsuccessful for that state contribution.
+    all be classified failed for that state contribution.
 
     All four genotype modules are cleared and only hpv16 set to cancerous —
     otherwise agents with a residual precin flag on hpv18 (from the Nigeria
@@ -61,9 +61,9 @@ def test_tx_zero_efficacy_row_means_zero_successful():
         sim.diseases[g].cancerous[uids] = False
     sim.diseases['hpv16'].cancerous[uids] = True
     out = t.administer(uids)
-    # ablation efficacy on cancerous = 0, so no agent should be classified successful from this path
-    assert len(out['successful']) == 0
-    assert len(out['unsuccessful']) == len(uids)
+    # ablation efficacy on cancerous = 0, so no agent should be classified cured from this path
+    assert len(out['cured']) == 0
+    assert len(out['failed']) + len(out['unneeded']) == len(uids)
 
 
 def test_tx_disjoint_outcomes_keys():
@@ -72,8 +72,8 @@ def test_tx_disjoint_outcomes_keys():
     uids = sim.people.alive.uids[:5]
     sim.diseases['hpv16'].cin[uids] = True
     out = t.administer(uids)
-    succ_set = set(int(u) for u in out['successful'])
-    unsucc_set = set(int(u) for u in out['unsuccessful'])
+    succ_set = set(int(u) for u in out['cured'])
+    unsucc_set = set(int(u) for u in out['failed']) | set(int(u) for u in out['unneeded'])
     assert succ_set.isdisjoint(unsucc_set)
     assert succ_set | unsucc_set == set(int(u) for u in uids)
 
@@ -97,7 +97,7 @@ def test_tx_clears_ti_cin_and_ti_cancerous_on_success():
     sim.diseases['hpv16'].ti_cin[uids] = 5.0
     sim.diseases['hpv16'].ti_cancerous[uids] = 10.0
     out = t.administer(uids)
-    succ = out['successful']
+    succ = out['cured']
     if len(succ):
         assert np.all(np.isnan(sim.diseases['hpv16'].ti_cin[succ]))
         assert np.all(np.isnan(sim.diseases['hpv16'].ti_cancerous[succ]))
@@ -122,7 +122,7 @@ def test_tx_treated_woman_clears_to_susceptible_not_latency():
     hpv16.cin[uids] = True
     hpv16.cancerous[uids] = False
     hpv16.to_latent[uids] = True
-    succ = t.administer(uids)['successful']
+    succ = t.administer(uids)['cured']
     assert len(succ), 'ablation has efficacy 0.936 on cin; expected successes'
     # Two steps: ti increments at the end of a step, and treatment schedules
     # clearance for module.ti + 1.
@@ -138,8 +138,7 @@ def test_tx_empty_uids_returns_empty_outcomes():
     sim = _four_genotype_sim()
     t = _attach_tx_and_init(sim, hpv_tx(name='ablation'))
     out = t.administer(ss.uids())
-    assert len(out['successful']) == 0
-    assert len(out['unsuccessful']) == 0
+    assert all(len(v) == 0 for v in out.values())
 
 
 def test_tx_neither_name_nor_df_raises():
@@ -169,11 +168,11 @@ def test_tx_module_name_separates_lookup_key_from_module_name():
 
 
 def test_two_ablation_programs_coexist_via_module_name():
-    """Regression: two shipped-ablation treat_num interventions in one sim
-    must not collide on the class-default product name."""
+    """Regression: two shipped-ablation treatments in one sim
+    must not collide on the product name."""
     sim = _four_genotype_sim()
     sim.pars['interventions'] = [
-        hpv.treat_num(name='abl_a', product=hpv_tx(name='ablation'), prob=0.0),
-        hpv.treat_num(name='abl_b', product=hpv_tx(name='ablation', module_name='ablation_older'), prob=0.0),
+        ss.treat(hpv_tx(name='ablation'), coverage=0.0, name='abl_a'),
+        ss.treat(hpv_tx(name='ablation', module_name='ablation_older'), coverage=0.0, name='abl_b'),
     ]
     sim.init()  # would raise 'Module ablation already added' without module_name=

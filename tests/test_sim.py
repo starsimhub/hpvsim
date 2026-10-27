@@ -49,7 +49,7 @@ def test_sim_has_one_hpv_disease():
 def test_sim_runs_short_window():
     sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2003, dt=0.25)
     sim.run()
-    assert sim.results.hpv16.n_infected[-1] >= 0
+    assert sim.results.hpv16.infected[-1] >= 0
 
 
 def test_sim_pop_scale_computed_from_total_pop():

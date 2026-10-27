@@ -89,7 +89,7 @@ for label, latency_pars in arms.items():
 print(f'{"":26s} {"latent women":>14s} {"reactivations":>14s} {"HPV prev":>10s}'
       f' {"cancers":>12s} {"seed range":>25s}')
 for label, sims in runs.items():
-    latent   = np.mean([float(s.results.all_hpv.n_latent[-1]) for s in sims])
+    latent   = np.mean([float(s.results.all_hpv.latent[-1]) for s in sims])
     wakeups  = np.mean([float(np.asarray(s.results.all_hpv.new_reactivations).sum()) for s in sims])
     prev     = np.mean([float(s.results.all_hpv.prevalence[-1]) for s in sims])
     cancers  = [float(s.results.all_hpv.cum_cancers[-1]) for s in sims]
@@ -127,12 +127,12 @@ its default.
 
 ```{python}
 slow = runs['Latency on, slow wake-up'][0]
-fig = slow.plot(['all_hpv_n_latent', 'all_hpv_prevalence'])
+fig = slow.plot(['all_hpv_latent', 'all_hpv_prevalence'])
 ```
 
 ```{python}
 fast = runs['Latency on, fast wake-up'][0]
-fig = fast.plot(['all_hpv_n_latent', 'all_hpv_prevalence'])
+fig = fast.plot(['all_hpv_latent', 'all_hpv_prevalence'])
 ```
 
 Compare the two pairs of panels. The slow arm accumulates a reservoir and holds

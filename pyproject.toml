@@ -42,9 +42,9 @@ dependencies = [
     'numpy',
     'pandas>=2.0.0',
     'sciris>=3.0.0',
-    'starsim>=3.6',  # 3.6 disallows float(TimePar); verified against 3.6.0
+    'starsim>=4.0.0',
     'matplotlib',
-    'optuna',  # not imported directly, but hpv.Calibration subclasses ss.Calibration and starsim ships optuna only as an optional extra
+    'optuna',  # not imported directly, but sim.fit(method='optuna') uses it and starsim ships optuna only as an optional extra
 ]
 
 [project.optional-dependencies]

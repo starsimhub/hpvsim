@@ -18,7 +18,7 @@ A simulation is a set of modules that share one population. Each layer answers a
 | Sexual network | Forms and dissolves marital and casual partnerships, and sets how many sex acts each partnership has per year | `hpv.SexualNetwork` |
 | Disease | One module per genotype: transmission, clearance, latency, precancer, cancer, cancer death | `hpv.HPV` |
 | Cross-genotype | Turns immunity earned against one genotype into protection against the others; pools per-genotype results into totals | `hpv.CrossImmunity`, `hpv.HPVTotal` |
-| Interventions | Deliver a product (vaccine, screening test, treatment) to a chosen group of people | `hpv.routine_vx`, `hpv.routine_screening`, `hpv.treat_num`, … |
+| Interventions | Deliver a product (vaccine, screening test, treatment) to a chosen group of people | `ss.vaccinate(hpv.vx(...))`, `ss.screen(hpv.dx(...))`, `ss.treat(hpv.tx(...))` |
 | Analyzers | Watch the population and record things the disease modules do not; they never change the run | `hpv.by_age`, `hpv.dalys`, `hpv.age_pyramid`, … |
 | HIV (optional) | Raises HPV acquisition, speeds progression, and weakens immunity, by CD4 stratum | `hpv.HIV_transmit`, `hpv.HIV_incidence` |
 

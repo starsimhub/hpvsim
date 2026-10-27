@@ -1,4 +1,4 @@
-"""HPV-specific Starsim products.
+"""HPV-specific Starsim products, delivered by ``ss.vaccinate()``, ``ss.screen()``, and ``ss.treat()``.
 
 Contains:
   - hpv.vx: prophylactic vaccine product
@@ -6,12 +6,18 @@ Contains:
   - hpv.tx: per-genotype state-flip treatment product
   - hpv.txvx: therapeutic vaccine product
   - hpv.radiation: cancer treatment product
+
+Each is a product written as code (an ``ss.Product`` with an ``administer()``), since the
+genotypes are diseases written as code, whose states v4's ``ss.Diagnostic`` and ``ss.Treatment``
+cannot key their results by (see ``v4_port_oct26.md``, HP70). Each returns its outcomes from
+``administer()``, so they are results and events of the delivery (e.g. ``screening.positive``).
 """
 import functools
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import sciris as sc
 import starsim as ss
 
 from hpvsim.utils import find_genotype_module, iter_hpv_modules
@@ -24,17 +30,17 @@ _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
 
 
 def _hiv_rel_imm_factor(sim):
-    """Return the HIV module's full ``hiv_rel_imm`` FloatArr, or None.
+    """Return HIV's full ``hiv_rel_imm`` FloatArr, or None.
 
-    Returns the HIV disease's ``hiv_rel_imm`` FloatArr (caller indexes by the
-    relevant uid subset; value is 1.0 for HIV- agents) when an ``hpv.HIV``
-    disease is registered in the sim, else ``None`` so callers cleanly no-op
-    without HIV. Returns None when stisim isn't installed.
+    Returns the ``hiv_rel_imm`` FloatArr of ``hpv.HIVEffects`` (caller indexes
+    by the relevant uid subset; value is 1.0 for HIV- agents) when the sim has
+    one, else ``None`` so callers cleanly no-op without HIV. Returns None when
+    stisim isn't installed.
     """
-    if not getattr(sim, 'diseases', None):
+    if not getattr(sim, 'connectors', None):
         return None
-    hivm = misc.hiv_module(sim)
-    return None if hivm is None else hivm.hiv_rel_imm
+    effects = misc.hiv_effects(sim)
+    return None if effects is None else effects.hiv_rel_imm
 
 
 @functools.lru_cache(maxsize=1)
@@ -190,19 +196,21 @@ def _resolve_txvx_pars(name, rel_imm):
     return dict(products[name])
 
 
-class vx(ss.Vx):
+def _default_name(product, name):
+    """Name a product after the product it looks up (e.g. 'via'), as its default name: if a delivery has the same name
+    (``ablation = ss.treat(hpv.tx('ablation'))``), the sim renames the product (``ablation_product``); ``module_name=`` names it for good"""
+    if name is not None and product._default_name:
+        product.name = product.label = name
+    return
+
+
+class vx(ss.Product):
     """HPV multi-genotype prophylactic vaccine.
 
     Constructed with EITHER ``name`` (looks up the per-genotype rel_imm from
     ``hpvsim/data/products_vx.csv``) OR ``rel_imm`` (explicit per-genotype
     dict). Default product names: ``'bivalent'``, ``'quadrivalent'``,
     ``'nonavalent'``.
-
-    In practice almost all callers use ``name`` — the named products in the CSV
-    cover the real-world vaccines. The explicit ``rel_imm`` dict is an
-    escape hatch for ad-hoc / experimental products (e.g. a hypothetical
-    vaccine, or sensitivity sweeps over cross-protection coefficients) and is
-    rarely needed.
 
     The vaccine model has two parameters:
 
@@ -220,67 +228,35 @@ class vx(ss.Vx):
     ``CrossImmunity`` connector applies ``vax_imm`` directly per-genotype
     without flowing it through the cross-immunity matrix, so the CSV's
     per-genotype ``rel_imm`` values are the complete vaccine cross-protection
-    profile: vaccine immunity does not amplify into cross-protection against
-    non-target genotypes.
+    profile.
+
+    Examples::
+
+        bivalent = hpv.vx('bivalent')
+        routine = ss.vaccinate(bivalent, where=ss.ppl.female, at_age=9, coverage=0.9, start=2020)
     """
 
-    def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95,
-                 module_name=None, **kwargs):
-        super().__init__(**kwargs)
-        self.define_pars(
-            name=name,
-            rel_imm=rel_imm,
-            sterilizing_p=sterilizing_p,
-        )
+    def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95, module_name=None, **kwargs):
+        super().__init__(name=module_name, **kwargs)
+        _default_name(self, name)
+        self.define_pars(sterilizing_p=sterilizing_p)
         self.rel_imm = _resolve_vx_pars(name, rel_imm)
-        # CRN-safe Bernoulli; p set per administer call.
-        self._sterilizing_dist = ss.bernoulli(p=0.0)
-        # Module name: explicit module_name= wins; otherwise fall back to the
-        # lookup name so two `hpv.vx(name='bivalent')` / `name='nonavalent'`
-        # products don't collide on the class default 'vx'.
-        if module_name is not None:
-            self.name = module_name
-        elif name is not None:
-            self.name = name
+        self.sterilizing = ss.bernoulli(p=self.pars.sterilizing_p) # One draw per agent, not per genotype
+        return
 
-    def administer(self, people, uids):
-        """Apply the vaccine: per-agent all-or-nothing sterilizing draw,
-        scaled per genotype by the CSV's rel_imm cross-protection coefficient.
-
-        A single per-agent sterilizing Bernoulli at ``sterilizing_p``
-        (default 0.95), then per-genotype scaling by ``rel_imm[g]`` from
-        products_vx.csv. ``rel_imm[g]`` is applied directly to ``vax_imm[g]``
-        as a multiplicative scalar on the per-agent peak.
-
-        For each vaccinated agent:
-          - Sterilizing fate is drawn once at p=sterilizing_p (NOT per-genotype).
-          - For each genotype g:
-              - Sterilizing agents:       vax_imm[g] = rel_imm[g]
-              - Non-sterilizing (leaky):  vax_imm[g] = rel_imm[g] * sterilizing_p
-        Max-of-existing prevents vaccine from downgrading prior immunity.
-        """
-        if len(uids) == 0:
-            return
-        # HIV co-infection reduces vaccine take (gated no-op without HIV).
+    def administer(self, uids):
+        """Per-agent all-or-nothing sterilizing draw, scaled per genotype by ``rel_imm``; HIV reduces it"""
         rel_imm_hiv = _hiv_rel_imm_factor(self.sim)
-        # Single sterilizing draw per agent, not per genotype.
-        self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
-        sterilizing_uids, leaky_uids = self._sterilizing_dist.filter(uids, both=True)
+        self.sterilizing.set(p=float(self.pars.sterilizing_p))
+        sterilizing_uids, leaky_uids = self.sterilizing.filter(uids, both=True)
         for genotype, rel_imm_g in self.rel_imm.items():
             hpv_mod = find_genotype_module(self.sim, genotype)
             if hpv_mod is None:
                 continue
-            # Sterilizing agents get rel_imm[g]; leaky get rel_imm[g] * sterilizing_p
-            ster_peak = float(rel_imm_g)
-            leaky_peak = ster_peak * float(self.pars.sterilizing_p)
-            if rel_imm_hiv is None:
-                ster_vals = ster_peak
-                leaky_vals = leaky_peak
-            else:
-                ster_vals = ster_peak * rel_imm_hiv[sterilizing_uids]
-                leaky_vals = leaky_peak * rel_imm_hiv[leaky_uids]
-            hpv_mod.vax_imm[sterilizing_uids] = np.maximum(hpv_mod.vax_imm[sterilizing_uids], ster_vals)
-            hpv_mod.vax_imm[leaky_uids] = np.maximum(hpv_mod.vax_imm[leaky_uids], leaky_vals)
+            for these, peak in [(sterilizing_uids, rel_imm_g), (leaky_uids, rel_imm_g*self.pars.sterilizing_p)]:
+                vals = peak if rel_imm_hiv is None else peak*rel_imm_hiv[these]
+                hpv_mod.vax_imm[these] = np.maximum(hpv_mod.vax_imm[these], vals)
+        return
 
 
 def _state_uids_for_module(module, state, uids):
@@ -305,179 +281,114 @@ def _state_uids_across_genotypes(state, uids, sim):
         for m in modules:
             out = out.intersect(m.susceptible.uids)
         return out
-    # Union — agent is in `state` for at least one genotype
     matched = ss.uids()
     for m in modules:
-        these = _state_uids_for_module(m, state, uids)
-        matched = matched.union(these)
+        matched = matched.union(_state_uids_for_module(m, state, uids))
     return matched
 
 
-class dx(ss.Dx):
+class dx(ss.Product):
     """HPV diagnostic product with per-genotype state classification.
 
-    Per-genotype rows in products_dx.csv are classified one genotype at a
-    time; rows with genotype='all' are collapsed across all HPV modules
-    (susceptible iff susceptible-to-all; positive iff infected-with-any).
-    Hierarchy-min semantics: when an agent is positive across multiple
-    genotypes, the lowest-index (most severe) result wins.
+    Each person tested gets one result, from the probability of each result
+    given the state she is in (``hpvsim/data/products_dx.csv``). Per-genotype
+    rows are classified one genotype at a time; rows with genotype='all' are
+    collapsed across all HPV modules (susceptible iff susceptible to all;
+    any other state iff in it for any genotype). When a person qualifies for
+    several rows, the most severe result (the first in ``hierarchy``) wins.
+
+    The results are the outcomes of its delivery, e.g. ``screening.positive``,
+    or ``colpo.hsil`` for colposcopy; a result whose probability is 0 in every
+    state (``inadequate``, in the shipped products) is left out.
+
+    Examples::
+
+        via = ss.screen(hpv.dx('via'), where=women, coverage=0.6, interval=ss.years(1))
+        ablation = ss.treat(hpv.tx('ablation'), who=via.positive & hpv.no_cancer)
     """
 
     def __init__(self, name=None, df=None, hierarchy=None, module_name=None, **kwargs):
-        resolved_df, resolved_hierarchy = _resolve_dx_pars(name, df, hierarchy)
-        # ss.Dx.__init__ needs df.disease, which HPV CSVs lack; stub it out.
-        df_for_base = resolved_df.copy()
-        if 'disease' not in df_for_base.columns:
-            df_for_base['disease'] = '_hpv_stub'
-        super().__init__(df=df_for_base, hierarchy=resolved_hierarchy, **kwargs)
-        # Unused: hpv.dx routes through iter_hpv_modules, not self.diseases.
-        self.diseases = None
-        # Store the original (no-stub) df for our own administer logic
-        self.df = resolved_df
-        # Module name: explicit module_name= wins; otherwise fall back to
-        # name= (either the CSV lookup key or the caller-supplied identifier
-        # for a df-built product). A df-only build keeps the class default
-        # ('dx'), which collides if two such products share a sim -- pass
-        # name= or module_name= to disambiguate.
-        if module_name is not None:
-            self.name = module_name
-        elif name is not None:
-            self.name = name
-        self._genotypes_in_df = list(resolved_df['genotype'].unique())
-        self._all_genotype = (len(self._genotypes_in_df) == 1
-                              and self._genotypes_in_df[0] == 'all')
+        df, hierarchy = _resolve_dx_pars(name, df, hierarchy)
+        super().__init__(name=module_name, **kwargs)
+        _default_name(self, name)
+        used = set(df.loc[df.probability > 0, 'result'])
+        self.hierarchy = [r for r in hierarchy[:-1] if r in used] + hierarchy[-1:] # Most severe first; the last is everyone else
+        self.df = df
+        self.health_states = list(df.state.unique())
+        self.result_dist = ss.choice(a=len(self.hierarchy))
+        genotypes = list(df.genotype.unique())
+        self._all_genotype = genotypes == ['all']
+        self._genotypes = genotypes
+        return
 
-    def administer(self, uids, return_format='dict'):
-        if len(uids) == 0:
-            if return_format == 'dict':
-                return {k: ss.uids() for k in self.hierarchy}
-            return np.array([], dtype=int)
+    def outcome_names(self):
+        return list(self.__dict__.get('hierarchy', []))
 
-        # Normalize so .intersect / .union work on a plain-ndarray input.
-        uids = ss.uids(uids)
-        # uid-keyed for .loc updates; hierarchy-min means lowest index wins.
-        results = pd.Series(self.default_value, index=uids)
-
+    def administer(self, uids):
+        results = pd.Series(len(self.hierarchy) - 1, index=uids) # The least severe, unless a row says otherwise
         for state in self.health_states:
             if self._all_genotype:
-                these = _state_uids_across_genotypes(state, uids, self.sim)
-                if len(these) == 0:
-                    continue
-                df_filter = (self.df.state == state) & (self.df.genotype == 'all')
-                self._draw_and_min_into(results, these, df_filter)
+                rows = [(_state_uids_across_genotypes(state, uids, self.sim), 'all')]
             else:
-                for module in iter_hpv_modules(self.sim):
-                    if module.genotype not in self._genotypes_in_df:
-                        continue
-                    these = _state_uids_for_module(module, state, uids)
-                    if len(these) == 0:
-                        continue
-                    df_filter = (
-                        (self.df.state == state)
-                        & (self.df.genotype == module.genotype)
-                    )
-                    self._draw_and_min_into(results, these, df_filter)
-
-        if return_format == 'dict':
-            return {k: ss.uids(results.index[results == i].to_numpy())
-                    for i, k in enumerate(self.hierarchy)}
-        return results.to_numpy(dtype=int)
-
-    def _draw_and_min_into(self, results, these, df_filter):
-        probs = [
-            float(self.df[df_filter & (self.df.result == r)]['probability'].values[0])
-            for r in self.hierarchy
-        ]
-        self.result_dist.pars['p'] = probs
-        draw = self.result_dist.rvs(these)
-        results.loc[these] = np.minimum(draw, results.loc[these])
+                rows = [(_state_uids_for_module(m, state, uids), m.genotype) for m in iter_hpv_modules(self.sim) if m.genotype in self._genotypes]
+            for these, genotype in rows:
+                if len(these):
+                    sub = self.df[(self.df.state == state) & (self.df.genotype == genotype)]
+                    probs = np.array([sub.probability[sub.result == r].sum() for r in self.hierarchy])
+                    self.result_dist.set(p=probs/probs.sum())
+                    results.loc[these] = np.minimum(self.result_dist.rvs(these), results.loc[these])
+        return {k: ss.uids(results.index[results == i].to_numpy()) for i, k in enumerate(self.hierarchy)}
 
 
-class tx(ss.Tx):
-    """HPV treatment product — per-genotype state-flip with efficacy draw.
+class tx(ss.Product):
+    """HPV treatment product: per-genotype state-flip with an efficacy draw.
 
-    On successful treatment of state in {precin, cin, cancerous} on
-    genotype g:
-        module.<state>[uids] = False
-        module.cin[uids]      = False
-        module.precin[uids]   = False
-        module.cancerous[uids] = False
-        module.ti_cin[uids]      = NaN
-        module.ti_cancerous[uids] = NaN
-        module.ti_clearance[uids] = module.ti + 1   # cleared next module step
-        module.to_latent[uids]    = False           # clears to susceptible
+    For each genotype a person has in a state the product treats
+    (``hpvsim/data/products_tx.csv``), one efficacy draw; on success the
+    genotype's precin/CIN/cancer is cleared (she is susceptible to it again,
+    from its next step). Its outcomes, as for ``ss.Treatment``, are ``cured``
+    (cleared of at least one genotype), ``failed`` (in a treated state, and
+    cleared of none), and ``unneeded`` (in no state it treats).
+
+    Examples::
+
+        ablation = ss.treat(hpv.tx('ablation'), who=screening.positive & hpv.no_cancer, coverage=0.9)
     """
 
     def __init__(self, name=None, df=None, module_name=None, **kwargs):
         df = _resolve_tx_pars(name, df)
-        # ss.Tx.__init__ needs df.disease, which HPV CSVs lack; stub it out.
-        df_for_base = df.copy()
-        if 'disease' not in df_for_base.columns:
-            df_for_base['disease'] = '_hpv_stub'
-        super().__init__(df=df_for_base, **kwargs)
-        # Unused: hpv.tx routes through iter_hpv_modules, not self.diseases.
-        self.diseases = None
-        # Restore the original (no-stub) df for our own administer logic.
+        super().__init__(name=module_name, **kwargs)
+        _default_name(self, name)
         self.df = df
-        # Module name: explicit module_name= wins; otherwise fall back to
-        # name= (either the CSV lookup key or the caller-supplied identifier
-        # for a df-built product). Two `hpv.tx(name='ablation')` products in
-        # the same sim collide -- use module_name= to disambiguate.
-        if module_name is not None:
-            self.name = module_name
-        elif name is not None:
-            self.name = name
+        self.health_states = list(df.state.unique())
+        self.efficacy_dist = ss.bernoulli(p=0)
+        return
 
-    def administer(self, uids, return_format='dict'):
-        if len(uids) == 0:
-            empty = ss.uids()
-            return {'successful': empty, 'unsuccessful': empty} if return_format == 'dict' else empty
+    def outcome_names(self):
+        return ['cured', 'failed', 'unneeded']
 
-        successful_uids_list = []
+    def administer(self, uids):
+        cured = []
+        treated = []
         for state in self.health_states:
             for module in iter_hpv_modules(self.sim):
-                # Match rows by state and genotype ('all' matches every module)
-                df_filter = (self.df.state == state) & (
-                    (self.df.genotype == module.genotype) | (self.df.genotype == 'all')
-                )
-                rows = self.df[df_filter]
-                if len(rows) == 0:
-                    continue
+                rows = self.df[(self.df.state == state) & ((self.df.genotype == module.genotype) | (self.df.genotype == 'all'))]
                 these = _state_uids_for_module(module, state, uids)
-                if len(these) == 0:
+                if len(rows) == 0 or len(these) == 0:
                     continue
+                treated.append(these)
                 self.efficacy_dist.set(p=float(rows['efficacy'].values[0]))
                 eff = self.efficacy_dist.filter(these)
-                if len(eff) == 0:
-                    continue
-                successful_uids_list.append(eff)
-                # State cleanup: clear all dysplasia state on the treated genotype
-                module.cin[eff] = False
-                module.precin[eff] = False
-                module.cancerous[eff] = False
-                module.undetected_cancerous[eff] = False
-                module.ti_cin[eff] = np.nan
-                module.ti_cancerous[eff] = np.nan
-                module.ti_cancer_detection[eff] = np.nan
-                # ti_clearance is read against the HPV module's own ti, not ours.
-                module.ti_clearance[eff] = module.ti + 1
-                # Cancel any pending latency roll: treatment-induced clearance
-                # sends the agent to susceptible, not into latency. No-op at the
-                # default hpv_control_prob=0, where to_latent is never set.
-                module.to_latent[eff] = False
+                if len(eff):
+                    cured.append(eff)
+                    module.clear_infection(eff)
+        cured = ss.uids(np.unique(np.concatenate(cured))) if cured else ss.uids()
+        treated = ss.uids(np.unique(np.concatenate(treated))) if treated else ss.uids()
+        return dict(cured=cured, failed=treated.remove(cured), unneeded=ss.uids(uids).remove(treated))
 
-        if successful_uids_list:
-            successful = ss.uids(np.unique(np.concatenate(successful_uids_list)))
-        else:
-            successful = ss.uids()
-        unsuccessful = ss.uids(np.setdiff1d(uids, successful))
-
-        if return_format == 'dict':
-            return {'successful': successful, 'unsuccessful': unsuccessful}
-        return successful
 
 class txvx(tx):
-    """HPV therapeutic vaccine — clears infection/lesions, then confers immunity.
+    """HPV therapeutic vaccine: clears infection/lesions, then confers immunity.
 
     A treatment product, not a prophylactic. It flips per-genotype disease
     state through the same state x genotype efficacy table as ``hpv.tx``
@@ -500,17 +411,13 @@ class txvx(tx):
                  imm_boost=None, module_name=None, **kwargs):
         if name is None and df is None:
             name = 'txvx1'
-        # Unset imm_init/imm_boost/rel_imm fall back to txvx1 shipped defaults
-        # (v2 parity: default_tx('txvx1') resolved both from products_txvx.csv).
-        # A caller passing df=custom for state efficacy still gets the standard
-        # v2 immunity behaviour unless they explicitly override.
         default_name = name if name in self._DEFAULTS else 'txvx1'
         if imm_init is None and imm_boost is None:
             imm_init, imm_boost = self._DEFAULTS[default_name]
         if imm_init is not None and imm_boost is not None:
             raise ValueError('hpv.txvx takes at most one of `imm_init` or `imm_boost`.')
         super().__init__(name=name, df=df, module_name=module_name, **kwargs)
-        self.imm_init = imm_init
+        self.imm_init = sc.dcp(imm_init)
         self.imm_boost = imm_boost
         # Per-target-genotype scaling of the conferred immunity. Defaults to the
         # named product's row in products_txvx.csv; 1.0 for anything unlisted.
@@ -518,64 +425,39 @@ class txvx(tx):
             rel_imm = _load_txvx_products().get(default_name)
         self.rel_imm = dict(rel_imm) if rel_imm is not None else {}
 
-    def administer(self, uids, return_format='dict'):
-        """Clear disease state as ``hpv.tx`` does, then confer immunity."""
-        out = super().administer(uids, return_format=return_format)
-        self._confer_immunity(uids)
-        return out
-
-    def _confer_immunity(self, uids):
-        """Give every dosed agent severity immunity against future infection.
-
-        Applied to everyone dosed, not only those whose clearance draw
-        succeeded — matching v2, where the immunity block sat outside the
-        state loop. Writes ``txvx_sev_imm`` pre-scaled by ``rel_imm`` per
-        target genotype, which CrossImmunity adds to ``sev_imm`` directly
-        rather than passing through the cross-protection matrix.
-        """
-        if len(uids) == 0 or (self.imm_init is None and self.imm_boost is None):
-            return
-        # One draw per agent, scaled per target genotype — v2 stored a single
-        # value per agent and applied the per-genotype scaling at read time, so
-        # drawing once here keeps the genotypes correlated as they were.
-        base = self.imm_init.rvs(uids) if self.imm_init is not None else None
+    def administer(self, uids):
+        """Clear disease state as ``hpv.tx`` does, then confer immunity on everyone dosed (as v2 did)"""
+        out = super().administer(uids)
+        base = self.imm_init.rvs(uids) if self.imm_init is not None else None # One draw per agent, scaled per target genotype
         for module in iter_hpv_modules(self.sim):
             scale = float(self.rel_imm.get(module.genotype, 1.0))
             if base is not None:
-                module.txvx_sev_imm[uids] = base * scale
+                module.txvx_sev_imm[uids] = base*scale
             else:
-                module.txvx_sev_imm[uids] = module.txvx_sev_imm[uids] * self.imm_boost
+                module.txvx_sev_imm[uids] = module.txvx_sev_imm[uids]*self.imm_boost
+        return out
 
 
 class radiation(ss.Product):
-    """HPV cancer-treatment product — extends ti_dead_cancer per cancerous module.
+    """HPV cancer-treatment product: extends ``ti_dead_cancer`` per cancerous genotype.
 
-    Default duration: normal(mean=18 months, sd=2 months), converted to
-    years at construction.
+    Default duration: normal(mean=18 months, sd=2 months).
+
+    Examples::
+
+        radiation = ss.treat(hpv.radiation(), who=screening.positive & hpv.has_cancer)
     """
 
     def __init__(self, dur=None, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
-            dur=dur or dict(dist='normal', par1=18 / 12, par2=2 / 12),
+            dur=dur or ss.normal(ss.years(1.5), ss.years(2/12)),
         )
-        # Placeholder; loc/scale are re-pointed on each administer call so
-        # post-init mutation of self.pars.dur is honored.
-        self._dur_dist = ss.normal(loc=0.0, scale=1.0)
+        return
 
     def administer(self, uids):
-        if len(uids) == 0:
-            return ss.uids()
-        self._dur_dist.set(loc=float(self.pars.dur['par1']),
-                           scale=float(self.pars.dur['par2']))
-        # dt_year, not t.dt: arithmetic on the freq object drops the time unit.
-        dt_year = self.sim.t.dt_year
         for module in iter_hpv_modules(self.sim):
             cancer_uids = module.cancerous.uids.intersect(uids)
-            if len(cancer_uids) == 0:
-                continue
-            # Draw on cancer_uids: intersect returns sorted order, not uids-order.
-            new_dur = self._dur_dist.rvs(cancer_uids)
-            module.ti_dead_cancer[cancer_uids] += np.ceil(new_dur / dt_year)
-        return uids
-
+            if len(cancer_uids):
+                module.ti_dead_cancer[cancer_uids] += np.ceil(self.pars.dur.rvs(cancer_uids)) # In the module's steps
+        return

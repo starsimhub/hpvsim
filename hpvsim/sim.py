@@ -56,11 +56,19 @@ class Sim(ss.Sim):
         (``hpv.HIV_incidence``) plus a coverage-based ``sti.ART``
         intervention (ART data is mandatory in this mode);
         ``'transmission'`` drives HIV via network transmission instead
-        (``hpv.HIV_transmit``) with no auto-added ART. ``hiv_data=``
-        supplies the input data (a folder path or a dict with
-        ``{'incidence', 'art_coverage', 'init_prev'}``); ``hiv_pars=``
-        overrides the constructed HIV disease's pars. Mutually exclusive
-        with supplying your own HIV-family disease in ``diseases=``.
+        (``hpv.HIV_transmit``) with no auto-added ART. Either way, an
+        ``sti.HIVTest`` diagnoses everyone with HIV each step (unless one is
+        given). ``hiv_data=`` supplies the input data (a folder path or a
+        dict with ``{'incidence', 'art_coverage', 'init_prev'}``);
+        ``hiv_pars=`` overrides the constructed HIV disease's pars, and those
+        of HIV's effects on HPV (``hpv.HIVEffects``, added whenever the sim
+        has HIV). Mutually exclusive with supplying your own ``sti.HIV`` in
+        ``diseases=``.
+
+      data (list, dict, or DataFrame): calibration targets (see
+        ``hpv.data.loaders.load_calib_data``): the sim adds the analyzers they
+        need and runs past their last year, and ``sim.fit(gof=hpv.calibration.gof)``
+        fits the parameters given with bounds (``ss.par``) to them.
 
       v2_compat_demographics (bool, default ``False``):
         Forces discrete integer-age demographics for bit-for-bit
@@ -103,10 +111,9 @@ class Sim(ss.Sim):
             if total_pop is None:
                 total_pop = country['age_data']['value'].sum()
         people = kwargs.pop('people', None)
-        copy_inputs = kwargs.pop('copy_inputs', True)
         sim_data = kwargs.pop('data', None)
         if people is None:
-            age_data = country['age_data'] if country is not None else None
+            age_data = country['age_data'] if country is not None else ss.uniform(0, 60) # Without a location, uniform ages, not ss.People's default (the world's)
             people = ss.People(n_agents, age_data=age_data,
                                extra_states=[ss.BoolArr('fine', default=False)])
 
@@ -126,9 +133,13 @@ class Sim(ss.Sim):
 
         # Autoconstruct HIV and ART if model_hiv=True.
         auto_interventions = []
+        effects_pars = {}
         if model_hiv:
             sti = misc.import_stisim()
-            from .hiv import HIV_incidence, HIV_transmit
+            from .hiv import HIV_incidence, HIV_transmit, HIVEffects
+            effect_keys = HIVEffects().pars.keys()
+            effects_pars = {k: v for k, v in (hiv_pars or {}).items() if k in effect_keys} # HIV's effects on HPV, for the connector below
+            hiv_pars = {k: v for k, v in (hiv_pars or {}).items() if k not in effect_keys}
             if any(isinstance(d, sti.HIV) for d in other_diseases):
                 raise ValueError(
                     'model_hiv= is mutually exclusive with supplying your own HIV '
@@ -157,6 +168,9 @@ class Sim(ss.Sim):
                 hiv_disease = HIV_transmit(init_prev_data=(data.get('init_prev') if data else None),
                                             pars=hiv_pars)
             other_diseases = other_diseases + [hiv_disease]
+            # No testing cascade: everyone with HIV is diagnosed each step, and scheduled for ART
+            if not any(isinstance(iv, sti.HIVTest) for iv in user_interventions):
+                auto_interventions.insert(0, sti.HIVTest(test_prob_data=1.0, dt_scale=False, name='hiv_dx_all'))
 
         if init_seeding not in ('exclusive', 'independent'):
             raise ValueError(
@@ -173,6 +187,13 @@ class Sim(ss.Sim):
                 'CrossImmunity in connectors= -- pass pars= to your instance directly.'
             )
         auto_connectors = [user_cross[0] if user_cross else CrossImmunity(pars=imm_pars)]
+
+        # HIV's effects on HPV, whenever the sim has HIV
+        hiv_cls = misc.hiv_class()
+        if hiv_cls is not None and any(isinstance(d, hiv_cls) for d in other_diseases):
+            from .hiv import HIVEffects
+            if not any(isinstance(c, HIVEffects) for c in user_connectors):
+                auto_connectors.append(HIVEffects(pars=effects_pars))
 
         if hpv_instances:
             hpv_diseases = hpv_instances  # override path; these manage their own init_prev
@@ -245,6 +266,14 @@ class Sim(ss.Sim):
         analyzers = auto_analyzers + user_analyzers
         interventions = auto_interventions + user_interventions
 
+        # Calibration data: the analyzers it needs, and a sim that runs past its last year (see hpv.calibration.gof)
+        if sim_data is not None:
+            from . import calibration
+            sim_data = hpv.data.loaders.load_calib_data(sim_data)
+            analyzers += calibration.data_analyzers(sim_data, analyzers)
+            if len(sim_data):
+                stop = max(float(stop), int(float(sim_data.index.max())) + 1)
+
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower() if location is not None else None
         # Stored for use in init() to discretize initial ages.
@@ -271,10 +300,9 @@ class Sim(ss.Sim):
             interventions=interventions,
             pars=sim_pars,
             total_pop=total_pop,
-            copy_inputs=copy_inputs,
-            data=sim_data,
             **kwargs,
         )
+        self.calib_data = sim_data # Not ss.Sim's data=, which is by result name: HPVsim's is by its own targets
         if mod_pars:
             from .parameters import route_pars
             route_pars(self, mod_pars, verbose=False)

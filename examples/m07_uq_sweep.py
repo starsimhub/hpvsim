@@ -4,11 +4,10 @@ Runs a 4 × 20 (coverage × seed) routine-vx sweep on the M05 Nigeria
 4-genotype anchor, reduces each coverage scenario to median + 10/90
 quantiles, and plots aggregate cancer trajectories by coverage.
 
-Exercises every M07 verification target:
-  - sc.parallelize for parallel sim CREATION
-  - ss.parallel for parallel sim EXECUTION
-  - ss.MultiSim.median for result REDUCTION
-  - make_sim(seed, coverage) builds one labeled sim per scenario point
+  - make_sim(coverage) builds one labeled sim per scenario
+  - ss.parallel(*sims, n_runs=N_SEEDS) runs each with N_SEEDS seeds
+  - the MultiSim's results have a run axis first, reduced by scenario
+    with .quantiles()
 
 Run from the repo root:
     python examples/m07_uq_sweep.py
@@ -39,90 +38,30 @@ VX_PARS = sc.objdict(
 )
 
 
-def make_sim(seed, coverage):
-    """Build one sim for the (seed, coverage) point.
-
-    Builds a fresh hpv.routine_vx with the swept coverage.
-
-    Sim deep-copies inputs at __init__, so post-run inspection must go
-    through sim.interventions, not the local reference.
-    """
-    return hpv.Sim(
-        location=VX_PARS.location,
-        start=VX_PARS.start,
-        stop=VX_PARS.stop,
-        rand_seed=int(seed),
-        n_agents=VX_PARS.n_agents,
-        genotypes=list(VX_PARS.genotypes),
-        v2_compat_demographics=VX_PARS.v2_compat_demographics,
-        verbose=0,
-        label=f'coverage={coverage:.0%}|seed={seed}',
-        interventions=[hpv.routine_vx(
-            product='bivalent',
-            prob=float(coverage),
-            age_range=[9, 10],
-            sex='f',
-            start_year=2020,
-            name='routine_bivalent_girls',
-        )],
-    )
+def make_sim(coverage, **kwargs):
+    """Build the sim of one coverage: routine bivalent vaccination of girls as they turn 9, from 2020"""
+    vaccination = ss.vaccinate(hpv.vx('bivalent'), where=ss.ppl.female, at_age=9, coverage=coverage, start=2020, name='routine_bivalent_girls')
+    return hpv.Sim(**(VX_PARS | kwargs), verbose=0, label=f'coverage={coverage:.0%}', interventions=vaccination)
 
 
 def main(out_png=Path('m07_uq_sweep.png')):
-    iterkwargs = [dict(seed=s, coverage=c)
-                  for c in COVERAGES for s in range(N_SEEDS)]
-    print(f'Building {len(iterkwargs)} sims via sc.parallelize...')
-    sims = sc.parallelize(make_sim, iterkwargs=iterkwargs)
-
-    print(f'Running {len(sims)} sims via ss.parallel...')
-    msim = ss.parallel(*sims, verbose=0)
-
-    # Group sims back into per-coverage MultiSims for reduction.
-    by_cov = {}
-    for cov in COVERAGES:
-        tag = f'coverage={cov:.0%}'
-        cov_sims = [s for s in msim.sims if s.label.startswith(tag)]
-        sub = ss.MultiSim(cov_sims)
-        sub.median()
-        by_cov[cov] = sub
-
-    _plot_coverage_sweep(by_cov, out_png)
+    sims = [make_sim(c) for c in COVERAGES]
+    print(f'Running {len(sims)} scenarios × {N_SEEDS} seeds via ss.parallel...')
+    msim = ss.parallel(*sims, n_runs=N_SEEDS, verbose=0)
+    _plot_coverage_sweep(msim, out_png)
     print(f'Wrote {out_png}')
 
 
-def _plot_coverage_sweep(by_cov, out_png):
+def _plot_coverage_sweep(msim, out_png):
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(8, 5))
-    for cov, sub_msim in by_cov.items():
-        # The HPVTotal analyzer aggregates per-genotype cancers; results
-        # are flattened to top-level keys after .median().
-        # Try a few candidate result keys to be robust to API drift.
-        candidates = [
-            'all_hpv_cum_cancers',
-            'hpv16_cum_cancers',
-        ]
-        result_key = next(
-            (k for k in candidates if hasattr(sub_msim.results, k)), None
-        )
-        if result_key is None:
-            raise RuntimeError(
-                f'No expected result key found on reduced msim. '
-                f'Tried {candidates}. Available keys: '
-                f'{list(sub_msim.results.keys())[:20]}'
-            )
-        res = getattr(sub_msim.results, result_key)
-        tv = sub_msim.sims[0].t.timevec
-        # Convert ss.date objects to float years (Starsim 3.x timevec
-        # contains ss.date — see starsim-dev-time skill).
-        if hasattr(tv[0], 'years'):
-            years = np.array([float(y.years) for y in tv])
-        else:
-            years = np.asarray(tv, dtype=float)
-        median = np.asarray(res)
-        lo = np.asarray(getattr(res, 'low', median))
-        hi = np.asarray(getattr(res, 'high', median))
-        line, = ax.plot(years, median, label=f'coverage={cov:.0%}')
-        ax.fill_between(years, lo, hi, alpha=0.2, color=line.get_color())
+    res = msim.results.all_hpv.cum_cancers # Runs by time, from the HPVTotal analyzer
+    q = np.asarray(res.quantiles([0.1, 0.5, 0.9])).reshape(len(COVERAGES), 3, -1) # One row per scenario and quantile
+    lo, median, hi = q[:, 0], q[:, 1], q[:, 2] # Each scenario by time
+    years = np.asarray(msim.sims[0].t.yearvec)
+    for i, cov in enumerate(COVERAGES):
+        line, = ax.plot(years, median[i], label=f'coverage={cov:.0%}')
+        ax.fill_between(years, lo[i], hi[i], alpha=0.2, color=line.get_color())
     ax.set_xlabel('Year')
     ax.set_ylabel('Cumulative cancers')
     ax.set_title('Cumulative cancers by routine-vx coverage (median + 10/90)')

@@ -32,7 +32,7 @@ def _short_summary(sim):
     """Tiny summary suitable for bit-equality assertions."""
     return {
         'cum_inf': float(sim.results.hpv16.cum_infections[-1]),
-        'n_alive': float(sim.results['n_alive'][-1]),
+        'alive': float(sim.results['alive'][-1]),
     }
 
 

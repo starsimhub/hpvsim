@@ -1,267 +1,47 @@
 """HIV–HPV co-infection.
 
-Two ways to drive HIV, both sharing the same CD4-stratified HIV->HPV effects
-and HIV-stratified results (all owned by the shared ``HIV`` base class):
-  - ``HIV_transmit``: network-transmitted, via beta_m2f/rel_beta_f2m onto
-    hpv.SexualNetwork.
-  - ``HIV_incidence``: a per-(year, sex, age) incidence curve imposed
-    directly, no network transmission.
+HIV is STIsim's (``sti.HIV``), used as it is. ``HIVEffects`` (a connector)
+gives HIV's effects on HPV, from each person's HIV status and CD4 count, and
+HPV prevalence by HIV status. Two ways to drive HIV:
+  - ``HIV_transmit()``: STIsim's HIV with hpvsim's defaults, transmitted per
+    act on hpv.SexualNetwork (as on any sexual network between men and women).
+  - ``HIV_incidence``: STIsim's HIV infected at the rate of a per-(year, sex,
+    age) incidence curve, with no transmission.
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 import stisim as sti
 
-from . import misc
 from .hpv import HPV
-from .network import SexualNetwork
 
-__all__ = ['HIV_transmit', 'HIV_incidence']
-
-
-class HIV(sti.HIV):
-    """Shared base for hpvsim's HIV variants (HIV_transmit, HIV_incidence).
-
-    Owns the CD4-stratified HIV->HPV effect pars -- rel_sus, rel_sev, rel_imm
-    and rel_reactivation, each as ``_lo``/``_hi`` either side of
-    ``cd4_threshold`` -- and HPV prevalence by HIV status. Cancer by HIV status
-    lives on ``HPVTotal`` (``sim.results.all_hpv``), which ticks at the sim's
-    cadence rather than HIV's.
-
-    Only these subclasses modulate HPV; a bare ``sti.HIV`` in ``diseases=``
-    does not, since the effects live on this class rather than a connector.
-    """
-
-    def __init__(self, init_prev_data=None, name='hiv'):
-        # Skip stisim's stratified results: they are raw agent counts, so
-        # wrong under multiscale (starsimhub/stisim#574). Use hpv.by_age.
-        super().__init__(init_prev_data=init_prev_data, name=name,
-                         age_bins=None, sex_keys=None)
-        self.define_pars(
-            rel_sus_lo=2.2,   rel_sus_hi=2.2,    # increased HPV acquisition
-            rel_sev_lo=1.5,   rel_sev_hi=1.2,    # faster/worse CIN->cancer progression
-            rel_imm_lo=0.36,  rel_imm_hi=0.76,   # reduced post-infection/vaccine immunity
-            rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier
-            cd4_threshold=200.0,  # lo/hi stratum boundary
-            cd4_upper=500.0,      # CD4 >= this -> no effect at all
-            dt=ss.years(0.25),
-        )
-        self.define_states(
-            ss.FloatArr('hiv_rel_sus', default=1.0),
-            ss.FloatArr('hiv_rel_sev', default=1.0),
-            ss.FloatArr('hiv_rel_imm', default=1.0),
-            ss.FloatArr('hiv_rel_reactivation', default=1.0),
-        )
-        self.hpv_modules = None
-
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        self.hpv_modules = [m for m in sim.diseases.values() if isinstance(m, HPV)]
-        if not self.hpv_modules:
-            raise ValueError('hpv.HIV requires HPV genotype module(s) in the sim.')
-
-    def _cd4_stratum(self, cd4):
-        """True for the hi stratum (CD4 >= cd4_threshold), False for lo."""
-        return cd4 >= self.pars.cd4_threshold
-
-    def _factor_array(self, effect, hiv_pos, is_hi, n):
-        """Build a per-agent factor array (1.0 for HIV-, stratum value for HIV+)."""
-        out = np.ones(n, dtype=float)
-        lo = self.pars[f'{effect}_lo']
-        hi = self.pars[f'{effect}_hi']
-        vals = np.where(is_hi, hi, lo)
-        out[hiv_pos] = vals[hiv_pos]
-        return out
-
-    def step_state(self):
-        super().step_state()
-        auids = self.sim.people.auids
-        cd4 = np.asarray(self.cd4[auids])
-        # Only HIV+ agents with CD4 in [0, cd4_upper) get an effect; above that, 1.0.
-        infected = self.infected[auids]
-        hiv_pos = infected & ~np.isnan(cd4) & (cd4 < self.pars.cd4_upper)
-        is_hi = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
-        n = len(auids)
-        self.hiv_rel_sus[auids] = self._factor_array('rel_sus', hiv_pos, is_hi, n)
-        self.hiv_rel_sev[auids] = self._factor_array('rel_sev', hiv_pos, is_hi, n)
-        self.hiv_rel_imm[auids] = self._factor_array('rel_imm', hiv_pos, is_hi, n)
-        self.hiv_rel_reactivation[auids] = self._factor_array('rel_reactivation', hiv_pos, is_hi, n)
-        # Written for all agents; starsim only samples it for susceptibles.
-        for m in self.hpv_modules:
-            m.rel_sus[auids] = m.rel_sus[auids] * self.hiv_rel_sus[auids]
-
-        # No testing cascade: diagnose every living HIV+ agent each step.
-        undiagnosed = self.infected & ~self.diagnosed & self.sim.people.alive
-        uids = undiagnosed.uids
-        if len(uids):
-            self.diagnosed[uids] = True
-            self.ti_diagnosed[uids] = self.ti
-            # sim.ti, not self.ti: sti.ART's gate checks ti_art against the sim clock.
-            self.ti_art[uids] = self.sim.ti + 1
-        return
-
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
-            ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
-            ss.Result('prevalence_f', dtype=float, scale=False, label='HIV prevalence (female, 15-49)'),
-            ss.Result('prevalence_m', dtype=float, scale=False, label='HIV prevalence (male, 15-49)'),
-        )
-
-    def _rescale_stisim_results(self):
-        """Recompute the inherited HIV results weighted by per-agent scale.
-
-        stisim counts agents with ``np.count_nonzero``, which ignores the
-        ``scale = 1/ms_agent_ratio`` a grow-multiscale fine agent carries, so
-        every stock over-reports. Results left untouched are for features
-        hpvsim does not model (PrEP, circumcision, testing, MTCT) and stay 0.
-        """
-        ti = self.ti
-        res = self.results
-        people = self.sim.people
-        w = people.scale.values
-        alive = people.alive.values
-        infected = self.infected.values & alive
-
-        def wsum(mask):
-            return float((w * mask).sum())
-
-        n_inf = wsum(infected)
-        n_alive = wsum(alive)
-        if 'n_infected' in res:
-            res['n_infected'][ti] = n_inf
-        if 'n_susceptible' in res:
-            res['n_susceptible'][ti] = wsum(self.susceptible.values & alive)
-        if 'n_diagnosed' in res:
-            res['n_diagnosed'][ti] = wsum(infected & self.diagnosed.values)
-        if 'n_on_art' in res:
-            n_art = wsum(infected & self.on_art.values)
-            res['n_on_art'][ti] = n_art
-            if 'p_on_art' in res:
-                res['p_on_art'][ti] = n_art / n_inf if n_inf else 0.0
-        if 'prevalence' in res:
-            res['prevalence'][ti] = n_inf / n_alive if n_alive else 0.0
-        if 'prevalence_15_49' in res:
-            age = people.age.values
-            adult = alive & (age >= 15) & (age < 50)
-            denom = wsum(adult)
-            res['prevalence_15_49'][ti] = (wsum(adult & infected) / denom
-                                            if denom else 0.0)
-
-        # Per-step flows, then their cumulative partners from the fixed series.
-        flows = (('new_infections', self.ti_infected),
-                 ('new_diagnoses', self.ti_diagnosed),
-                 ('new_deaths', self.ti_dead))
-        for key, ti_arr in flows:
-            if key in res and ti_arr is not None:
-                res[key][ti] = wsum(np.asarray(ti_arr.values) == ti)
-        for new_key, cum_key in (('new_infections', 'cum_infections'),
-                                 ('new_diagnoses', 'cum_diagnoses'),
-                                 ('new_deaths', 'cum_deaths')):
-            if new_key in res and cum_key in res:
-                res[cum_key][ti] = float(np.sum(res[new_key][:ti + 1]))
-
-        # Simple state counts, same weighting.
-        for key, attr in (('n_acute', 'acute'), ('n_latent', 'latent'),
-                          ('n_falling', 'falling'),
-                          ('n_on_effective_art', 'on_effective_art'),
-                          ('n_art_naive', 'art_naive'),
-                          ('n_art_discontinued', 'art_discontinued'),
-                          ('n_on_nonsuppressive_art', 'on_nonsuppressive_art'),
-                          ('n_prep_naive', 'prep_naive')):
-            state = getattr(self, attr, None)
-            if key in res and state is not None:
-                res[key][ti] = wsum(state.values & alive)
-        if 'new_agents_on_art' in res:
-            started = (np.asarray(self.ti_art.values) == ti) & self.on_art.values
-            res['new_agents_on_art'][ti] = wsum(started & alive)
-        if 'incidence' in res:
-            # New infections over susceptible person-time, both now weighted.
-            n_sus = wsum(self.susceptible.values & alive)
-            res['incidence'][ti] = (res['new_infections'][ti] / n_sus
-                                    if n_sus else 0.0)
-        return
-
-    def update_results(self):
-        """HPV prevalence by HIV status, and scale-correct the stisim results.
-
-        Cancer by HIV status lives on ``HPVTotal`` instead, which ticks at the
-        sim's cadence so an event cannot be counted twice when HIV's dt differs.
-        """
-        super().update_results()
-        self._rescale_stisim_results()
-        ti = self.ti
-        people = self.sim.people
-        alive = people.alive.values
-        hiv_pos = self.infected.values & alive
-        hiv_neg = (~self.infected.values) & alive
-
-        any_hpv = np.zeros(alive.shape, dtype=bool)
-        for m in self.hpv_modules:
-            any_hpv |= m.infected.values
-
-        # Scale-weight numerator and denominator so fine agents count fractionally.
-        scale = people.scale.values
-        n_pos = float((hiv_pos * scale).sum())
-        n_neg = float((hiv_neg * scale).sum())
-        self.results['hpv_prevalence_with_hiv'][ti] = (
-            float(((any_hpv & hiv_pos) * scale).sum()) / n_pos if n_pos else 0.0)
-        self.results['hpv_prevalence_no_hiv'][ti] = (
-            float(((any_hpv & hiv_neg) * scale).sum()) / n_neg if n_neg else 0.0)
-
-        # Adult (15-49) HIV prevalence by sex -- matches UNAIDS / Spectrum
-        # convention. stisim's own _f/_m strata are suppressed for being
-        # scale-unaware; computed here with per-agent weighting and the same
-        # age window as `prevalence_15_49`.
-        female = people.female.values
-        age = people.age.values
-        adult = (age >= 15) & (age < 50)
-        for key, in_sex in (('prevalence_f', female), ('prevalence_m', ~female)):
-            denom = float(((alive & in_sex & adult) * scale).sum())
-            self.results[key][ti] = (
-                float(((hiv_pos & in_sex & adult) * scale).sum()) / denom if denom else 0.0)
+__all__ = ['HIVEffects', 'HIV_transmit', 'HIV_incidence']
 
 
-class HIV_transmit(HIV):
-    """Network-transmitted HIV -- see HIV for the CD4-effect/results machinery
-    this inherits. Adds beta_m2f/rel_beta_f2m + validate_beta() targeting
-    hpv.SexualNetwork.
+def hiv_values(pars, kwargs, **defaults):
+    """hpvsim's defaults for STIsim's HIV (a quarterly step, and no results by age), updated by those given"""
+    return sc.mergedicts(dict(dt=ss.years(0.25), age_bins=None), defaults, pars, kwargs)
+
+
+def HIV_transmit(init_prev_data=None, pars=None, name='hiv', **kwargs):
+    """Network-transmitted HIV: STIsim's HIV, transmitting at beta_m2f per act
+    (and beta_m2f*rel_beta_f2m from women to men) on hpv.SexualNetwork.
 
     Use this when HIV prevalence should emerge from network transmission
     dynamics; use HIV_incidence instead to impose a known incidence curve
     directly.
     """
-
-    def __init__(self, init_prev_data=None, pars=None, name='hiv', **kwargs):
-        super().__init__(init_prev_data=init_prev_data, name=name)
-        self.define_pars(beta_m2f=0.0035, rel_beta_f2m=0.5)
-        self.update_pars(pars, **kwargs)
-
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        if not any(isinstance(n, SexualNetwork) for n in sim.networks.values()):
-            misc.warn('hpv.HIV_transmit: no SexualNetwork found; HIV will not transmit.')
-
-    def validate_beta(self):
-        """Route beta_m2f/rel_beta_f2m onto every SexualNetwork's betamap entry.
-
-        hpv.SexualNetwork puts females in p1, males in p2, so betamap[net][0]
-        = f2m (smaller), betamap[net][1] = m2f = beta_m2f (larger).
-        """
-        betamap = super().validate_beta()
-        for net in self.sim.networks.values():
-            if isinstance(net, SexualNetwork):
-                key = ss.standardize_netkey(net.name)
-                betamap[key] = [self.pars.beta_m2f * self.pars.rel_beta_f2m, self.pars.beta_m2f]
-        return betamap
+    return sti.HIV(init_prev_data=init_prev_data, name=name, **hiv_values(pars, kwargs, beta_m2f=0.0035))
 
 
-class HIV_incidence(HIV):
+class HIV_incidence(sti.HIV):
     """HIV driven by an imposed incidence curve, with no network transmission.
 
-    New infections are diagnosed and ART-scheduled immediately, so plain
-    ``sti.ART(coverage=...)`` works without a testing cascade.
+    STIsim's HIV, with one more transition (``acquisition``): infection at the
+    rate of the curve. A testing intervention (e.g. ``sti.HIVTest``) diagnoses
+    them, as for any HIV; ``hpv.Sim(model_hiv=...)`` adds one that diagnoses
+    everyone with HIV each step, so a plain ``sti.ART(coverage=...)`` treats them.
 
     Args:
         incidence: DataFrame ``[age, sex, year, incidence]``; sex 'f'/'m',
@@ -272,29 +52,27 @@ class HIV_incidence(HIV):
     """
 
     def __init__(self, incidence=None, pars=None, init_prev_data=None, name='hiv', **kwargs):
-        super().__init__(init_prev_data=init_prev_data, name=name)
         if incidence is None:
             raise ValueError(
                 'HIV_incidence requires an incidence DataFrame '
                 '[age, sex, year, incidence]; pass incidence=.'
             )
+        super().__init__(init_prev_data=init_prev_data, name=name,
+                         **hiv_values(pars, kwargs, beta_m2f=0, beta_m2c=0, beta_breastfeed=0))
         self.incidence = incidence
-        # Per-agent infection draw; p is set per-step from the looked-up rates.
-        self.infect_bern = ss.bernoulli(p=0.0)
+        self.define_transitions(acquisition=ss.Transition(self.susceptible, self.acute, rate=self.incidence_rate)) # Infection at the rate of the curve, in place of transmission
         # Filled in init_pre:
         self._years = None          # sorted unique years (int)
-        self._year_index = None     # {year: row index into the rate cube}
         self._ages = None           # sorted unique age-band lower bounds (int)
         # rate_cube[sex][year_idx, age_idx] -> incidence rate; sex in {0:'f',1:'m'}
         self._rate_cube = None
-        self.update_pars(pars, **kwargs)
 
     def init_pre(self, sim):
         super().init_pre(sim)
         # Precompute a fast lookup cube indexed by [sex, year, age].
         df = self.incidence
         self._years = np.sort(df['year'].unique()).astype(int)
-        self._year_index = {int(y): i for i, y in enumerate(self._years)}
+        year_index = {int(y): i for i, y in enumerate(self._years)}
         self._ages = np.sort(df['age'].unique()).astype(int)
         n_year, n_age = len(self._years), len(self._ages)
         age_index = {int(a): i for i, a in enumerate(self._ages)}
@@ -304,9 +82,7 @@ class HIV_incidence(HIV):
             s = sex_code.get(str(r.sex).lower()[0])
             if s is None:
                 continue
-            yi = self._year_index[int(r.year)]
-            ai = age_index[int(r.age)]
-            cube[s][yi, ai] = float(r.incidence)
+            cube[s][year_index[int(r.year)], age_index[int(r.age)]] = float(r.incidence)
         self._rate_cube = cube
 
     def _lookup_rates(self, year, ages, female):
@@ -320,47 +96,99 @@ class HIV_incidence(HIV):
         ai = np.clip(np.searchsorted(self._ages, np.floor(ages), side='right') - 1,
                      0, len(self._ages) - 1)
         rates = np.empty(len(ages), dtype=float)
-        f_curve = self._rate_cube[0][yi]
-        m_curve = self._rate_cube[1][yi]
-        rates[female] = f_curve[ai[female]]
-        rates[~female] = m_curve[ai[~female]]
+        rates[female] = self._rate_cube[0][yi][ai[female]]
+        rates[~female] = self._rate_cube[1][yi][ai[~female]]
         return rates
 
-    def infect(self):
-        """Full override -- no super().infect() call, no network transmission."""
-        people = self.sim.people
-        eligible = (self.susceptible & ~self.infected & people.alive).uids
-        if not len(eligible):
-            return
-        ages = np.asarray(people.age[eligible], dtype=float)
-        female = np.asarray(people.female[eligible], dtype=bool)
-        year = float(self.t.now('year'))
-        rates = self._lookup_rates(year, ages, female)
-        dt_years = float(self.t.dt_year)
-        p = 1.0 - np.exp(-rates * dt_years)
-        self.infect_bern.set(p=p)
-        selected = self.infect_bern.filter(eligible)
-        if len(selected):
-            self.set_prognoses(selected)
-            self.diagnosed[selected] = True
-            self.ti_diagnosed[selected] = self.ti
-            # sim.ti + 1, not self.ti + 1: sti.ART's gate is an exact ti_art==ti
-            # match on the sim clock, and interventions run before diseases.
-            self.ti_art[selected] = self.sim.ti + 1
-        return
+    def incidence_rate(self, sim, uids):
+        """The rate of the transition acquisition: the curve's annual rate for each person's age and sex"""
+        people = sim.people
+        ages = np.asarray(people.age[uids], dtype=float)
+        female = np.asarray(people.female[uids], dtype=bool)
+        return ss.peryear(self._lookup_rates(float(self.t.now('year')), ages, female))
+
+
+class HIVEffects(ss.Connector):
+    """HIV's effects on HPV, by CD4 count, and HPV prevalence by HIV status.
+
+    People with HIV and a CD4 count below ``cd4_upper`` have their HPV
+    acquisition (rel_sus), progression (rel_sev), conferred immunity
+    (rel_imm), and reactivation of latent infection (rel_reactivation)
+    multiplied by a factor, ``_lo`` below ``cd4_threshold`` and ``_hi`` at or
+    above it. It reads the HIV disease's ``infected`` and ``cd4``; HPV reads
+    the factors (``hiv_rel_sev`` etc.) from it. Cancer by HIV status is on
+    ``HPVTotal`` (``sim.results.all_hpv``), which ticks at the sim's cadence.
+    ``hpv.Sim`` adds one whenever the sim has HIV.
+    """
+
+    def __init__(self, pars=None, name='hiv_effects', **kwargs):
+        super().__init__(name=name)
+        self.define_pars(
+            rel_sus_lo=2.2,   rel_sus_hi=2.2,    # increased HPV acquisition
+            rel_sev_lo=1.5,   rel_sev_hi=1.2,    # faster/worse CIN->cancer progression
+            rel_imm_lo=0.36,  rel_imm_hi=0.76,   # reduced post-infection/vaccine immunity
+            rel_reactivation_lo=1.0, rel_reactivation_hi=1.0,  # latent reactivation hazard multiplier
+            cd4_threshold=200.0,  # lo/hi stratum boundary
+            cd4_upper=500.0,      # CD4 >= this -> no effect at all
+        )
+        self.update_pars(pars, **kwargs)
+        self.define_states(
+            ss.FloatArr('hiv_rel_sus', default=1.0),
+            ss.FloatArr('hiv_rel_sev', default=1.0),
+            ss.FloatArr('hiv_rel_imm', default=1.0),
+            ss.FloatArr('hiv_rel_reactivation', default=1.0),
+        )
+        self.hpv_modules = None
+        self.hiv = None
+
+    def init_pre(self, sim):
+        self.hpv_modules = [m for m in sim.diseases.values() if isinstance(m, HPV)]
+        if not self.hpv_modules:
+            raise ValueError('hpv.HIVEffects requires HPV genotype module(s) in the sim.')
+        self.hiv = next((d for d in sim.diseases.values() if isinstance(d, sti.HIV)), None)
+        if self.hiv is None:
+            raise ValueError('hpv.HIVEffects requires an HIV disease (sti.HIV) in the sim.')
+        super().init_pre(sim)
+
+    def factor(self, effect, hiv_pos, is_hi):
+        """A per-agent factor (1.0 for HIV-, the stratum value for HIV+)"""
+        lo = self.pars[f'{effect}_lo']
+        hi = self.pars[f'{effect}_hi']
+        return np.where(hiv_pos, np.where(is_hi, hi, lo), 1.0)
 
     def step(self):
-        """Full override of BaseSTI.step(): infect() already calls
-        set_prognoses() directly, so there's no 3-tuple/set_outcomes() flow."""
-        self.infect()
+        auids = self.sim.people.auids
+        cd4 = np.asarray(self.hiv.cd4[auids])
+        # Only HIV+ agents with CD4 in [0, cd4_upper) get an effect; above that, 1.0.
+        hiv_pos = np.asarray(self.hiv.infected[auids], dtype=bool) & ~np.isnan(cd4) & (cd4 < self.pars.cd4_upper)
+        is_hi = np.nan_to_num(cd4, nan=1e4) >= self.pars.cd4_threshold
+        self.hiv_rel_sus[auids] = self.factor('rel_sus', hiv_pos, is_hi)
+        self.hiv_rel_sev[auids] = self.factor('rel_sev', hiv_pos, is_hi)
+        self.hiv_rel_imm[auids] = self.factor('rel_imm', hiv_pos, is_hi)
+        self.hiv_rel_reactivation[auids] = self.factor('rel_reactivation', hiv_pos, is_hi)
+        # Written for all agents; starsim only samples it for susceptibles.
+        for m in self.hpv_modules:
+            m.rel_sus[auids] = m.rel_sus[auids] * self.hiv_rel_sus[auids]
         return
 
-    def init_post(self):
-        super().init_post()  # HIV.init_post(): CD4/care_seeking init, init_prev seeding
-        # All initially-seeded cases are diagnosed and ART-eligible immediately.
-        # ti_art=0, not +1: init_post runs entirely before the tick loop.
-        initial_cases = self.infected.uids
-        self.diagnosed[initial_cases] = True
-        self.ti_diagnosed[initial_cases] = 0
-        self.ti_art[initial_cases] = 0
-        return
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
+            ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
+        )
+
+    def update_results(self):
+        """HPV prevalence by HIV status, each agent weighted by its scale, so fine agents count fractionally"""
+        super().update_results()
+        ti = self.ti
+        people = self.sim.people
+        alive = people.alive.values
+        scale = people.scale.values
+        infected = np.asarray(self.hiv.infected.values, dtype=bool)
+        any_hpv = np.zeros(alive.shape, dtype=bool)
+        for m in self.hpv_modules:
+            any_hpv |= m.infected.values
+        for key, group in (('hpv_prevalence_with_hiv', infected & alive), ('hpv_prevalence_no_hiv', ~infected & alive)):
+            n = float((group * scale).sum())
+            self.results[key][ti] = float(((any_hpv & group) * scale).sum()) / n if n else 0.0

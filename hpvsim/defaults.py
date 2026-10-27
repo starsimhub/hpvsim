@@ -387,7 +387,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'cbr',
                 ],
                 'Population size': [
-                    'n_alive',
+                    'alive',
                     'n_alive_by_sex',
                 ],
             })

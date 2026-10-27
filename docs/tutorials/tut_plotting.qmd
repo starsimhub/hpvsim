@@ -102,17 +102,15 @@ df.tail(4).round(3)
 
 Counts like `new_cancers` are per timestep, not per year. At the default
 quarter-year timestep there are four rows per calendar year, so a yearly total
-is the sum of all four. `annualize()` does that for you and returns one row per
+is the sum of all four. `resample('year')` does that for you and returns one row per
 year:
 
 ```{python}
-annual = sim.results.all_hpv.new_cancers.annualize()
-annual_years = np.floor(annual.timevec.years).astype(int)
-print('Cancers in 2035:', round(float(annual.values[annual_years == 2035][0])))
+annual = sim.results.all_hpv.new_cancers.resample('year', use_years=True)
+print('Cancers in 2035:', round(float(annual.values[annual.timevec == 2035][0])))
 ```
 
-An annualized timestamp sits in the middle of its year, so match on `np.floor`
-of the year rather than on equality.
+With `use_years=True`, each row is labeled by the year it covers, as an integer.
 
 ## Printing a run
 

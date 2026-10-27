@@ -1,6 +1,6 @@
-"""HIV-HPV co-infection: HIV_transmit (network-driven) and HIV_incidence
-(curve-driven), both built on the shared hpv.HIV base that owns the
-CD4-stratified HPV-modulation effects and HIV-stratified results.
+"""HIV-HPV co-infection: STIsim's HIV, driven by transmission (HIV_transmit)
+or an incidence curve (HIV_incidence), and its CD4-stratified effects on HPV
+and HPV results by HIV status (hpv.HIVEffects).
 """
 from pathlib import Path
 
@@ -26,32 +26,35 @@ def _tiny(**kw):
 # --------------------------------------------------------------------------- #
 
 def test_hiv_gating():
-    """HPV._hiv_module() finds the HIV disease when present, None otherwise;
+    """HPV._hiv_effects() finds HIV's effects (added with the HIV disease) when present, None otherwise;
     the CD4-stratified factors default to a no-op (1.0) with no HIV+ agents."""
     sim = hpv.Sim(**_tiny(genotypes=[16], diseases=[hpv.HIV_transmit(beta_m2f=0.0)]))
     sim.init()
     hpvmod = sim.diseases.hpv16
-    assert hpvmod._hiv_module() is sim.diseases.hiv
-    assert np.allclose(sim.diseases.hiv.hiv_rel_sev.values[:5], 1.0)
+    assert hpvmod._hiv_effects() is sim.connectors.hiv_effects
+    assert np.allclose(sim.connectors.hiv_effects.hiv_rel_sev.values[:5], 1.0)
 
     sim_no_hiv = hpv.Sim(**_tiny(genotypes=[16]))
     sim_no_hiv.init()
-    assert sim_no_hiv.diseases.hpv16._hiv_module() is None
+    assert sim_no_hiv.diseases.hpv16._hiv_effects() is None
 
 # --------------------------------------------------------------------------- #
 # HIV_transmit: network transmission
 # --------------------------------------------------------------------------- #
 
 def test_hiv_transmission():
-    """beta is keyed to the SexualNetwork name as [f2m, m2f] (p1=female, p2=male)."""
+    """HIV transmits per act on the SexualNetwork, at beta_m2f (and beta_m2f*rel_beta_f2m from women to men)."""
     h = hpv.HIV_transmit(beta_m2f=0.0035, rel_beta_f2m=0.5)
-    sim = hpv.Sim(**_tiny(genotypes=[16], diseases=[h]))
-    sim.init()
-    net = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)][0]
-    betamap = sim.diseases.hiv.validate_beta()
-    f2m, m2f = betamap[net.name]
-    assert np.isclose(m2f, 0.0035)
-    assert np.isclose(f2m, 0.0035 * 0.5)
+    assert np.isclose(h.value('beta_m2f'), 0.0035)
+    assert np.isclose(h.value('rel_beta_f2m'), 0.5)
+    assert 'sexualnetwork' in h.hetero_networks
+    infections = []
+    for beta in [0.0, 0.2]:
+        sim = hpv.Sim(**_tiny(genotypes=[16], diseases=[hpv.HIV_transmit(beta_m2f=beta, init_prev=0.2)], rand_seed=1))
+        sim.run()
+        infections.append(sim.results.hiv.new_infections_sex.values.sum())
+    assert infections[0] == 0, 'HIV transmitted with beta_m2f=0'
+    assert infections[1] > 0, 'HIV did not transmit on the SexualNetwork'
 
 # --------------------------------------------------------------------------- #
 # HIV_incidence: curve-driven infection + plain sti.ART
@@ -60,47 +63,51 @@ def test_hiv_transmission():
 def test_hiv_incidence():
     """HIV_incidence builds a plausible epidemic from a real incidence curve,
     infected agents get a CD4 trajectory, and plain sti.ART treats a plausible
-    fraction of them and reconstitutes their CD4 with no separate
-    testing-cascade intervention."""
+    fraction of them (once a test diagnoses everyone with HIV each step) and
+    reconstitutes their CD4."""
     data = hpv.data.load_hiv_data(_RWANDA_HIV_DATA)
     hiv = hpv.HIV_incidence(incidence=data['incidence'])
+    dx = sti.HIVTest(test_prob_data=1.0, dt_scale=False)
     art = sti.ART(coverage=hpv.data.reshape_art_coverage(data['art_coverage']))
     sim = hpv.Sim(location='rwanda', rand_seed=0, genotypes=[16, 18], n_agents=2000,
-                  start=1985, stop=2015, dt=0.5, diseases=[hiv], interventions=[art])
+                  start=1985, stop=2015, dt=0.5, diseases=[hiv], interventions=[dx, art])
     sim.run()
     hivmod = sim.diseases.hiv
     infected = hivmod.infected.uids
     assert len(infected) > 0, 'HIV_incidence infected nobody'
-    assert np.isfinite(hivmod.cd4[infected]).any(), 'set_prognoses not wired'
+    assert np.isfinite(hivmod.cd4[infected]).any(), 'CD4 not set at infection'
 
     on_art = infected[hivmod.on_art[infected]]
     off_art = infected[~hivmod.on_art[infected]]
     assert len(on_art) > 0, 'plain sti.ART treated nobody: ART start must be scheduled for the step after diagnosis'
     assert len(off_art) > 0
-    assert np.nanmean(hivmod.cd4[on_art]) > np.nanmean(hivmod.cd4[off_art]), \
+    years_on_art = (hivmod.ti - hivmod.ti_art[on_art])*hivmod.t.dt_year
+    settled = on_art[years_on_art >= 1] # On ART for a year or more (those ART put on it last are the lowest CD4 counts)
+    assert len(settled) > 0
+    assert np.mean(hivmod.cd4[settled]) > np.mean(hivmod.cd4_preart[settled]), \
         'CD4 not reconstituted for on-ART agents'
 
     # Bare sti.ART() forces the ti_art exact-match path, unlike stratified coverage.
     hiv2 = hpv.HIV_incidence(incidence=data['incidence'])
     sim2 = hpv.Sim(location='rwanda', rand_seed=0, genotypes=[16, 18], n_agents=2000,
-                  start=1985, stop=2015, dt=0.5, diseases=[hiv2], interventions=[sti.ART()])
+                  start=1985, stop=2015, dt=0.5, diseases=[hiv2],
+                  interventions=[sti.HIVTest(test_prob_data=1.0, dt_scale=False), sti.ART()])
     sim2.run()
     assert sim2.diseases.hiv.on_art.uids.__len__() > 0, \
         'bare sti.ART() treated nobody: it only treats agents whose ti_art equals the current step'
 
 def test_hiv_transmit_auto_diagnoses():
-    """HIV_transmit's agents get diagnosed and treated even though it does no
-    self-diagnosis: HIV.step_state() diagnoses every living HIV+ agent each step."""
+    """With model_hiv=, agents get diagnosed and treated with no testing cascade
+    given: hpv.Sim adds an sti.HIVTest that diagnoses everyone with HIV each step."""
     sim = hpv.Sim(n_agents=2000, start=2000, stop=2020, dt=0.5, location='nigeria',
-                  genotypes=[16], rand_seed=0,
-                  diseases=[hpv.HIV_transmit(beta_m2f=0.05)],
-                  interventions=[sti.ART()])
+                  genotypes=[16], rand_seed=0, model_hiv='transmission',
+                  hiv_pars=dict(beta_m2f=0.05), interventions=[sti.ART()])
     sim.run()
     hivmod = sim.diseases.hiv
     infected = hivmod.infected.uids
     assert len(infected) > 0, 'HIV_transmit infected nobody -- check beta_m2f/network'
     assert hivmod.diagnosed[infected].any(), \
-        'HIV_transmit agents never got diagnosed: HIV.step_state() must diagnose living HIV+ agents each step'
+        'HIV_transmit agents never got diagnosed: model_hiv= adds a test that diagnoses living HIV+ agents each step'
     assert hivmod.on_art.uids.__len__() > 0, \
         'HIV_transmit + bare sti.ART() treated nobody: agents must be diagnosed before ART can treat them'
 
@@ -121,15 +128,14 @@ def test_hiv_data_loading():
         hpv.data.load_hiv_data(Path(__file__).parent)  # no HIV CSVs here
 
 def test_hiv_results_are_scale_weighted():
-    """Inherited stisim HIV stocks are recomputed with per-agent scale.
+    """STIsim's HIV results count each agent by its scale.
 
-    stisim.utils.count is np.count_nonzero, so under grow-multiscale a fine
-    agent (scale = 1/ratio) is counted as a whole person and the result is then
-    multiplied by pop_scale, over-reporting every HIV stock. hpv.HIV overrides
-    update_results to fix the all-age quantities.
+    Under grow-multiscale a fine agent (scale = 1/ratio) counted as a whole
+    person would over-report every HIV stock once multiplied by pop_scale;
+    STIsim counts each agent by its weight when weights differ.
     """
-    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=1000, rand_seed=0,
-                  start=1990, stop=2000, dt=1.0, ms_agent_ratio=10,
+    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=2000, rand_seed=1, # Seed 1: 8 infected fine agents (seed 0 has none)
+                  start=1990, stop=2005, dt=1.0, ms_agent_ratio=10,
                   model_hiv='transmission', verbose=0)
     sim.run()
     r, ppl, hiv = sim.results.hiv, sim.people, sim.diseases.hiv
@@ -143,9 +149,9 @@ def test_hiv_results_are_scale_weighted():
     wtd = float((w * infected).sum())
     raw = float(infected.sum())
     assert wtd < raw, 'fine agents should weigh less than whole people'
-    assert np.isclose(float(r['n_infected'][-1]), wtd * scale, rtol=0.02)
+    assert np.isclose(float(r['infected'][-1]), wtd * scale, rtol=0.02)
     # The uncorrected value would have been the raw count x pop_scale.
-    assert not np.isclose(float(r['n_infected'][-1]), raw * scale, rtol=0.02)
+    assert not np.isclose(float(r['infected'][-1]), raw * scale, rtol=0.02)
 
     # Prevalence is a scale-weighted fraction, and stays a fraction.
     n_alive = float((w * alive).sum())
@@ -225,13 +231,13 @@ def test_hiv_effect():
     sim.init()
     females = sim.people.female.uids
     half = ss.uids(females[::2])
-    sim.diseases.hiv.infected[half] = True
-    sim.diseases.hiv.cd4[half] = 100.0  # lo stratum
+    sim.diseases.hiv.move(half, sim.diseases.hiv.latent)
+    sim.diseases.hiv.cd4_latent[half] = 100.0  # lo stratum
     sim.diseases.hiv.step_state()
     sim.diseases.hpv16.set_prognoses(females)
     sim.run()
 
-    res = sim.results.hiv
+    res = sim.results.hiv_effects
     all_hpv = sim.results.all_hpv
     for key in ('hpv_prevalence_with_hiv', 'hpv_prevalence_no_hiv'):
         assert key in res
@@ -264,7 +270,7 @@ def test_hiv_cancer_rates_are_annual_and_female():
 
     # annualize() on the per-ti annualized rate collapses quarters to the
     # annual rate; a valid rate for a year with cancers should be > 0.
-    ann = r['cancer_incidence_no_hiv'].annualize()
+    ann = r['cancer_incidence_no_hiv'].resample('year')
     assert (ann.values >= 0).all()
     assert (ann.values > 0).any()
 
@@ -278,8 +284,8 @@ def test_hiv_cancer_rates_are_annual_and_female():
 def test_crude_cancer_incidence():
     """cancer_incidence is the unstandardized companion to the ASR: same
     per-ti annualized-rate treatment, no WHO 2000 age weighting."""
-    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=2000, rand_seed=0,
-                  start=1990, stop=2005, dt=0.25, verbose=0)
+    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=2000, rand_seed=1,
+                  start=1990, stop=2005, dt=0.25, verbose=0) # Seed 1: 4 cancers (seed 0 has none)
     sim.run()
     r = sim.results.all_hpv
 
@@ -290,7 +296,7 @@ def test_crude_cancer_incidence():
     assert r['asr_cancer_incidence'].max() > 0
     # annualize is idempotent on already-annualized-per-ti rates: the annual
     # mean should be within the min/max of the sub-annual quarters.
-    ann = r['cancer_incidence'].annualize()
+    ann = r['cancer_incidence'].resample('year')
     per_ti = np.asarray(r['cancer_incidence'])
     assert ann.values.min() >= per_ti.min() - 1e-9
     assert ann.values.max() <= per_ti.max() + 1e-9
@@ -314,9 +320,10 @@ def test_hiv_rel_imm_effect():
         hivmod = sim.diseases.hiv
         uid = sim.people.auids[sim.people.female[sim.people.auids]][0]
         if make_positive:
-            hivmod.infected[uid] = True
-            hivmod.cd4[uid] = 100.0  # lo stratum
-        hivmod.step_state()  # populate hiv_rel_imm before clearance reads it
+            hivmod.move(ss.uids([uid]), hivmod.latent)
+            hivmod.cd4_latent[uid] = 100.0  # lo stratum
+        hivmod.step_state()  # their CD4 count
+        sim.connectors.hiv_effects.step()  # populate hiv_rel_imm before clearance reads it
         hpvmod.infected[uid] = True
         hpvmod.precin[uid] = True
         hpvmod.cin[uid] = False
@@ -330,14 +337,14 @@ def test_hiv_rel_imm_effect():
     nab_neg, cell_neg = _build(seed=1, make_positive=False)
     nab_pos, cell_pos = _build(seed=1, make_positive=True)
     assert nab_neg > 0 and cell_neg > 0
-    factor = hpv.HIV_transmit().pars.rel_imm_lo
+    factor = hpv.HIVEffects().pars.rel_imm_lo
     assert np.isclose(nab_pos, nab_neg * factor, rtol=1e-6)
     assert np.isclose(cell_pos, cell_neg * factor, rtol=1e-6)
 
     # Prophylactic vaccine immunity: HIV+ (lo stratum) gets strictly less than HIV-.
     # The therapeutic is not scaled by HIV, matching v2.
     def _coinfection_sim(product):
-        interventions = [ss.treat_num(product=product, prob=0.0)]
+        interventions = [ss.Delivery(product, coverage=0.0)]
         sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25, location='nigeria',
                       genotypes=[16, 18], diseases=[hpv.HIV_transmit(beta_m2f=0.0)],
                       interventions=interventions)
@@ -345,32 +352,34 @@ def test_hiv_rel_imm_effect():
         hivmod = sim.diseases.hiv
         females = sim.people.auids[sim.people.female[sim.people.auids]]
         uid_pos, uid_neg = females[0], females[1]
-        hivmod.infected[uid_pos] = True
-        hivmod.cd4[uid_pos] = 100.0
+        hivmod.move(ss.uids([uid_pos]), hivmod.latent)
+        hivmod.cd4_latent[uid_pos] = 100.0
         hivmod.step_state()
+        sim.connectors.hiv_effects.step()
         return sim, uid_pos, uid_neg, sim.interventions[0].product
 
     sim, uid_pos, uid_neg, product = _coinfection_sim(hpv_vx(name='nonavalent', sterilizing_p=1.0))
-    product.administer(sim.people, np.array([uid_pos, uid_neg]))
+    product.administer(ss.uids([uid_pos, uid_neg]))
     hpvmod = sim.diseases.hpv16
     assert float(hpvmod.vax_imm[uid_pos]) < float(hpvmod.vax_imm[uid_neg])
 
 def test_hiv_reactivation_effect():
     """rel_reactivation defaults to a no-op (1.0) with no HIV+ agents, and can
     be overridden independently of the other three effects."""
-    sim = hpv.Sim(**_tiny(genotypes=[16], diseases=[
-        hpv.HIV_transmit(beta_m2f=0.0, pars=dict(rel_reactivation_lo=5.0, rel_reactivation_hi=7.0))]))
+    sim = hpv.Sim(**_tiny(genotypes=[16], diseases=[hpv.HIV_transmit(beta_m2f=0.0)],
+                          connectors=[hpv.HIVEffects(rel_reactivation_lo=5.0, rel_reactivation_hi=7.0)]))
     sim.init()
     hivmod = sim.diseases.hiv
-    uid_lo, uid_hi = sim.people.auids[0], sim.people.auids[1]
-    hivmod.infected[uid_lo] = True
-    hivmod.cd4[uid_lo] = 100.0  # lo stratum
-    hivmod.infected[uid_hi] = True
-    hivmod.cd4[uid_hi] = 350.0  # hi stratum
+    effects = sim.connectors.hiv_effects
+    uid_lo, uid_hi = (~hivmod.infected).uids[:2] # Not infected at the start, whose CD4 the HIV module sets itself
+    hivmod.move(ss.uids([uid_lo, uid_hi]), hivmod.latent)
+    hivmod.cd4_latent[uid_lo] = 100.0  # lo stratum
+    hivmod.cd4_latent[uid_hi] = 350.0  # hi stratum
     hivmod.step_state()
-    assert np.isclose(hivmod.hiv_rel_reactivation[uid_lo], 5.0)
-    assert np.isclose(hivmod.hiv_rel_reactivation[uid_hi], 7.0)
-    assert np.isclose(hivmod.pars.rel_sus_lo, 2.2)  # untouched effects stay default
+    effects.step()
+    assert np.isclose(effects.hiv_rel_reactivation[uid_lo], 5.0)
+    assert np.isclose(effects.hiv_rel_reactivation[uid_hi], 7.0)
+    assert np.isclose(effects.pars.rel_sus_lo, 2.2)  # untouched effects stay default
 
 # --------------------------------------------------------------------------- #
 # model_hiv= sim assembly
@@ -379,8 +388,8 @@ def test_hiv_reactivation_effect():
 def test_model_hiv_sim_assembly():
     """model_hiv=True/'incidence'/'transmission' construct the right pieces,
     combining model_hiv= with a user-supplied HIV disease raises, nothing is
-    auto-wired without model_hiv=, and a raw sti.HIV gets no CD4-effect on HPV
-    while hpv.HIV_transmit does."""
+    auto-wired without model_hiv=, and HIV's effects on HPV come with any
+    HIV, a raw sti.HIV too."""
     data = dict(
         incidence=pd.DataFrame({'age': [20, 20], 'sex': ['f', 'm'], 'year': [2000, 2000],
                                  'incidence': [0.01, 0.01]}),
@@ -391,10 +400,12 @@ def test_model_hiv_sim_assembly():
     sim.init()
     assert isinstance(sim.diseases.hiv, hpv.HIV_incidence)
     assert any(isinstance(iv, sti.ART) for iv in sim.interventions.values())
+    assert any(isinstance(iv, sti.HIVTest) for iv in sim.interventions.values())
+    assert isinstance(sim.connectors.hiv_effects, hpv.HIVEffects)
 
     sim_t = hpv.Sim(**_tiny(genotypes=[16], model_hiv='transmission'))
     sim_t.init()
-    assert isinstance(sim_t.diseases.hiv, hpv.HIV_transmit)
+    assert isinstance(sim_t.diseases.hiv, sti.HIV) and not isinstance(sim_t.diseases.hiv, hpv.HIV_incidence)
     assert not any(isinstance(iv, sti.ART) for iv in sim_t.interventions.values())
 
     with pytest.raises(ValueError, match="requires hiv_data"):
@@ -406,17 +417,19 @@ def test_model_hiv_sim_assembly():
 
     sim_no_hiv = hpv.Sim(**_tiny(genotypes=[16]))
     sim_no_hiv.init()
-    assert not any(isinstance(d, hpv.HIV_transmit) for d in sim_no_hiv.diseases.values())
+    assert not any(isinstance(d, sti.HIV) for d in sim_no_hiv.diseases.values())
+    assert 'hiv_effects' not in sim_no_hiv.connectors
 
-    # Vignette B: raw sti.HIV gets no HPV-modulation effect.
+    # Vignette B: a raw sti.HIV gets HIV's effects on HPV too.
     sim_raw = hpv.Sim(**_tiny(genotypes=[16], diseases=[sti.HIV(beta_m2f=0.02)],
                               interventions=[sti.HIVTest(), sti.ART()]))
     sim_raw.init()
     hpvmod = sim_raw.diseases.hpv16
     hivmod = sim_raw.diseases.hiv
-    uid = sim_raw.people.auids[0]
-    hivmod.infected[uid] = True
-    hivmod.cd4[uid] = 50.0
-    hpvmod.rel_sus[sim_raw.people.auids] = 1.0
-    hpvmod.step_state()
-    assert np.isclose(hpvmod.rel_sus[uid], 1.0)  # no cross-effect for a vanilla sti.HIV
+    uid = (~hivmod.infected).uids[0]
+    hivmod.move(ss.uids([uid]), hivmod.latent)
+    hivmod.cd4_latent[uid] = 50.0
+    hivmod.step_state()
+    hpvmod.step_state()  # Resets rel_sus
+    sim_raw.connectors.hiv_effects.step()
+    assert np.isclose(hpvmod.rel_sus[uid], sim_raw.connectors.hiv_effects.pars.rel_sus_lo)

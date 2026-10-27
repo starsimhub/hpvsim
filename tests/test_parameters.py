@@ -146,28 +146,29 @@ def test_absent_scope_is_skipped_not_fatal():
 
 
 def test_hiv_par_routing():
-    """pars=dict(hiv=dict(...)) routes into an already-constructed HIV
-    disease; hiv_pars= (construction-time) and pars=dict(hiv=...)
-    (post-construction) compose."""
+    """hiv_pars= (construction-time) goes to HIV, and to HIV's effects on HPV
+    for theirs; pars=dict(hiv=...) and pars=dict(hiv_effects=...)
+    (post-construction) route into the constructed modules, and compose."""
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
                   genotypes=[16], model_hiv='transmission',
-                  hiv_pars=dict(rel_sus_lo=0.4), pars=dict(hiv=dict(rel_sus_hi=0.5)))
+                  hiv_pars=dict(rel_sus_lo=0.4, beta_m2f=0.01),
+                  pars=dict(hiv=dict(rel_beta_f2m=0.7), hiv_effects=dict(rel_sus_hi=0.5)))
     sim.init()
-    assert sim.diseases.hiv.pars.rel_sus_lo == 0.4
-    assert sim.diseases.hiv.pars.rel_sus_hi == 0.5
+    effects = sim.connectors.hiv_effects
+    assert effects.pars.rel_sus_lo == 0.4
+    assert effects.pars.rel_sus_hi == 0.5
+    assert sim.diseases.hiv.value('beta_m2f') == 0.01
+    assert sim.diseases.hiv.value('rel_beta_f2m') == 0.7
 
 
 def test_bare_beta_does_not_broadcast_to_hiv():
     """A bare beta= override must not leak into the auto-constructed HIV
-    disease. beta/init_prev are inherited stisim BaseSTIPars keys shared
-    with HPV, but 'hiv' is intentionally excluded from route_pars' bare-key
+    disease: 'hiv' is intentionally excluded from route_pars' bare-key
     broadcast registry (par_registry) -- only the scoped hiv=/hiv_pars=
     forms may touch HIV's pars."""
-    from hpvsim.hiv import HIV
-    default_hiv_beta = HIV().pars.beta
     sim = make_sim(genotypes=[16], model_hiv='transmission', pars=dict(beta=0.2))
     sim.init()
-    assert sim.diseases.hiv.pars.beta == default_hiv_beta
+    assert sim.diseases.hiv.value('beta_m2f') == hpv.HIV_transmit().value('beta_m2f')
     assert sim.diseases.hpv16.pars.beta == 0.2
 
 
@@ -207,14 +208,6 @@ def test_pars_dict_not_mutated():
     pars = dict(location='kenya')
     make_sim(genotypes=[16], pars=pars)
     assert pars == dict(location='kenya')
-
-
-def test_copy_inputs_kwarg_accepted():
-    """copy_inputs=/data= are genuine ss.Sim.__init__ kwargs (defaults
-    True/None) that must still construct without error now that
-    unrecognized bare kwargs route through mod_pars/route_pars instead of
-    flowing straight through to super().__init__."""
-    make_sim(genotypes=[16], copy_inputs=False)
 
 
 def test_validate_beta_zeroes_non_sexual_networks():

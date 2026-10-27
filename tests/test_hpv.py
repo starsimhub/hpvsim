@@ -12,8 +12,7 @@ def _minimal_sim(genotype='hpv16', n_agents=1000, init_prev=0.05, beta=0.3,
     """Build a minimal Sim with HPV(genotype=...) and a stock random network.
 
     Returns ``(sim, hpv)`` where ``hpv`` is the live module reference inside
-    the sim. ``ss.Sim`` deep-copies its pars by default, so we use
-    ``copy_inputs=False`` to keep the original instance addressable from tests.
+    the sim: ``ss.Sim`` copies the modules it is given, and its copy is ``sim.pars.diseases``.
     """
     hpv = HPV(
         genotype=genotype,
@@ -28,9 +27,8 @@ def _minimal_sim(genotype='hpv16', n_agents=1000, init_prev=0.05, beta=0.3,
         dur=ss.years(n_steps * 0.5),
         dt=ss.years(0.5),
         verbose=0,
-        copy_inputs=False,
     )
-    return sim, hpv
+    return sim, sim.pars.diseases
 
 
 def test_genotype_attribute_set():
@@ -97,5 +95,5 @@ def test_runs_a_few_timesteps():
     """End-to-end: minimal sim with random net runs without error."""
     sim, hpv = _minimal_sim(init_prev=0.05, n_agents=500, n_steps=4)
     sim.run()
-    assert 'n_infected' in sim.results.hpv16
-    assert sim.results.hpv16.n_infected[-1] >= 0
+    assert 'infected' in sim.results.hpv16
+    assert sim.results.hpv16.infected[-1] >= 0

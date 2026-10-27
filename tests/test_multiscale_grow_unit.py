@@ -214,7 +214,7 @@ def test_stock_prevalence_scale_weighted(grown_sim):
         r = dis.results
         for state_name in ('susceptible', 'infected', 'precin', 'cin',
                            'cancerous', 'latent'):
-            key = f'n_{state_name}'
+            key = state_name
             assert key in r, f'{dis.name}: expected result {key}'
             assert r[key].dtype == float, (
                 f'{dis.name}.{key}: dtype={r[key].dtype}, expected float'
@@ -235,7 +235,7 @@ def test_stock_prevalence_scale_weighted(grown_sim):
     # ---- HPVTotal union-based stocks ----
     hpvt = sim.results.get('all_hpv', None)
     assert hpvt is not None, 'HPVTotal analyzer result block missing'
-    for key in ('n_infected', 'n_precin', 'n_cin', 'n_cancerous'):
+    for key in ('infected', 'precin', 'cin', 'cancerous'):
         assert hpvt[key].dtype == float, (
             f'hpvtotal.{key}: dtype={hpvt[key].dtype}, expected float'
         )
@@ -252,17 +252,17 @@ def test_stock_prevalence_scale_weighted(grown_sim):
     any_infected &= alive_mask
     inf_uids = auids[any_infected]
     expected_hpvt_inf = ppl.scale_flows(inf_uids) if len(inf_uids) > 0 else 0.0
-    stored_hpvt_inf = float(hpvt['n_infected'].values[ti_last]) / pop_scale
+    stored_hpvt_inf = float(hpvt['infected'].values[ti_last]) / pop_scale
     assert np.isclose(stored_hpvt_inf, expected_hpvt_inf, rtol=1e-6), (
-        f'hpvtotal.n_infected at ti={ti_last}: stored/pop_scale={stored_hpvt_inf:.4f}, '
+        f'hpvtotal.infected at ti={ti_last}: stored/pop_scale={stored_hpvt_inf:.4f}, '
         f'scale_flows={expected_hpvt_inf:.4f}'
     )
 
 
 def test_per_genotype_prevalence_scale_weighted(grown_sim):
-    """Per-genotype prevalence must be re-derived from the scale-weighted n_infected.
+    """Per-genotype prevalence must be re-derived from the scale-weighted infected.
 
-    HPV.update_results divides the scale-weighted n_infected by
+    Starsim divides the scale-weighted infected by
     scale_flows(alive_uids), so stored_prev * n_alive_sw must land within 5% of
     n_infected_sw (population turnover) and well below the unweighted count.
     """
@@ -284,8 +284,8 @@ def test_per_genotype_prevalence_scale_weighted(grown_sim):
         assert 'prevalence' in r, f'{dis.name}: prevalence result missing'
 
         stored_prev = float(r['prevalence'].values[ti_last])
-        # n_infected has scale=True, prevalence is a ratio: divide out pop_scale.
-        n_infected_sw = float(r['n_infected'].values[ti_last]) / sim.pars.pop_scale
+        # infected has scale=True, prevalence is a ratio: divide out pop_scale.
+        n_infected_sw = float(r['infected'].values[ti_last]) / sim.pars.pop_scale
 
         # rtol=5% absorbs one step's births/deaths between update_results and here.
         back_calc_numerator = stored_prev * n_alive_sw
@@ -333,8 +333,8 @@ def test_per_genotype_prevalence_ratio1_unchanged(ratio1_sim):
             continue
         r = dis.results
         stored_prev = float(r['prevalence'].values[ti_last])
-        # n_infected carries pop_scale (applied at finalize); n_alive_sw does not.
-        n_infected_sw = float(r['n_infected'].values[ti_last]) / sim.pars.pop_scale
+        # infected carries pop_scale (applied at finalize); n_alive_sw does not.
+        n_infected_sw = float(r['infected'].values[ti_last]) / sim.pars.pop_scale
         back_calc_numerator = stored_prev * n_alive_sw
         assert np.isclose(back_calc_numerator, n_infected_sw, rtol=0.05), (
             f'{dis.name}.prevalence ratio==1 back-calc mismatch at ti={ti_last}: '

@@ -57,8 +57,8 @@ migration module that keeps the simulated age structure pinned to the WPP
 trajectory:
 
 ```{python}
-print(f'Alive in 1990: {float(sim.results.n_alive[0]):>12,.0f}')
-print(f'Alive in 2020: {float(sim.results.n_alive[-1]):>12,.0f}')
+print(f'Alive in 1990: {float(sim.results.alive[0]):>12,.0f}')
+print(f'Alive in 2020: {float(sim.results.alive[-1]):>12,.0f}')
 print(f'Net immigration over the run: '
       f'{float(sim.results.agemigration.new_immigrants.sum() - sim.results.agemigration.new_emigrants.sum()):,.0f}')
 ```

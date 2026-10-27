@@ -19,12 +19,16 @@ def multigenotype_sim():
     across the four genotypes, and both tests assert that total is non-zero so
     a future shrink can't make them pass vacuously.
     """
+    def count_cancerous(sim): # The number of cancerous flags of each agent at each step, since few are cancerous at any one time
+        mods = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
+        counts = sum(np.asarray(m.cancerous.raw).astype(int) for m in mods)
+        sim.cancer_counts = getattr(sim, 'cancer_counts', []) + [counts]
     sim = hpv.Sim(
         location='nigeria',
         start=2000, stop=2050, dt=0.5,
         n_agents=6000,
         genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
-        rand_seed=0,
+        rand_seed=0, analyzers=count_cancerous, verbose=0,
     )
     sim.run()
     return sim
@@ -40,15 +44,10 @@ def test_no_double_counting_of_multigenotype_cancers(multigenotype_sim):
     """
     sim = multigenotype_sim
 
-    genotypes = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
-    # Use .raw (all ever-created agent slots) so all modules have the same shape.
-    n_slots = genotypes[0].cancerous.raw.shape[0]
-    cancerous_count_per_agent = np.zeros(n_slots, dtype=int)
-    for mod in genotypes:
-        cancerous_count_per_agent += np.asarray(mod.cancerous.raw).astype(int)
-
+    # At each step, over all ever-created agent slots
+    cancerous_count_per_agent = np.concatenate(sim.cancer_counts)
     assert cancerous_count_per_agent.sum() > 0, (
-        'no agent is cancerous at sim end — the dedup rule is untested here'
+        'no agent is ever cancerous — the dedup rule is untested here'
     )
     max_concurrent = int(cancerous_count_per_agent.max())
     n_double = int((cancerous_count_per_agent >= 2).sum())
@@ -100,9 +99,9 @@ def test_hpvtotal_new_cancers_equals_per_module_sum(multigenotype_sim):
 
 
 def test_hpvtotal_n_latent_is_a_union_not_a_sum():
-    """all_hpv.n_latent must count each agent once even if latent for
+    """all_hpv.latent must count each agent once even if latent for
     multiple genotypes simultaneously -- it is a _UNION_STATES entry (boolean
-    OR across modules), not an element-wise sum of per-module n_latent.
+    OR across modules), not an element-wise sum of per-module latent.
 
     hpv_control_prob=1.0 forces latency on every clearance, so with 2
     genotypes co-infection is common and a naive sum would double-count.
@@ -118,8 +117,8 @@ def test_hpvtotal_n_latent_is_a_union_not_a_sum():
     sim.run()
 
     genotypes = [m for m in sim.diseases.values() if isinstance(m, hpv.HPV)]
-    naive_sum = sum(mod.results.n_latent[:] for mod in genotypes)
-    union = sim.results.all_hpv.n_latent[:]
+    naive_sum = sum(mod.results.latent[:] for mod in genotypes)
+    union = sim.results.all_hpv.latent[:]
 
     assert union.max() > 0, 'no agent ever latent — the union logic is untested here'
     assert naive_sum.max() > union.max(), (
@@ -129,6 +128,6 @@ def test_hpvtotal_n_latent_is_a_union_not_a_sum():
         'union-vs-sum; investigate before weakening the assertion below.'
     )
     assert (union <= naive_sum + 1e-6).all(), (
-        'all_hpv.n_latent exceeds the naive per-module sum at some timestep -- '
+        'all_hpv.latent exceeds the naive per-module sum at some timestep -- '
         'a union count can never exceed a sum of its parts.'
     )

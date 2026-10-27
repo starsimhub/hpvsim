@@ -212,8 +212,8 @@ class HPVTotal(ss.Analyzer):
       - **People-level union** for per-agent state counts listed in
         ``_UNION_STATES``: boolean OR across each module's BoolState array,
         then counted (an agent infected with any genotype counts once).
-      - **Custom derivation** for results that need it: ``n_susceptible``
-        (= n_alive - n_infected), ``prevalence`` (= n_infected / n_alive),
+      - **Custom derivation** for results that need it: ``susceptible``
+        (= alive - infected), ``prevalence`` (= infected / alive),
         and the extra ``cum_infections_unique`` (people-level cumulative
         unique-agent count, complementing the sum-of-flows ``cum_infections``).
       - **Element-wise sum** across module result arrays for everything
@@ -231,12 +231,12 @@ class HPVTotal(ss.Analyzer):
 
     # HPV result key -> BoolState name, aggregated by boolean OR across modules.
     _UNION_STATES = {
-        'n_infected':               'infected',
-        'n_precin':                 'precin',
-        'n_cin':                    'cin',
-        'n_cancerous':              'cancerous',
-        'n_undetected_cancerous':   'undetected_cancerous',
-        'n_latent':                 'latent',
+        'infected':               'infected',
+        'precin':                 'precin',
+        'cin':                    'cin',
+        'cancerous':              'cancerous',
+        'undetected_cancerous':   'undetected_cancerous',
+        'latent':                 'latent',
     }
 
     # WHO 2000 World Standard Population weights per 5-year band (0-4 to 100+).
@@ -279,7 +279,7 @@ class HPVTotal(ss.Analyzer):
         return np.sum(rates * weights) / weights.sum()
 
     # HPV result keys we override with custom derivation, not naive sum/union.
-    _DERIVED = ('n_susceptible', 'prevalence')
+    _DERIVED = ('susceptible', 'prevalence')
 
     # HPV result keys not aggregated (bookkeeping artifacts).
     _SKIP = ('timevec',)
@@ -302,7 +302,7 @@ class HPVTotal(ss.Analyzer):
         per-genotype HPV result definitions (dtype + label) are available
         as a template when this runs.
 
-        The union-based stocks (n_infected, n_precin, n_cin, n_cancerous) are
+        The union-based stocks (infected, precin, cin, cancerous) are
         declared as ``dtype=float`` so that ``step()`` can write scale-weighted
         values (fine agents carry ``scale=1/ratio`` and must count as 1/ratio).
         """
@@ -320,7 +320,7 @@ class HPVTotal(ss.Analyzer):
             defs.append(ss.Result(key, dtype=result_dtype,
                                   label=f'{src.label} (any genotype)'))
         # Derived results (computed in step()).
-        defs.append(ss.Result('n_susceptible', dtype=float,
+        defs.append(ss.Result('susceptible', dtype=float,
                               label='Currently uninfected with any genotype'))
         # scale=False: prevalence is a ratio, not a count.
         defs.append(ss.Result('prevalence', dtype=float, scale=False,
@@ -360,10 +360,10 @@ class HPVTotal(ss.Analyzer):
         Element-wise sums for the remaining results are computed in
         ``finalize_results`` once each module's full per-step array exists.
 
-        Union stocks (n_infected, n_precin, n_cin, n_cancerous) are written as
+        Union stocks (infected, precin, cin, cancerous) are written as
         scale-weighted floats: ``people.scale_flows(uids_in_state)`` so that
         fine agents (scale=1/ratio) count as 1/ratio, not 1. Derived results
-        (n_susceptible, prevalence) are computed from scale-weighted totals.
+        (susceptible, prevalence) are computed from scale-weighted totals.
         """
         ti = self.ti
         hpvs = self.hpv_modules
@@ -391,9 +391,9 @@ class HPVTotal(ss.Analyzer):
             self.results[key][ti] = (
                 people.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
             )
-        # Derived from scale-weighted n_infected.
-        sw_inf = float(self.results['n_infected'][ti])
-        self.results['n_susceptible'][ti] = n_alive_sw - sw_inf
+        # Derived from scale-weighted infected.
+        sw_inf = float(self.results['infected'][ti])
+        self.results['susceptible'][ti] = n_alive_sw - sw_inf
         self.results['prevalence'][ti] = sw_inf / n_alive_sw
         # Cumulative unique: agents ever infected with any genotype, still alive.
         ever_infected = np.zeros_like(people.alive.values)

@@ -1,4 +1,4 @@
-"""Unit tests for hpv.Calibration, compute_gof, and the default eval_fn."""
+"""Unit tests for calibration: hpv.Sim(data=...) with sim.fit(gof=hpv.calibration.gof), compute_gof, and the default eval_fn."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -9,15 +9,17 @@ import hpvsim as hpv
 
 
 # ---------------------------------------------------------------------------
-# Calibration class / build_sim
+# Fitting, and build_sim
 # ---------------------------------------------------------------------------
 
-def test_calibration_importable():
-    """hpv.Calibration exists at top level and is an ss.Calibration."""
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
-    calib_pars = dict(beta=[0.20, 0.10, 0.30])
-    calib = hpv.Calibration(sim, calib_pars, total_trials=2, debug=True)
-    assert isinstance(calib, ss.Calibration)
+def test_fit_shared_beta():
+    """A beta given as ss.par reaches every genotype as one parameter, which sim.fit() fits once."""
+    df = pd.DataFrame({'all_hpv.asr_cancer_incidence': [10.0]}, index=pd.Index([2020.0], name='t'))
+    sim = hpv.Sim(n_agents=200, start=2017, stop=2019, dt=1.0, rand_seed=0, genotypes=[16, 18], data=df,
+                  pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])), verbose=0)
+    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    assert list(fit.pars.keys()) == ['beta']
+    assert 0.1 <= fit.pars.beta <= 0.3
 
 
 def test_build_sim_routes_top_level_pars():
@@ -51,7 +53,7 @@ def test_build_sim_raises_on_unknown_key():
 
 def test_build_sim_does_not_mutate_base():
     """build_sim mutates only the sim handed to it, leaving the original the
-    copy was taken from untouched — the basis of ss.Calibration's dcp-per-trial."""
+    copy was taken from untouched — as a copy of a sim for each trial would."""
     sim_base = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     sim_base.init()
     original_seed = sim_base.pars.rand_seed
@@ -104,7 +106,7 @@ def test_compute_gof_zero_actual_max_does_not_divide():
 def _sim_with_all_hpv_by_age(*, n_agents=400, years=(2020,), keys=('cancers',),
                              genotypes=None):
     """Build a sim with an all_hpv_by_age analyzer (matches the analyzer
-    name Calibration attaches automatically)."""
+    name hpv.Sim(data=...) attaches automatically)."""
     edges = np.array([0., 30., 60., 100.])
     kw = dict(n_agents=n_agents, start=min(years) - 1,
               stop=max(years) + 1, dt=1.0, rand_seed=0,
@@ -200,31 +202,23 @@ def test_default_eval_fn_missing_row_raises():
 
 def test_calibration_validates_data_index_and_column_scope():
     """data= DataFrame must use 't' index; unknown scope prefixes error."""
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
-    calib_pars = dict(beta=[0.20, 0.10, 0.30])
     # Bad index name -> load_calib_data rejects
     bad_idx = pd.DataFrame([[1.0]], index=pd.Index([2020.0], name='year'),
                            columns=['all_hpv.cancers.0-100'])
     with pytest.raises(ValueError, match="must be 't'"):
-        hpv.Calibration(sim, calib_pars, data=bad_idx,
-                        total_trials=1, debug=True)
+        hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0, data=bad_idx)
     # Unrecognized scope prefix -> _setup_analyzers rejects
     bad_col = pd.DataFrame([[1.0]], index=pd.Index([2020.0], name='t'),
                            columns=['not_a_scope.something'])
     with pytest.raises(ValueError, match='unrecognized data columns'):
-        hpv.Calibration(sim, calib_pars, data=bad_col,
-                        total_trials=1, debug=True)
+        hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0, data=bad_col)
 
 
-def test_calibration_rejects_both_data_and_eval_fn():
-    """Can't pass both data= and eval_fn= — they overwrite each other."""
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
-    calib_pars = dict(beta=[0.20, 0.10, 0.30])
-    good = pd.DataFrame([[1.0]], index=pd.Index([2020.0], name='t'),
-                        columns=['all_hpv.cancers.0-100'])
+def test_gof_needs_data():
+    """hpv.calibration.gof on a sim made without data= says what to do."""
+    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0, verbose=0).run()
     with pytest.raises(ValueError, match='data='):
-        hpv.Calibration(sim, calib_pars, data=good,
-                        eval_fn=lambda s: 0.0, total_trials=1, debug=True)
+        hpv.calibration.gof(sim)
 
 
 # ---------------------------------------------------------------------------
@@ -266,12 +260,10 @@ def test_data_loads_cancers_from_csv_and_attaches_by_age(tmp_path):
     values = {(2020, a): float(a) for a in ages}
     csv = _write_cancer_cases_csv(tmp_path, [2020], ages, values)
 
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2021, dt=1.0, rand_seed=0)
-    calib = hpv.Calibration(sim, dict(beta=[0.20, 0.10, 0.30]),
-                            data=[str(csv)], total_trials=1,
-                            n_workers=1, debug=True, verbose=False)
+    sim = hpv.Sim(n_agents=200, start=2019, stop=2021, dt=1.0, rand_seed=0,
+                  data=[str(csv)], pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
 
-    df = calib.eval_kw['data']
+    df = sim.calib_data
     assert isinstance(df, pd.DataFrame)
     # One column per age bin (open-ended last)
     assert list(df.columns) == [
@@ -282,7 +274,7 @@ def test_data_loads_cancers_from_csv_and_attaches_by_age(tmp_path):
     assert list(df.index) == [2020.0]
     assert df.index.name == 't'
 
-    analyzers = calib.sim.pars.get('analyzers', [])
+    analyzers = sim.pars.analyzers
     by_age_ars = [a for a in analyzers if getattr(a, 'name', None) == 'all_hpv_by_age']
     assert len(by_age_ars) == 1
     assert list(by_age_ars[0].edges) == [0.0, 15.0, 20.0, 25.0, 30.0, 150.0]
@@ -295,11 +287,9 @@ def test_data_loads_genotype_dist_from_csv(tmp_path):
                                   {'16': 0.5, '18': 0.15, 'hi5': 0.2, 'ohr': 0.15})
 
     sim = hpv.Sim(location='nigeria', n_agents=200, start=2019, stop=2021, dt=1.0,
-                  genotypes=[16, 18, 'hi5', 'ohr'], rand_seed=0, verbose=0)
-    calib = hpv.Calibration(sim, dict(beta=[0.2, 0.1, 0.3]),
-                            data=[str(csv)], total_trials=1,
-                            n_workers=1, debug=True, verbose=False)
-    df = calib.eval_kw['data']
+                  genotypes=[16, 18, 'hi5', 'ohr'], rand_seed=0, verbose=0,
+                  data=[str(csv)], pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
+    df = sim.calib_data
     assert set(df.columns) == {
         'by_genotype.cancerous_genotype_dist.hpv16',
         'by_genotype.cancerous_genotype_dist.hpv18',
@@ -313,12 +303,10 @@ def test_data_genotype_dist_e2e_calibrates(tmp_path):
     csv = _write_cancer_types_csv(tmp_path, 2020,
                                   {'16': 0.5, '18': 0.15, 'hi5': 0.2, 'ohr': 0.15})
     sim = hpv.Sim(location='nigeria', n_agents=200, start=2019, stop=2021, dt=1.0,
-                  genotypes=[16, 18, 'hi5', 'ohr'], rand_seed=0, verbose=0)
-    calib = hpv.Calibration(sim, dict(beta=[0.2, 0.1, 0.3]),
-                            data=[str(csv)], total_trials=2,
-                            n_workers=1, debug=True, verbose=False)
-    calib.calibrate()
-    assert len(calib.df) >= 1
+                  genotypes=[16, 18, 'hi5', 'ohr'], rand_seed=0, verbose=0,
+                  data=[str(csv)], pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
+    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    assert np.isfinite(fit.mismatch)
 
 
 def test_data_asr_reads_from_hpv_total(tmp_path):
@@ -326,21 +314,19 @@ def test_data_asr_reads_from_hpv_total(tmp_path):
     Eval reads sim.results.all_hpv.asr_cancer_incidence directly."""
     asr_csv = _write_asr_csv(tmp_path, 2020, 15.7)
     sim = hpv.Sim(location='nigeria', n_agents=200, start=2019, stop=2021, dt=1.0,
-                  rand_seed=0, verbose=0)
-    calib = hpv.Calibration(sim, dict(beta=[0.2, 0.1, 0.3]),
-                            data=[str(asr_csv)], total_trials=1,
-                            n_workers=1, debug=True, verbose=False)
-    df = calib.eval_kw['data']
+                  rand_seed=0, verbose=0,
+                  data=[str(asr_csv)], pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
+    df = sim.calib_data
     assert list(df.columns) == ['all_hpv.asr_cancer_incidence']
     assert float(df.iloc[0, 0]) == 15.7
     # No by_age or age_pyramid attached — ASR is on HPVTotal.
-    analyzers = calib.sim.pars.get('analyzers', [])
+    analyzers = sim.pars.analyzers
     names = [getattr(a, 'name', None) for a in analyzers]
     assert 'all_hpv_by_age' not in names
     assert 'all_hpv_pyramid' not in names
     # E2E: calibration runs without error via HPVTotal.asr path.
-    calib.calibrate()
-    assert 'mismatch' in calib.df.columns
+    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    assert np.isfinite(fit.mismatch)
 
 
 def test_data_cancers_e2e_calibrates(tmp_path):
@@ -348,12 +334,10 @@ def test_data_cancers_e2e_calibrates(tmp_path):
     ages = [0, 15, 20, 25, 30]
     values = {(2020, a): 1.0 for a in ages}
     csv = _write_cancer_cases_csv(tmp_path, [2020], ages, values)
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2021, dt=1.0, rand_seed=0)
-    calib = hpv.Calibration(sim, dict(beta=[0.2, 0.1, 0.3]),
-                            data=[str(csv)], total_trials=2,
-                            n_workers=1, debug=True, verbose=False)
-    calib.calibrate()
-    assert 'mismatch' in calib.df.columns
+    sim = hpv.Sim(n_agents=200, start=2019, stop=2021, dt=1.0, rand_seed=0,
+                  data=[str(csv)], pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
+    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    assert np.isfinite(fit.mismatch)
 
 
 def test_data_accepts_prebuilt_standardized_dataframe(tmp_path):
@@ -363,14 +347,12 @@ def test_data_accepts_prebuilt_standardized_dataframe(tmp_path):
         {'all_hpv.cancers.0-15': [1.0], 'all_hpv.cancers.15-30': [5.0]},
         index=pd.Index([2020.0], name='t'),
     )
-    sim = hpv.Sim(n_agents=200, start=2019, stop=2019, dt=1.0, rand_seed=0)
-    calib = hpv.Calibration(sim, dict(beta=[0.2, 0.1, 0.3]),
-                            data=df, total_trials=1,
-                            n_workers=1, debug=True, verbose=False)
+    sim = hpv.Sim(n_agents=200, start=2019, stop=2019, dt=1.0, rand_seed=0,
+                  data=df, pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
     # sim.stop auto-extended past 2020
-    assert int(calib.sim.pars.stop) >= 2021
+    assert sim.pars.stop >= 2021
     # analyzer attached with edges derived from labels
-    by_age_ars = [a for a in calib.sim.pars.get('analyzers', [])
+    by_age_ars = [a for a in sim.pars.analyzers
                   if getattr(a, 'name', None) == 'all_hpv_by_age']
     assert list(by_age_ars[0].edges) == [0.0, 15.0, 30.0]
 

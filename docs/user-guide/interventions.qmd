@@ -2,7 +2,7 @@
 title: "Interventions"
 ---
 
-HPVsim separates *what* is given from *who gets it*. A **product** is the vaccine, screening test or treatment itself, with its own efficacy or test-positivity by genotype and disease state. An **intervention** is the delivery program: which people, from which year, at what coverage. The same product can be delivered several ways, and the same delivery pattern can carry different products.
+HPVsim separates *what* is given from *who gets it*. A **product** is the vaccine, screening test or treatment itself, with its own efficacy or test-positivity by genotype and disease state. An **intervention** is the delivery program, one of Starsim's deliveries (`ss.vaccinate`, `ss.screen`, `ss.treat`): which people, from which year, at what coverage. The same product can be delivered several ways, and the same delivery pattern can carry different products.
 
 Product characteristics live in CSVs under `hpvsim/data/`, so you can read exactly what the model assumes:
 
@@ -14,45 +14,40 @@ Product characteristics live in CSVs under `hpvsim/data/`, so you can read exact
 | `hpv.txvx` | `txvx1`, `txvx2` | Writes therapeutic-vaccine immunity |
 | `hpv.radiation` | — | Extends survival with cancer; it does not cure |
 
-Diagnostics are multinomial draws conditioned on true state and genotype. Where a woman is positive for more than one genotype, the most severe result in the product's hierarchy wins. Results come back as `intervention.outcomes['<result label>']`, and that dictionary is how a cascade is wired: each downstream step's `eligibility` reads the upstream step's outcomes.
+Diagnostics are multinomial draws conditioned on true state and genotype. Where a woman is positive for more than one genotype, the most severe result in the product's hierarchy wins. Each result of a test is an event of the delivery that gave it, e.g. `screening.positive` or `colposcopy.hsil`, and that is how a cascade is wired: each downstream step is triggered by a result of the step before, with `who=`. A test's results are its product's, most severe first; a treatment's are `cured`, `failed`, and `unneeded`.
 
 Treatment products act on the model's disease states directly. Ablation and excision clear precancer and CIN — since v3.1 they clear precancer too, which makes screen-and-treat avert more cancers than in earlier versions. Radiation extends time to cancer death by a drawn duration (mean 18 months); a woman treated for cancer still has cancer.
 
 ## Delivery, coverage and targeting
 
-Every intervention is either routine or campaign. `hpv.routine_screening(start_year=2015, prob=0.3)` offers a screen every year from 2015; `hpv.campaign_screening(years=[2015, 2025], prob=0.3)` offers it twice. `prob` is an **annual** probability, converted internally to the timestep in use — so `prob=0.3` with quarterly steps does not mean 30% per quarter. Pass a list of probabilities alongside a list of years to ramp coverage over time. `start_year` and `end_year` must fall inside the simulation window or the run stops with an error.
+A delivery with `interval=` runs in rounds: `ss.screen(..., interval=ss.years(1), start=2015, coverage=0.3)` screens 30% of those eligible each year from 2015. With `at=['2015', '2025']` it runs twice, a campaign. With neither, it is routine: each person is offered the product once, at the first step on which they are eligible, e.g. vaccination of girls as they turn 9 with `at_age=9`. `coverage` is the share reached in each round, whatever the timestep. To ramp coverage over time, give it as a time series, e.g. `coverage=ss.timeseries({'2010': 0.1, '2030': 0.7}, mode='linear')`. `start` must fall inside the simulation window; a `stop` after its end never stops the delivery.
 
-All vaccination, screening, treatment and therapeutic-vaccination interventions default to `sex='f'`. That changed in v3.1: pass `sex=None` explicitly for gender-neutral vaccination. Age targeting uses `age_range=[lo, hi]`, and the upper bound is treated as exclusive for vaccination, screening and triage but inclusive for treatment — so `age_range=[30, 50]` on a screening program reaches women up to their 50th birthday.
+Who is eligible is a condition on people, given as `where=`, e.g. `ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)` for women up to their 50th birthday. Nothing is limited to women unless you say so: leave out `ss.ppl.female` for gender-neutral vaccination.
 
-Give every intervention in a cascade a `name`, since downstream steps refer to it by name. Names share a namespace with product modules, so avoid `'vx'`, `'dx'`, `'tx'` and `'radiation'` as intervention names — a collision raises `Module vx already added` at initialisation.
+A delivery is named after the variable it is assigned to (or `name=`), and its results are under that name, e.g. `sim.results.screening.positive`: each has `delivered`, `eligible`, `coverage`, and one result per outcome. A product is named after the product it looks up (`'via'`), and is renamed `<name>_product` if a delivery has that name.
 
 ## How to build a screen-and-treat cascade
 
-A screening program is a chain: screen, triage the positives, treat what triage finds. Each link is its own intervention, and eligibility functions connect them.
+A screening program is a chain: screen, triage the positives, treat what triage finds. Each link is its own delivery, triggered by a result of the one before.
 
 ```{python}
 import numpy as np
 import starsim as ss
 import hpvsim as hpv
 
-screen = hpv.routine_screening(product='hpv', prob=0.35, age_range=[30, 50],
-                               start_year=2010, name='screen')
+women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
+screening = ss.screen(hpv.dx('hpv'), where=women, coverage=0.35, interval=ss.years(1), start=2010)
 
 # Women who screen positive go to colposcopy
-positives = lambda sim: sim.interventions['screen'].outcomes['positive']
-triage = hpv.routine_triage(product='colposcopy', prob=0.9, eligibility=positives,
-                            start_year=2010, name='triage')
+triage = ss.screen(hpv.dx('colposcopy'), who=screening.positive, coverage=0.9)
 
-# Women with a low- or high-grade lesion are offered ablation
-lesions = lambda sim: np.union1d(sim.interventions['triage'].outcomes['hsil'],
-                                 sim.interventions['triage'].outcomes['lsil'])
-ablate = hpv.treat_num(product='ablation', prob=0.9, eligibility=lesions,
-                       max_capacity=None)
+# Women with a low- or high-grade lesion are offered ablation, unless they have cancer
+ablation = ss.treat(hpv.tx('ablation'), who=(triage.hsil | triage.lsil) & hpv.no_cancer, coverage=0.9)
 
 pars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,
             start=2000, stop=2020, verbose=0)
 baseline = hpv.Sim(**pars, label='no screening')
-program = hpv.Sim(**pars, interventions=[screen, triage, ablate],
+program = hpv.Sim(**pars, interventions=[screening, triage, ablation],
                     label='screen and treat')
 
 msim = ss.MultiSim([baseline, program])
@@ -61,15 +56,15 @@ msim.run(parallel=False, verbose=0)
 for sim in msim.sims:
     print(f'{sim.label:>18}: {float(sim.results.all_hpv.cum_cancers[-1]):>11,.0f} cancers by 2020')
 
-prog = msim.sims[1]
-print('screens delivered: ', f'{float(prog.interventions.screen.results.new_screens.sum()):,.0f}')
-print('screen positives:  ', f'{float(prog.interventions.screen.results.new_dx.sum()):,.0f}')
-print('women treated:     ', f'{float(prog.interventions["treat_num"].results.new_cin_treated.sum()):,.0f}')
+res = msim.sims[1].results
+print('screens delivered: ', f'{float(res.screening.delivered.sum()):,.0f}')
+print('screen positives:  ', f'{float(res.screening.positive.sum()):,.0f}')
+print('women treated:     ', f'{float(res.ablation.delivered.sum()):,.0f}')
 ```
 
-`max_capacity=None` treats everyone eligible. Set it to a number of women per timestep to represent a service constrained by staff or theatre time, which is usually closer to reality than unlimited treatment. Use `hpv.treat_delay(delay=1.0, ...)` where women are referred and treated later, and expect loss to follow-up to matter: the cascade multiplies, so 35% screened × 90% triaged × 90% treated reaches under 30% of the women you intended.
+By default everyone eligible is treated. Set `capacity=` to a number of women per step, or a rate such as `ss.peryear(50_000)`, to represent a service constrained by staff or theatre time, which is usually closer to reality than unlimited treatment; with `queue=True`, those not served wait for the next opening instead of being lost. Use `delay=ss.years(1)` where women are referred and treated later, and expect loss to follow-up to matter: the cascade multiplies, so 35% screened × 90% triaged × 90% treated reaches under 30% of the women you intended.
 
-To ramp a program's coverage over calendar time without writing several interventions, use `hpv.dynamic_pars` with a dotted path, for example `{'screen.prob': {'years': [2010, 2030], 'vals': [0.1, 0.7]}}`.
+To change any other parameter over calendar time, use `hpv.dynamic_pars` with a dotted path, for example `{'hpv16.beta': {'years': [2010, 2030], 'vals': [0.25, 0.2]}}`.
 
 ## See also
 

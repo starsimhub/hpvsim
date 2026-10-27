@@ -4,13 +4,13 @@ title: "Results and analyzers"
 
 Results are grouped by the module that produced them, because each module records what it can see. `sim.results.hpv16` holds HPV16's own time series; `sim.results.agemigration` holds migration flows; `sim.results.all_hpv` holds the pooled HPV totals. A named intervention appears under its own name.
 
-Every genotype module records the same set: the stocks `n_susceptible`, `n_infected`, `n_precin`, `n_cin`, `n_cancerous`, `n_latent`; the flows `new_infections`, `new_cancers`, `new_cancer_deaths`, `new_reactivations`; their cumulative counterparts; and `prevalence`. Two accumulators, `sum_age_at_cancer` and `sum_age_at_cancer_death`, let you recover mean age at diagnosis or death: divide by `new_cancers` or `new_cancer_deaths` over the period you care about.
+Every genotype module records the same set: the stocks `susceptible`, `infected`, `precin`, `cin`, `cancerous`, `latent`; the flows `new_infections`, `new_cancers`, `new_cancer_deaths`, `new_reactivations`; their cumulative counterparts; and `prevalence`. Two accumulators, `sum_age_at_cancer` and `sum_age_at_cancer_death`, let you recover mean age at diagnosis or death: divide by `new_cancers` or `new_cancer_deaths` over the period you care about.
 
 ## Pooling across genotypes
 
 `sim.results.all_hpv` comes from the `HPVTotal` analyzer, which HPVsim attaches automatically. It mirrors the per-genotype schema but pools three different ways, and the difference matters when you report numbers:
 
-- **Stocks are counted per person.** A woman with HPV16 and HPV18 counts once in `all_hpv.n_infected`. `prevalence` and `n_susceptible` follow from that, and `cum_infections_unique` counts women ever infected with anything.
+- **Stocks are counted per person.** A woman with HPV16 and HPV18 counts once in `all_hpv.infected`. `prevalence` and `susceptible` follow from that, and `cum_infections_unique` counts women ever infected with anything.
 - **Cancer flows are exact sums.** Each cancer is attributed to a single genotype, so `all_hpv.new_cancers` is the true total.
 - **Infection flows are plain sums, and overcount.** `all_hpv.new_infections` adds the genotypes together, so a woman who acquires two genotypes in one timestep contributes two. Use `cum_infections_unique` when you mean people.
 
@@ -34,11 +34,11 @@ Analyzers watch the population and record what the disease modules do not. They 
 | `hpv.age_causal_infection` | Age at the causal infection, at CIN and at cancer, plus dwell times |
 | `hpv.snapshot` | A frozen copy of the population at chosen dates |
 
-`hpv.by_age` replaced `AgeResults` in v3.1 and its interface is different: keys come first and positionally, `hpv.by_age(['cancers', 'hpv_prevalence'], edges=..., years=...)`. It accepts the flows `cancers` and `cins`, the stocks `n_infected`, `n_precin`, `n_cin`, `n_cancerous`, the population denominators `n_alive`, `n_females`, `n_males`, and the proportions `hpv_prevalence`, `precin_prevalence`, `cin_prevalence`, `cancer_prevalence`. Each (key, age band) pair becomes its own result — `sim.results.by_age.cancers_30_40` — and `to_dataframe(key)` returns a year-by-age-band table, summing flows across each calendar year and averaging stocks and proportions.
+`hpv.by_age` replaced `AgeResults` in v3.1 and its interface is different: keys come first and positionally, `hpv.by_age(['cancers', 'hpv_prevalence'], edges=..., years=...)`. It accepts the flows `cancers` and `cins`, the stocks `infected`, `precin`, `cin`, `cancerous`, the population denominators `alive`, `n_females`, `n_males`, and the proportions `hpv_prevalence`, `precin_prevalence`, `cin_prevalence`, `cancer_prevalence`. Each (key, age band) pair becomes its own result — `sim.results.by_age.cancers_30_40` — and `to_dataframe(key)` returns a year-by-age-band table, summing flows across each calendar year and averaging stocks and proportions.
 
 Because `by_age` supplies its own denominators, you can build crude age-specific rates from one analyzer: ask for `cancers` and `n_females` over the same bins and divide. The age-standardized `asr_cancer_incidence` remains the better choice for anything you intend to compare against a registry or across countries, since it removes the effect of differing age structures.
 
-One caveat if you cross-check against sim-level results: `by_age`'s `n_females` counts living women only, while starsim's own `sim.results.n_female` includes agents pending removal and so runs a few percent higher. Use `by_age`'s denominators with `by_age`'s numerators.
+One caveat if you cross-check against sim-level results: `by_age`'s `n_females` counts living women only, while starsim's own `sim.results.female` includes agents pending removal and so runs a few percent higher. Use `by_age`'s denominators with `by_age`'s numerators.
 
 ## How to produce cancer outputs you can compare with a registry
 

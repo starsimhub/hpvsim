@@ -16,14 +16,14 @@ class by_age(ss.Analyzer):
     bin (e.g. ``cancers_20_25``, ``cancers_25_30``, ...). This lets
     starsim's ``finalize_results`` handle ``pop_scale`` multiplication
     automatically for count-shaped results (``scale=True``), and lets each
-    per-bin timeseries be annualized via ``ss.Result.annualize()``.
+    per-bin timeseries be annualized via ``ss.Result.resample('year')``.
 
     Supported keys:
 
       - count (``scale=True``, annualize mean):
-        ``n_cancerous``, ``n_cin``, ``n_precin``, ``n_infected``, ``hpv``
+        ``cancerous``, ``cin``, ``precin``, ``infected``, ``hpv``
       - demographic denominators (``scale=True``, annualize mean):
-        ``n_alive``, ``n_females``, ``n_males``
+        ``alive``, ``n_females``, ``n_males``
       - annual event flows (``scale=True``, annualize sum):
         ``cancers``, ``cins``
       - prevalences (``scale=False``, annualize mean, ratio in [0, 1]):
@@ -54,16 +54,16 @@ class by_age(ss.Analyzer):
 
     # Result-name -> BoolState attr, unioned across genotypes. Prevalent stocks.
     _COUNT_KEYS = {
-        'n_cancerous':   'cancerous',
-        'n_cin':         'cin',
-        'n_precin':      'precin',
-        'n_infected':    'infected',
+        'cancerous':   'cancerous',
+        'cin':         'cin',
+        'precin':      'precin',
+        'infected':    'infected',
         'hpv':           'infected',
     }
 
     # Result-name -> people attr, or None to count ``alive``.
     _DEMO_KEYS = {
-        'n_alive':   None,
+        'alive':   None,
         'n_females': 'female',
         'n_males':   'male',
     }
@@ -202,7 +202,7 @@ class by_age(ss.Analyzer):
         annual_bins = []
         year_index = None
         for lo, hi in zip(self.edges[:-1], self.edges[1:]):
-            r = self.results[self._result_name(key, lo, hi)].annualize()
+            r = self.results[self._result_name(key, lo, hi)].resample('year')
             annual_bins.append(np.asarray(r.values))
             if year_index is None:
                 year_index = np.floor(np.asarray(r.timevec.years)).astype(int)

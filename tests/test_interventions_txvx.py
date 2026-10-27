@@ -39,8 +39,7 @@ def test_txvx_clears_lesions_and_confers_scaled_immunity():
     Immunity reaches everyone dosed — including those whose clearance draw
     failed — and is scaled per target genotype by rel_imm.
     """
-    sim = make_sim([hpv.linked_txvx(name='txv', product=make_txvx(), prob=1.0,
-                                    eligibility=lambda s: ss.uids())])
+    sim = make_sim([ss.treat(make_txvx(), coverage=0.0, name='txv')])
     sim.init()
     product = sim.interventions['txv'].product
     m16, mohr = sim.diseases['hpv16'], sim.diseases['ohr']
@@ -60,8 +59,7 @@ def test_txvx_clears_lesions_and_confers_scaled_immunity():
 
 def test_txvx_immunity_reaches_those_it_fails_to_cure():
     """Immunity is conferred on dosing, independently of clearance success."""
-    sim = make_sim([hpv.linked_txvx(name='txv', product=make_txvx(efficacy=0.0),
-                                    prob=1.0, eligibility=lambda s: ss.uids())])
+    sim = make_sim([ss.treat(make_txvx(efficacy=0.0), coverage=0.0, name='txv')])
     sim.init()
     product = sim.interventions['txv'].product
     m16 = sim.diseases['hpv16']
@@ -70,7 +68,7 @@ def test_txvx_immunity_reaches_those_it_fails_to_cure():
     m16.cin[uids] = True
 
     out = product.administer(uids)
-    assert len(out['successful']) == 0, 'zero-efficacy product cured someone'
+    assert len(out['cured']) == 0, 'zero-efficacy product cured someone'
     assert m16.cin[uids].all(), 'lesions cleared despite zero efficacy'
     assert (m16.txvx_sev_imm[uids] > 0).all(), 'no immunity for the uncured'
 
@@ -78,18 +76,17 @@ def test_txvx_immunity_reaches_those_it_fails_to_cure():
 def test_txvx_in_a_screening_program_reduces_cancer():
     """Delivered to screen-positive women, the therapeutic averts cancer."""
     def run(with_txvx):
-        ivs = [hpv.routine_screening(name='scr', product='hpv', prob=1.0,
-                                     age_range=[30, 50], start_year=2022)]
+        women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
+        scr = ss.screen(hpv.dx('hpv'), where=women, coverage=1.0, interval=ss.years(1), start=2022, name='scr')
+        ivs = [scr]
         if with_txvx:
-            ivs.append(hpv.linked_txvx(
-                name='txv', product=make_txvx(efficacy=0.9), prob=1.0,
-                eligibility=lambda s: s.interventions['scr'].outcomes['positive']))
+            ivs.append(ss.treat(make_txvx(efficacy=0.9), who=scr.positive & hpv.no_cancer, name='txv'))
         sim = make_sim(ivs, n_agents=3000, stop=2060)
         sim.run()
         return sim
 
     base, txv = run(False), run(True)
-    assert txv.interventions['txv'].tx_vaccinated.uids.size > 0, 'nobody dosed'
+    assert txv.results.txv.delivered.sum() > 0, 'nobody dosed'
     base_cancers = float(base.results.all_hpv.cum_cancers[-1])
     txv_cancers = float(txv.results.all_hpv.cum_cancers[-1])
     assert txv_cancers < base_cancers, (

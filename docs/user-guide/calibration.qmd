@@ -4,7 +4,7 @@ title: "Calibration"
 
 The default parameters are a point of departure, not a description of your setting. Calibration finds the values that best explain the data you have — and for cervical cancer that data is usually thin: a registry with counts by age band for one or two years, perhaps an HPV prevalence survey, perhaps a genotype distribution among a few hundred cases. The workflow is built around that, not around dense time series.
 
-`hpv.Calibration` wraps Starsim's calibration machinery, which uses [Optuna](https://optuna.org) to search the parameter space. You give it a sim, the parameters to vary, and the data.
+HPVsim uses Starsim's fitting, `sim.fit()`, with [Optuna](https://optuna.org) to search the parameter space. The data and the parameters to vary, with their bounds, go on the sim (`hpv.Sim(data=..., pars=...)`), and `hpv.calibration.gof` is HPVsim's goodness of fit to that data.
 
 ## Telling it what your data is
 
@@ -18,34 +18,34 @@ Targets go in as one table, with a float year index named `t` and column names t
 
 You can also pass a dictionary of data frames, or a list of long-format CSVs with columns `year, name, [age, sex, genotype,] value`.
 
-Age-stratified columns configure the model for you: HPVsim reads the band labels (`'0-30'`, `'70+'`) for the bin edges and the index for the years, attaches a `by_age` analyzer with those settings, and extends `sim.pars.stop` past your last data year if the sim would have finished too early. Keeping analyzer bins and registry bins in sync by hand is a common source of quiet error, and this removes it.
+Age-stratified columns configure the model for you: `hpv.Sim(data=...)` reads the band labels (`'0-30'`, `'70+'`) for the bin edges and the index for the years, attaches a `by_age` analyzer with those settings, and extends `sim.pars.stop` past your last data year if the sim would have finished too early. Keeping analyzer bins and registry bins in sync by hand is a common source of quiet error, and this removes it.
 
 Missing cells are allowed: `NaN` is skipped, so a registry reporting 2015 and 2019 but not the years between costs you nothing.
 
 ## Choosing parameters and reading the mismatch
 
-`calib_pars` is nested by scope, and each leaf is a list: `[best guess, low, high, step]`, with `step` optional.
+The parameters are nested by scope, and each one to fit is given with its bounds, as `ss.par(best guess, bounds=[low, high])`:
 
 ```python
-calib_pars = dict(
-    beta = [0.25, 0.10, 0.40, 0.05],                    # all genotypes
-    hpv16 = dict(cin_fn=dict(k=[0.30, 0.15, 0.50, 0.05])),
-    network = dict(f_partners_casual=[0.5, 0.1, 0.9, 0.05]),
-    cross_immunity = dict(own_imm_hr=[0.9, 0.7, 1.0, 0.05]),
+pars = dict(
+    beta = ss.par(0.25, bounds=[0.10, 0.40]),                     # all genotypes
+    hpv16 = dict(rel_beta=ss.par(1.0, bounds=[0.5, 1.5])),
+    network = dict(f_partners_casual=ss.par(0.5, bounds=[0.1, 0.9])),
+    cross_immunity = dict(own_imm_hr=ss.par(0.9, bounds=[0.7, 1.0])),
 )
 ```
 
-The scopes are the same ones described in [Parameters](parameters.qmd). Flat dotted keys, and the older `dict(low=..., high=..., guess=...)` leaf form, are no longer accepted — both raise an error telling you which form to use.
+The scopes are the same ones described in [Parameters](parameters.qmd). Only a parameter at the top level of its module can be fitted, not one inside a parameter that is itself a dict, such as `hpv16.cin_fn.k`.
 
-Mismatch is a weighted sum over columns. Each column's error is normalized by the largest observed value in it, so a cancer count in the thousands and a prevalence of 0.1 contribute comparably; `weights={'all_hpv.prevalence': 2.0}` then adjusts deliberately. Because normalization depends on the data you supplied, mismatch values are comparable within one calibration and meaningless between two.
+Mismatch is a weighted sum over columns. Each column's error is normalized by the largest observed value in it, so a cancer count in the thousands and a prevalence of 0.1 contribute comparably; `gof=functools.partial(hpv.calibration.gof, weights={'all_hpv.prevalence': 2.0})` then adjusts deliberately. Because normalization depends on the data you supplied, mismatch values are comparable within one calibration and meaningless between two.
 
-Two defaults exist because of how rare cervical cancer is. `reseed=False` keeps the random seed fixed across trials — with reseeding, cancer counts move more with the seed than with the parameters, and the search converges on the luckiest seed rather than the best parameters. And Optuna trials are stored in an append-only journal file rather than SQLite, which deadlocks past about 32 concurrent workers.
+Cervical cancer is rare, so cancer counts move a lot with the random seed. Each Optuna trial runs with a seed of its own, so the search averages over that noise rather than fitting the luck of one seed; the noise is still there, so give the sim enough agents that it is small compared with the differences between parameter sets. To run many trials at once, pass `n_workers=`; `storage='fit.log'` keeps the trials in a file, so that calling `sim.fit()` again resumes the fit.
 
 ## Checking whether the fit is real
 
-A single best-fitting trial tells you very little when the outcome is a handful of rare events. Look at the spread of the best trials instead: `hpv.plot_calibration` re-runs the top trials and draws the model's range against your data, one panel per target. `calib.df` holds every trial's mismatch and parameter values — a flat mismatch across a parameter's full range means your data cannot identify it, so fix it to a literature value rather than let the search wander.
+A single best-fitting trial tells you very little when the outcome is a handful of rare events. Look at the spread of the best trials instead: `hpv.plot_calibration` re-runs the top trials and draws the model's range against your data, one panel per target. `fit.trials` holds every trial's mismatch (`objective`) and parameter values — a flat mismatch across a parameter's full range means your data cannot identify it, so fix it to a literature value rather than let the search wander.
 
-To inspect any output other than your targets, re-run the best trials with `hpv.make_calib_sims(calib, n=50, extract_fn=...)`; without an `extract_fn` you get 50 full sims back, which is many gigabytes. Use `calib.shrink()` before committing a calibration to source control.
+To inspect any output other than your targets, run the fitted model forward with `fit.project(n=50)`, or re-run chosen trials with `ss.parallel(fit.sim, pars=[...])`; both return a MultiSim whose results have one row per run. `fit.pars` holds the best values, which is all you need to commit to source control.
 
 ## How to run a first calibration
 
@@ -53,31 +53,29 @@ Start deliberately small. A handful of trials on a small population tells you wh
 
 ```{python}
 import pandas as pd
+import starsim as ss
 import hpvsim as hpv
 
 # Two rounds of an HPV prevalence survey (illustrative values)
 data = pd.DataFrame({'all_hpv.prevalence': [0.12, 0.10]},
                     index=pd.Index([2010.0, 2015.0], name='t'))
 
-def make_sim():
-    return hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
-                   start=2000, stop=2016, dt=0.5, verbose=0)
-
-calib_pars = dict(
-    beta = [0.25, 0.10, 0.40, 0.05],
-    hpv16 = dict(cin_fn=dict(k=[0.30, 0.15, 0.50, 0.05])),
+pars = dict(
+    beta = ss.par(0.25, bounds=[0.10, 0.40]),
+    hpv16 = dict(rel_beta=ss.par(1.0, bounds=[0.5, 1.5])),
 )
 
-calib = hpv.Calibration(make_sim(), calib_pars, data=data,
-                        total_trials=6, n_workers=2)
-calib.calibrate()
+sim = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
+              start=2000, stop=2016, dt=0.5, verbose=0, data=data, pars=pars)
 
-print('best parameters:', calib.best_pars)
-print(calib.df[['mismatch', 'beta', 'hpv16.cin_fn.k']].head())
+fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=6, n_workers=2, verbose=False)
+
+print('best parameters:', fit.pars)
+print(fit.trials.sort_values('objective').head())
 ```
 
 ```{python}
-fig = hpv.plot_calibration(calib, top_n=4)
+fig = hpv.plot_calibration(fit, top_n=4)
 ```
 
 Six trials over two parameters is a plumbing test, not a calibration. For real work: fit the sexual network to behavioral data first, then transmission to prevalence, then progression to cancer, adding parameters only where the data can identify them. Expect several hundred to a few thousand trials, and run those on a machine you are not also using for anything else.
@@ -87,6 +85,6 @@ Coverage runs matter more than trial counts. Before spending compute, run 50 par
 ## See also
 
 - [T7 - Calibration](../tutorials/tut_calibration.qmd)
-- [Parameters](parameters.qmd) for the scoping rules `calib_pars` uses
+- [Parameters](parameters.qmd) for the scoping rules the parameters use
 - [Results and analyzers](results.qmd) for the result names available as targets
-- [`hpv.Calibration` API reference](../api/calibration.qmd)
+- [`hpv.calibration` API reference](../api/calibration.qmd)

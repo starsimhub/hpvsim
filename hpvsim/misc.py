@@ -756,18 +756,19 @@ def import_stisim():
     return sti
 
 
+@functools.cache
 def hiv_class():
-    """hpvsim's HIV base class, or ``None`` if stisim isn't installed.
+    """STIsim's HIV class (``sti.HIV``), or ``None`` if stisim isn't installed (looked up once).
 
     Returns ``None`` silently so callers that only optionally use HIV
-    (e.g. ``CrossImmunity``, ``HPV._hiv_module``) can branch on ``is None``
+    (e.g. ``CrossImmunity``, ``HPV._hiv_effects``) can branch on ``is None``
     instead of wrapping every import in try/except.
     """
     try:
-        from .hiv import HIV
+        import stisim as sti
     except ImportError:
         return None
-    return HIV
+    return sti.HIV
 
 
 def hiv_module(sim):
@@ -779,3 +780,11 @@ def hiv_module(sim):
     cls = hiv_class()
     return None if cls is None else next(
         (d for d in sim.diseases.values() if isinstance(d, cls)), None)
+
+
+def hiv_effects(sim):
+    """HIV's effects on HPV (the ``hpv.HIVEffects`` connector) in ``sim``, or ``None`` if there isn't one."""
+    if hiv_class() is None:
+        return None
+    from .hiv import HIVEffects
+    return next((c for c in sim.connectors.values() if isinstance(c, HIVEffects)), None)

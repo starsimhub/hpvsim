@@ -42,12 +42,12 @@ def test_by_age_per_bin_results_scale_flag():
     """COUNT + FLOW keys register with scale=True; PREV with scale=False."""
     edges = [0., 20., 40., 60., 100.]
     sim = hpv.Sim(location='nigeria', n_agents=200, start=2000, stop=2001, dt=1.0,
-                  analyzers=[hpv.by_age(['cancers', 'n_cancerous', 'hpv_prevalence'],
+                  analyzers=[hpv.by_age(['cancers', 'cancerous', 'hpv_prevalence'],
                                         edges=edges)])
     sim.init()
     ar = sim.analyzers['by_age']
     assert ar.results[ar._result_name('cancers', 0., 20.)].scale is True
-    assert ar.results[ar._result_name('n_cancerous', 0., 20.)].scale is True
+    assert ar.results[ar._result_name('cancerous', 0., 20.)].scale is True
     assert ar.results[ar._result_name('hpv_prevalence', 0., 20.)].scale is False
 
 
@@ -123,21 +123,21 @@ def test_by_age_cancers_matches_all_hpv_new_cancers():
 
 
 def test_by_age_demographic_denominators():
-    """n_alive/n_females/n_males register scale=True, are internally
+    """alive/n_females/n_males register scale=True, are internally
     consistent per bin, and sum across bins to the sim population."""
     edges = [0., 30., 60., 150.]
     sim = hpv.Sim(location='nigeria', total_pop=200_000, n_agents=2000,
                   start=2000, stop=2003, dt=1.0, rand_seed=0,
-                  analyzers=[hpv.by_age(['n_alive', 'n_females', 'n_males'],
+                  analyzers=[hpv.by_age(['alive', 'n_females', 'n_males'],
                                         edges=edges)])
     sim.run()
     ar = sim.analyzers['by_age']
-    assert sim.results.by_age.n_alive_0_30.scale is True
-    assert (ar.n_alive > 0).all()
-    np.testing.assert_allclose(ar.n_females + ar.n_males, ar.n_alive)
-    np.testing.assert_allclose(ar.n_alive.sum(axis=1),
-                               np.asarray(sim.results.n_alive, dtype=float))
-    female_frac = ar.n_females.sum() / ar.n_alive.sum()
+    assert sim.results.by_age.alive_0_30.scale is True
+    assert (ar.alive > 0).all()
+    np.testing.assert_allclose(ar.n_females + ar.n_males, ar.alive)
+    np.testing.assert_allclose(ar.alive.sum(axis=1),
+                               np.asarray(sim.results.alive, dtype=float))
+    female_frac = ar.n_females.sum() / ar.alive.sum()
     assert 0.4 < female_frac < 0.6
 
 

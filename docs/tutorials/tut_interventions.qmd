@@ -22,73 +22,39 @@ ones that ship with HPVsim are in three CSV files you can read directly:
 - prophylactic vaccines — bivalent, quadrivalent, nonavalent — in
   `hpvsim/data/products_vx.csv`
 
-A program decides who is offered the product, when, and how often. Screening
-programs are `hpv.routine_screening` and `hpv.campaign_screening`, treatment
-is `hpv.treat_num` and `hpv.treat_delay`, and vaccination is `hpv.routine_vx`
-and `hpv.campaign_vx`. Naming a product as a string, as we do below, picks up
-the standard version from those files.
+A program decides who is offered the product, when, and how often. In HPVsim a program is one of Starsim's deliveries: `ss.screen` for a test, `ss.treat` for a treatment, and `ss.vaccinate` for a vaccine. Naming a product as a string, as in `hpv.dx('via')`, picks up the standard version from those files.
 
-Every program reaches women only, unless you pass `sex=None` for both sexes.
+Who is eligible is a condition on people, given as `where=`, e.g. women aged 30 to 49 is `ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)`.
 
 ## Wire up a screen-and-treat cascade
 
-Real programs are a chain: screen, triage the positives, decide what treatment
-each woman needs, then deliver it. In HPVsim each link is its own program, and
-you connect them by naming each one and pointing the next at its outcomes.
+Real programs are a chain: screen, triage the positives, decide what treatment each woman needs, then deliver it. In HPVsim each link is its own delivery, and the next link is triggered by a result of the one before.
 
 ```{python}
 import numpy as np
 import starsim as ss
 import hpvsim as hpv
 
-def screen_and_treat(annual_prob):
+women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
+
+def screen_and_treat(coverage):
     """A VIA screen, triage to a treatment decision, then ablation or excision."""
 
-    screen = hpv.routine_screening(
-        product    = 'via',
-        prob       = annual_prob,
-        start_year = 2015,
-        age_range  = [30, 50],
-        name       = 'screen',
-    )
-    assign = hpv.routine_triage(
-        product     = 'tx_assigner',
-        prob        = 0.9,
-        eligibility = lambda sim: sim.interventions['screen'].outcomes['positive'],
-        name        = 'assign',
-    )
-    ablate = hpv.treat_num(
-        product     = 'ablation',
-        prob        = 0.9,
-        eligibility = lambda sim: sim.interventions['assign'].outcomes['ablation'],
-        name        = 'ablate',
-    )
-    excise = hpv.treat_delay(
-        product     = 'excision',
-        prob        = 0.9,
-        delay       = 0.5,                 # Six months from decision to surgery
-        eligibility = lambda sim: sim.interventions['assign'].outcomes['excision'],
-        name        = 'excise',
-    )
-    return [screen, assign, ablate, excise]
+    screening = ss.screen(hpv.dx('via'), where=women, coverage=coverage, interval=ss.years(1), start=2015)
+    assignment = ss.screen(hpv.dx('tx_assigner'), who=screening.positive, coverage=0.9)
+    ablation = ss.treat(hpv.tx('ablation'), who=assignment.ablation & hpv.no_cancer, coverage=0.9)
+    excision = ss.treat(hpv.tx('excision'), who=assignment.excision & hpv.no_cancer, coverage=0.9,
+                        delay=ss.months(6)) # Six months from decision to surgery
+    return [screening, assignment, ablation, excision]
 ```
 
 Three things make this work.
 
-Each link has a `name`, and the next link's `eligibility` is a function that
-reads the previous link's `outcomes`. Positive screens go to `assign`; the
-`tx_assigner` product sorts them into `ablation` or `excision` according to how
-advanced the lesion is; each treatment program picks up its own group.
+Each result of a test is an event that triggers the next link, on the same step: `screening.positive` sends women to `assignment`; the `tx_assigner` product sorts them into `ablation` or `excision` according to how advanced the lesion is (or `radiation`, for cancer); each treatment picks up its own group. `hpv.no_cancer` leaves out women who have cancer, since ablation and excision do not treat it. Each delivery is named after its variable, so its results are `sim.results.screening`, `sim.results.ablation`, and so on.
 
-`prob` is an **annual** probability, not a probability per timestep and not a
-lifetime coverage. `prob=0.2` means a woman in the eligible age range has a 20%
-chance of being screened each year, which averages out to roughly one screen
-every five years — close to what WHO recommends. `prob=0.7` is almost annual
-screening.
+`interval=ss.years(1)` makes screening a round each year, and `coverage` is the share of the eligible women reached in each round, not a lifetime coverage. `coverage=0.2` means a woman in the eligible age range has a 20% chance of being screened each year, which averages out to roughly one screen every five years — close to what WHO recommends. `coverage=0.7` is almost annual screening.
 
-`hpv.treat_delay(delay=0.5)` puts six months between the treatment decision and
-the treatment. Women who die or progress in the meantime are never treated,
-which is what happens when surgical capacity is scarce.
+`delay=ss.months(6)` puts six months between the treatment decision and the treatment. Women who die or develop cancer in the meantime are never treated, which is what happens when surgical capacity is scarce.
 
 ## Run it and count the cancers
 
@@ -131,20 +97,13 @@ forties, not from screening her often.
 
 ## Add therapeutic vaccination
 
-A therapeutic vaccine is offered to women who already have HPV, to help them
-clear it. HPVsim delivers it either as a campaign to an age group, or to the
-women a screening program has just found. Here we add the second kind on top
-of the five-yearly screening program:
+A therapeutic vaccine is offered to women who already have HPV, to help them clear it. It is a treatment, delivered with `ss.treat`: either in rounds to an age group, or to the women a screening program has just found. Here we add the second kind on top of the five-yearly screening program:
 
 ```{python}
-def screen_then_txvx(annual_prob):
-    cascade = screen_and_treat(annual_prob)
-    txvx = hpv.linked_txvx(
-        product     = 'txvx1',
-        prob        = 0.8,
-        eligibility = lambda sim: sim.interventions['screen'].outcomes['positive'],
-        name        = 'txvx',
-    )
+def screen_then_txvx(coverage):
+    cascade = screen_and_treat(coverage)
+    screening = cascade[0]
+    txvx = ss.treat(hpv.txvx('txvx1'), who=screening.positive & hpv.no_cancer, coverage=0.8)
     return cascade + [txvx]
 
 s_screen = hpv.Sim(**PARS, interventions=screen_and_treat(0.2),

@@ -15,15 +15,15 @@ def _four_genotype_sim():
 
 
 def _attach_dx_and_init(sim, dx_instance):
-    """Attach the dx product to a stub treat_num, init the sim, and return
+    """Attach the dx product to a stub delivery, init the sim, and return
     the initialized copy of the product.
 
     Starsim deep-copies pars inputs on Sim construction, so the object stored
     on the intervention after init may differ from the one passed in. Callers
     must use the returned product for all administer/result_dist calls.
     """
-    # prob=0 attaches the dx to a sim that will init without ever firing it.
-    stub = ss.treat_num(product=dx_instance, prob=0.0)
+    # coverage=0 attaches the dx to a sim that will init without ever firing it.
+    stub = ss.Delivery(dx_instance, coverage=0.0)
     sim.pars['interventions'] = [stub]
     sim.init()
     return sim.interventions[0].product
@@ -39,7 +39,7 @@ def _force_state(sim, uids, state, genotype):
 def test_dx_via_hierarchy_default():
     """The 'via' product default hierarchy is positive > inadequate > negative."""
     d = hpv_dx(name='via')
-    assert d.hierarchy == ['positive', 'inadequate', 'negative']
+    assert d.hierarchy == ['positive', 'negative']
 
 
 def test_dx_unknown_name_raises():
@@ -70,7 +70,7 @@ def test_dx_module_name_separates_lookup_key_from_module_name():
     module name (e.g. two 'via' screens in one sim)."""
     d = hpv_dx(name='via', module_name='via_older')
     assert d.name == 'via_older'
-    assert d.hierarchy == ['positive', 'inadequate', 'negative']
+    assert d.hierarchy == ['positive', 'negative']
 
 
 def test_two_df_built_dx_products_coexist_in_a_sim():
@@ -86,8 +86,8 @@ def test_two_df_built_dx_products_coexist_in_a_sim():
     d2 = hpv_dx(name='dx_triage', df=_mkdf(0.9))
     sim = _four_genotype_sim()
     sim.pars['interventions'] = [
-        ss.treat_num(name='stub_a', product=d1, prob=0.0),
-        ss.treat_num(name='stub_b', product=d2, prob=0.0),
+        ss.Delivery(d1, coverage=0.0, name='stub_a'),
+        ss.Delivery(d2, coverage=0.0, name='stub_b'),
     ]
     sim.init()  # would raise 'Module dx already added' before the fix
 
@@ -99,7 +99,7 @@ def test_dx_all_genotype_mode_classifies_susceptibles():
     d_init = _attach_dx_and_init(sim, hpv_dx(name='via'))
     alive = sim.people.alive.uids[:5]
     out = d_init.administer(alive)
-    assert set(out.keys()) == {'positive', 'inadequate', 'negative'}
+    assert set(out.keys()) == {'positive', 'negative'}
     total = sum(len(v) for v in out.values())
     assert total == 5
 
@@ -111,8 +111,8 @@ def test_dx_latent_state_silently_empty():
     d_init = _attach_dx_and_init(sim, hpv_dx(name='hpv'))
     alive = sim.people.alive.uids[:10]
     out = d_init.administer(alive)
-    # hierarchy is ['positive', 'inadequate', 'negative']
-    assert set(out.keys()) == {'positive', 'inadequate', 'negative'}
+    # hierarchy is ['positive', 'negative']
+    assert set(out.keys()) == {'positive', 'negative'}
 
 
 def test_dx_per_genotype_classifies_precin_hpv16():

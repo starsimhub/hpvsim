@@ -6,33 +6,33 @@ no entry for a genotype confers nothing against it.
 """
 import numpy as np
 import pytest
-
+import starsim as ss
 import hpvsim as hpv
+
+
+def _run_hpv16_vaccine():
+    """Vaccinate girls aged 9-14 against hpv16 only; return the sim, those vaccinated (alive), and whether each agent was"""
+    reached = []
+    def track(sim):
+        reached.extend(sim.interventions.vx.reached().tolist())
+    girls = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14)
+    vx = ss.vaccinate(hpv.vx(rel_imm={'hpv16': 1.0}), where=girls, coverage=1.0, start=2020, name='vx')
+    sim = hpv.Sim(location='nigeria', start=2018, stop=2022, n_agents=500, genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
+                  rand_seed=0, interventions=[vx], analyzers=track, verbose=0)
+    sim.run()
+    vaccinated = sim.people.alive.asnew()
+    vaccinated.raw[:] = False
+    vaccinated[ss.uids(reached)] = True
+    vacc_uids = (vaccinated & sim.people.alive).uids
+    if len(vacc_uids) == 0:
+        pytest.skip('No agents vaccinated in this small-sim window')
+    return sim, vacc_uids, vaccinated
 
 
 def test_single_genotype_vaccine_does_not_bleed_to_others():
     """A vaccine with rel_imm only for hpv16 gives zero protection against the
     other genotypes via the CrossImmunity connector."""
-    intv = hpv.routine_vx(
-        product=hpv.vx(rel_imm={'hpv16': 1.0}),
-        prob=1.0,
-        age_range=[9, 14],
-        sex='f',
-        start_year=2020,
-        name='hpv16_only_smoke',
-    )
-    sim = hpv.Sim(
-        location='nigeria', start=2018, stop=2022,
-        n_agents=500,
-        genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
-        rand_seed=0,
-        interventions=[intv],
-    )
-    sim.run()
-    intv = sim.interventions[0]
-    vacc_uids = intv.vaccinated.uids
-    if len(vacc_uids) == 0:
-        pytest.skip('No agents vaccinated in this small-sim window')
+    sim, vacc_uids, vaccinated = _run_hpv16_vaccine()
 
     assert (sim.diseases['hpv16'].vax_imm[vacc_uids] > 0).all(), \
         'Vaccinated agents must have vax_imm[hpv16]>0 (direct vaccine effect)'
@@ -47,7 +47,7 @@ def test_single_genotype_vaccine_does_not_bleed_to_others():
 
     # With vax_imm[g]==0, rel_sus[g] must track nab_imm only: no lower than
     # age-matched unvaccinated females.
-    unvax_mask = sim.people.alive & ~intv.vaccinated
+    unvax_mask = sim.people.alive & ~vaccinated
     ages = sim.people.age
     for g in ['hpv18', 'hi5', 'ohr']:
         vacc_vax = sim.diseases[g].vax_imm[vacc_uids]
@@ -76,28 +76,9 @@ def test_hpv16_vaccine_does_reduce_hpv16_susceptibility():
     """Positive control: the hpv16-only vaccine must reduce hpv16 rel_sus
     for vaccinated agents compared to unvaccinated females.
     """
-    intv = hpv.routine_vx(
-        product=hpv.vx(rel_imm={'hpv16': 1.0}),
-        prob=1.0,
-        age_range=[9, 14],
-        sex='f',
-        start_year=2020,
-        name='hpv16_only_positive_control',
-    )
-    sim = hpv.Sim(
-        location='nigeria', start=2018, stop=2022,
-        n_agents=500,
-        genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
-        rand_seed=0,
-        interventions=[intv],
-    )
-    sim.run()
-    intv = sim.interventions[0]
-    vacc_uids = intv.vaccinated.uids
-    if len(vacc_uids) == 0:
-        pytest.skip('No agents vaccinated in this small-sim window')
+    sim, vacc_uids, vaccinated = _run_hpv16_vaccine()
 
-    unvax_mask = sim.people.alive & ~intv.vaccinated
+    unvax_mask = sim.people.alive & ~vaccinated
     unvax_f = (unvax_mask & sim.people.female).uids
     if len(unvax_f) == 0:
         pytest.skip('No unvaccinated females for comparison')

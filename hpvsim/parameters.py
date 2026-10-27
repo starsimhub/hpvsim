@@ -349,10 +349,8 @@ def expanddict(flat):
 def par_registry():
     """Category -> par-name-set (built lazily; lightweight).
 
-    No 'hiv' category: HIV's pars overlap HPV's on 'beta'/'init_prev' (both
-    inherited from stisim's BaseSTIPars), so a bare-key broadcast would
-    silently also flip on HIV transmission (e.g. bare beta= turning on
-    hiv.pars.beta from its 0 default). The scoped hiv=dict(...) form in
+    No 'hiv' category: HIV's pars overlap HPV's (e.g. 'init_prev'), so a
+    bare-key broadcast would silently change HIV too. The scoped hiv=dict(...) and hiv_effects=dict(...) forms in
     route_pars does NOT consult this registry -- it dispatches directly by
     instance name -- so scoped/hiv_pars= routing is unaffected.
     """
@@ -375,7 +373,7 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
 
     A top-level key is either:
       - Scoped: matches a live HPV genotype's name, the HIV disease's name
-        (``'hiv'``), or ``cross_immunity``/``network`` (aliases
+        (``'hiv'``), HIV's effects on HPV (``'hiv_effects'``), or ``cross_immunity``/``network`` (aliases
         ``crossimmunity``/``sexualnetwork``). Routed to that instance's pars
         via ONE ``instance.pars.update(value)`` call -- starsim's own
         ``Pars.update()`` handles arbitrarily nested overrides natively
@@ -406,15 +404,19 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
 
     if hasattr(sim, 'diseases') and sim.diseases is not None:
         diseases = {d.name: d for d in sim.diseases.values() if isinstance(d, disease_types)}
-        connectors = [c for c in sim.connectors.values() if isinstance(c, CrossImmunity)]
+        all_connectors = list(sim.connectors.values())
         networks = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
     else:
         diseases = {d.name: d for d in sc.tolist(sim.pars.get('diseases'))
                     if isinstance(d, disease_types)}
-        connectors = [c for c in sc.tolist(sim.pars.get('connectors'))
-                      if isinstance(c, CrossImmunity)]
+        all_connectors = sc.tolist(sim.pars.get('connectors'))
         networks = [n for n in sc.tolist(sim.pars.get('networks'))
                     if isinstance(n, SexualNetwork)]
+    connectors = [c for c in all_connectors if isinstance(c, CrossImmunity)]
+    effects = [] # HIV's effects on HPV (hpv.HIVEffects)
+    if hiv_cls is not None:
+        from .hiv import HIVEffects
+        effects = [c for c in all_connectors if isinstance(c, HIVEffects)]
 
     registry = par_registry()
     # Split each top-level key into one of three buckets:
@@ -426,10 +428,10 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
     #                (any genotype, or 'hiv') but isn't in this particular
     #                sim; skip with a warning instead of raising, so one
     #                calibrated pars dict can drive a whole scenario sweep.
-    optional_scopes = set(GENOTYPE_KEYS) | {'hiv'}
+    optional_scopes = set(GENOTYPE_KEYS) | {'hiv', 'hiv_effects'}
     scoped, broadcast, absent = {}, {}, []
     for key, value in nested.items():
-        if key in diseases or key in ('cross_immunity', 'crossimmunity', 'network', 'sexualnetwork'):
+        if key in diseases or key in ('cross_immunity', 'crossimmunity', 'network', 'sexualnetwork') or (key == 'hiv_effects' and effects):
             scoped[key] = value
         elif key in optional_scopes:
             absent.append(key)
@@ -482,6 +484,9 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
                 raise ValueError(f'route_pars: {key!r} needs a SexualNetwork on the sim.')
             for n in networks:
                 n.pars.update(value)
+        elif key == 'hiv_effects':
+            for c in effects:
+                c.pars.update(value)
 
     if unmatched and strict:
         raise ValueError(f'route_pars: unrecognized par(s): {sorted(unmatched)}')

@@ -1,102 +1,85 @@
-"""Integration smoke tests for hpv.treat_num and its HPV-specific eligibility."""
+"""Integration tests for treatment: ss.treat() delivering hpv.tx and hpv.radiation, and the conditions on cancer."""
 import numpy as np
 import starsim as ss
 import hpvsim as hpv
 
+genotypes = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
-def _four_genotype_sim_with(intvs):
+
+def _four_genotype_sim_with(intvs, analyzers=None):
     return hpv.Sim(
         n_agents=500, start=2020, stop=2025, location='nigeria',
-        diseases=[hpv.HPV(g) for g in ('hpv16', 'hpv18', 'hi5', 'ohr')],
-        interventions=intvs,
+        diseases=[hpv.HPV(g) for g in genotypes],
+        interventions=intvs, analyzers=analyzers, verbose=0,
     )
 
 
-def test_treat_num_treat_cancer_flag_set_for_radiation():
-    treat = hpv.treat_num(name='cancer_rx', product=hpv.radiation(), prob=1.0)
-    sim = _four_genotype_sim_with([treat])
+def _run_with_cancers(treat, n=5):
+    """Give some women cancer of hpv16 after init, run, and return the sim, those women, and the agents the treatment reached"""
+    reached = []
+    def track(sim):
+        reached.extend(sim.interventions.rx.reached().tolist())
+    sim = _four_genotype_sim_with([treat], analyzers=track)
     sim.init()
-    assert sim.interventions['cancer_rx'].treat_cancer is True
+    uids = sim.people.female.uids[:n]
+    sim.diseases.hpv16.cancerous[uids] = True
+    sim.diseases.hpv16.ti_dead_cancer[uids] = np.inf # Not dying of it during the test
+    sim.run()
+    return sim, uids, set(reached)
 
 
-def test_treat_num_treat_cancer_flag_unset_for_excision():
-    treat = hpv.treat_num(name='cin_rx', product='excision', prob=1.0)
-    sim = _four_genotype_sim_with([treat])
-    sim.init()
-    assert sim.interventions['cin_rx'].treat_cancer is False
-
-
-def test_treat_num_excludes_cancer_when_not_treat_cancer():
-    """A non-cancer treat_num must NOT make cancerous agents eligible."""
-    treat = hpv.treat_num(name='cin_rx', product='excision', prob=1.0)
-    sim = _four_genotype_sim_with([treat])
+def test_cancer_conditions_are_complements():
+    sim = _four_genotype_sim_with([])
     sim.init()
     uids = sim.people.alive.uids[:5]
-    sim.diseases['hpv16'].cancerous[uids] = True
-    live = sim.interventions['cin_rx']
-    eligible = live.check_eligibility()
-    for u in uids:
-        assert u not in eligible
+    sim.diseases.hpv18.cancerous[uids] = True
+    has, no = np.asarray(hpv.has_cancer(sim)), np.asarray(hpv.no_cancer(sim))
+    assert has[uids].all() and not no[uids].any()
+    assert (has ^ no)[sim.people.alive.uids].all()
 
 
-def test_treat_num_only_treats_cancer_when_treat_cancer():
-    """A treat_num(radiation) must ONLY treat cancerous agents.
+def test_treatment_excludes_cancer_with_no_cancer():
+    """A CIN treatment given where=hpv.no_cancer does not reach women with cancer."""
+    treat = ss.treat(hpv.tx('excision'), where=ss.ppl.female & hpv.no_cancer, coverage=1.0, at=['2022'], name='rx')
+    sim, uids, reached = _run_with_cancers(treat)
+    assert reached, 'nobody was treated'
+    assert not set(uids.tolist()) & reached
 
-    Cancer treatments default to sex='f' (cervical cancer program), so the
-    state-gating check uses female UIDs to isolate it from the sex filter.
-    """
-    treat = hpv.treat_num(name='cancer_rx', product=hpv.radiation(), prob=1.0)
+
+def test_radiation_only_treats_cancer_with_has_cancer():
+    """Radiation given where=hpv.has_cancer reaches the women with cancer, and nobody else."""
+    treat = ss.treat(hpv.radiation(), where=ss.ppl.female & hpv.has_cancer, coverage=1.0, at=['2022'], name='rx')
+    sim, uids, reached = _run_with_cancers(treat)
+    alive = uids[sim.people.alive[uids]] # Those who have not died of other causes
+    assert len(alive) and set(alive.tolist()) <= reached
+    cancerous = set(np.concatenate([sim.diseases[g].cancerous.uids for g in genotypes]).tolist())
+    assert reached <= cancerous | set(uids.tolist())
+
+
+def test_treatment_capacity_respected():
+    """With a capacity per round (in people, not agents), no more than that many are treated per round."""
+    capacity = 1e6
+    treat = ss.treat(hpv.tx('excision'), where=ss.ppl.female & hpv.no_cancer, capacity=capacity, interval=ss.years(1), name='rx')
     sim = _four_genotype_sim_with([treat])
-    sim.init()
-    uids = sim.people.female.uids[:5]
-    sim.diseases['hpv16'].cancerous[uids] = True
-    live = sim.interventions['cancer_rx']
-    eligible = live.check_eligibility()
-    for u in uids:
-        assert u in eligible
-    other = sim.people.female.uids[10]
-    assert other not in eligible
-
-
-def test_treat_num_string_product_resolves_to_tx():
-    """treat_num(product='excision') should resolve via hpv.tx."""
-    treat = hpv.treat_num(name='rx', product='excision', prob=0.0)
-    sim = _four_genotype_sim_with([treat])
-    sim.init()
-    live = sim.interventions['rx']
-    assert live.product.__class__.__name__ == 'tx'
-    assert live.product.name == 'excision'
-
-
-def test_treat_num_age_range_upper_bound_exclusive():
-    """age_range=[lo, hi) — an agent exactly at hi is not eligible."""
-    treat = hpv.treat_num(name='rx', product='excision', prob=1.0, age_range=[30, 40])
-    sim = _four_genotype_sim_with([treat])
-    sim.init()
-    uids = sim.people.female.uids[:3]
-    for g in ('hpv16', 'hpv18', 'hi5', 'ohr'):
-        sim.diseases[g].cancerous[uids] = False
-    sim.people.age[uids] = [30.0, 39.9, 40.0]
-    eligible = sim.interventions['rx'].check_eligibility()
-    assert uids[0] in eligible
-    assert uids[1] in eligible
-    assert uids[2] not in eligible
-
-
-def test_treat_num_capacity_respected():
-    """With max_capacity=5, no more than 5 agents are treated per step."""
-    treat = hpv.treat_num(
-        name='rx',
-        product='excision',
-        prob=1.0,
-        max_capacity=5,
-        eligibility=lambda s: s.people.alive.uids[:50],
-    )
-    sim = _four_genotype_sim_with([treat])
-    sim.init()
-    chosen = sim.people.alive.uids[:50]
-    sim.diseases['hpv16'].cin[chosen] = True
     sim.run()
-    live = sim.interventions['rx']
-    n_steps = len(sim.timevec)
-    assert live.cin_treated.uids.size <= n_steps * 5
+    delivered = np.asarray(sim.results.rx.delivered)
+    rounds = (delivered > 0).sum()
+    assert delivered.sum() <= capacity*rounds + sim.pars.pop_scale # Within one agent: a capacity of a fraction of an agent carries over
+    assert delivered.sum() > 0
+
+
+def test_ablation_cures_cin():
+    """Ablation of women with CIN cures 93.6% of them (products_tx.csv)."""
+    treat = ss.treat(hpv.tx('ablation'), where=ss.ppl.female, coverage=1.0, at=['2021'], name='rx')
+    sim = hpv.Sim(n_agents=4000, start=2020, stop=2022, location='nigeria', genotypes=[16], interventions=[treat], verbose=0)
+    sim.init()
+    women = sim.people.female.uids
+    sim.diseases.hpv16.infected[women] = True
+    sim.diseases.hpv16.susceptible[women] = False
+    sim.diseases.hpv16.cin[women] = True
+    sim.diseases.hpv16.ti_cin[women] = 0
+    sim.diseases.hpv16.ti_clearance[women] = np.inf
+    sim.run()
+    r = sim.results.rx
+    cured, failed = np.asarray(r.cured).sum(), np.asarray(r.failed).sum()
+    assert 0.9 < cured/(cured + failed) < 0.97

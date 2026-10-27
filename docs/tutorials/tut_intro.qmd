@@ -132,11 +132,11 @@ to 14 from 2015, and run that alongside the unchanged model:
 ```{python}
 import starsim as ss
 
-vx = hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 14],
-                    start_year=2015)
+girls = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14)
+vaccination = ss.vaccinate(hpv.vx('bivalent'), where=girls, coverage=0.9, start=2015)
 
 s0 = hpv.Sim(**pars, label='No vaccination')
-s1 = hpv.Sim(**pars, interventions=vx, label='Vaccination from 2015')
+s1 = hpv.Sim(**pars, interventions=vaccination, label='Vaccination from 2015')
 
 msim = ss.MultiSim([s0, s1])
 msim.run(verbose=0)

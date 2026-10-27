@@ -51,12 +51,11 @@ def _sim_with_country_pars(n_agents=2000, n_steps=4):
     country = hpvsim.data.load_country('nigeria')
     net = SexualNetwork(**country['network_pars'])
     sim = ss.Sim(
-        networks=[net], n_agents=n_agents, diseases=None,
+        networks=net, n_agents=n_agents, diseases=None,
         dur=ss.years(n_steps * 0.5), dt=ss.years(0.5),
         rand_seed=0, verbose=0,
-        copy_inputs=False,
     )
-    return sim, net
+    return sim, sim.pars.networks # The sim's copy of the network
 
 
 def test_pairs_form_after_a_few_steps():
@@ -92,8 +91,9 @@ def test_cross_layer_concurrency_filter():
     net = SexualNetwork(**network_pars)
     sim = ss.Sim(networks=[net], n_agents=2000, diseases=None,
                  dur=ss.years(2), dt=ss.years(0.5), rand_seed=0, verbose=0,
-                 copy_inputs=False)
+                 )
     sim.run()
+    net = sim.networks[0] # The sim's copy
 
     m_mask = net.edges_for_layer('m')
     c_mask = net.edges_for_layer('c')
@@ -129,8 +129,9 @@ def test_mixing_matrix_rows_are_male_age_bands():
                         m_cross_layer=0.0, f_cross_layer=0.0)
     sim = ss.Sim(networks=[net], n_agents=8000, diseases=None,
                  dur=ss.years(0.5), dt=ss.years(0.5), rand_seed=0, verbose=0,
-                 copy_inputs=False)
+                 )
     sim.run()
+    net = sim.networks[0] # The sim's copy
 
     mask = net.edges_for_layer('m')
     assert mask.sum() > 50, 'too few pairs to discriminate orientation'
@@ -152,8 +153,9 @@ def test_age_mixing_assortativity():
     net = SexualNetwork(**country['network_pars'])
     sim = ss.Sim(networks=[net], n_agents=5000, diseases=None,
                  dur=ss.years(5), dt=ss.years(0.5), rand_seed=0, verbose=0,
-                 copy_inputs=False)
+                 )
     sim.run()
+    net = sim.networks[0] # The sim's copy
     m_mask = net.edges_for_layer('m')
     if m_mask.sum() < 100:
         return

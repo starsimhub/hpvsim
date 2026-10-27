@@ -30,7 +30,7 @@ PARS = dict(
 
 msim = ss.MultiSim(hpv.Sim(**PARS), n_runs=5)
 msim.run(verbose=0)
-fig = msim.plot('all_hpv_asr_cancer_incidence')
+fig = msim.plot('all_hpv_asr_cancer_incidence', lines=True)
 ```
 
 Five lines, one model. The spread between them is the stochastic noise floor of
@@ -46,23 +46,19 @@ for s in msim.sims:
 
 ## Reduce to a median and a band
 
-`median()` collapses the runs into a median plus 10th and 90th percentiles:
+Without `lines=True`, `msim.plot()` shows the median of the runs and a 95% interval:
 
 ```{python}
-msim.median()
 fig = msim.plot('all_hpv_asr_cancer_incidence')
 ```
 
-Two things change after this call. First, `median()` rewrites the MultiSim in
-place — the individual runs are still in `msim.sims`, but `msim.results` now
-holds the reduced summary. Second, the reduced results are a flat list with
-module-prefixed names, so `all_hpv.cum_cancers` becomes `all_hpv_cum_cancers`,
-and each one carries `.low` and `.high`:
+The results across the runs are in `msim.results`, named as for one sim, with the runs as their first axis: `msim.results.all_hpv.cum_cancers` has one row per run. `median()` and `quantiles()` reduce them, and the individual runs are still in `msim.sims`:
 
 ```{python}
-r = msim.results['all_hpv_cum_cancers']
-print(f'Cancers by 2040: {float(r[-1]):,.0f} '
-      f'(10-90%: {float(np.asarray(r.low)[-1]):,.0f} to {float(np.asarray(r.high)[-1]):,.0f})')
+r = msim.results.all_hpv.cum_cancers
+low, mid, high = r.quantiles([0.1, 0.5, 0.9])
+print(f'Cancers by 2040: {float(mid[-1]):,.0f} '
+      f'(10-90%: {float(low[-1]):,.0f} to {float(high[-1]):,.0f})')
 ```
 
 Prefer `median()` over `mean()` for cancers, infections and prevalence. These
@@ -71,49 +67,36 @@ deviations is not a 95% interval and its lower edge can fall below zero.
 
 ## Compare vaccination coverage levels
 
-Write a function that builds one sim, then build every combination you want and
-hand them all to `ss.parallel`. Here we cross three coverage levels with five
-seeds, and run to 2060 so the vaccinated girls reach the ages where cervical
-cancer occurs:
+Write a function that builds the sim of one scenario, then hand them all to `ss.parallel` with the number of runs of each. Here we run three coverage levels with five seeds each, to 2060 so the vaccinated girls reach the ages where cervical cancer occurs:
 
 ```{python}
 LONG = dict(PARS, stop=2060)
 COVERAGES = [0.0, 0.5, 0.9]
 N_SEEDS = 5
 
-def make_sim(seed, coverage):
-    """One sim for a given random seed and vaccination coverage."""
-    return hpv.Sim(
-        **LONG,
-        rand_seed=seed,
-        label=f'coverage={coverage:.0%}',
-        interventions=[hpv.routine_vx(
-            product='bivalent',
-            prob=float(coverage),
-            age_range=[9, 14],
-            start_year=2010,
-        )],
-    )
+girls = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14)
 
-sims = [make_sim(seed=s, coverage=c) for c in COVERAGES for s in range(N_SEEDS)]
-msim = ss.parallel(*sims, verbose=0)
+def make_sim(coverage):
+    """One sim for a given vaccination coverage."""
+    vaccination = ss.vaccinate(hpv.vx('bivalent'), where=girls, coverage=coverage, start=2010)
+    return hpv.Sim(**LONG, label=f'coverage={coverage:.0%}', interventions=vaccination)
+
+sims = [make_sim(coverage=c) for c in COVERAGES]
+msim = ss.parallel(*sims, n_runs=N_SEEDS, verbose=0)
 ```
 
-Now group them by coverage level and reduce each group on its own:
+Each result now has the runs of every scenario, and `quantiles()` reduces each scenario on its own, giving one row per scenario and quantile:
 
 ```{python}
 years = np.asarray(msim.sims[0].results.timevec.years)
 i2055 = int(np.argmin(abs(years - 2055)))
 
-by_coverage = {}
-for cov in COVERAGES:
-    group = ss.MultiSim([s for s in msim.sims if s.label == f'coverage={cov:.0%}'])
-    group.median()
-    by_coverage[cov] = group
-    asr = group.results['all_hpv_asr_cancer_incidence']
-    print(f'coverage={cov:>4.0%}  incidence in 2055: {float(asr[i2055]):5.1f} '
-          f'({float(np.asarray(asr.low)[i2055]):.1f} to '
-          f'{float(np.asarray(asr.high)[i2055]):.1f}) per 100,000')
+asr = msim.results.all_hpv.asr_cancer_incidence.quantiles([0.1, 0.5, 0.9])
+asr = np.asarray(asr).reshape(len(COVERAGES), 3, -1) # Scenario, quantile, time
+for i, cov in enumerate(COVERAGES):
+    low, mid, high = asr[i, :, i2055]
+    print(f'coverage={cov:>4.0%}  incidence in 2055: {mid:5.1f} '
+          f'({low:.1f} to {high:.1f}) per 100,000')
 ```
 
 Read the bands, not just the medians. Where two scenarios' bands sit clear of
@@ -130,5 +113,4 @@ back are copies, not the objects you put in. Always read results from
 MultiSim from sims you have already run yourself is the one case where the two
 are the same objects.
 
-A larger worked sweep, using `sc.parallelize` so the sims are built in parallel
-as well as run in parallel, is in `examples/m07_uq_sweep.py`.
+A larger worked sweep, with 20 seeds of each scenario, is in `examples/m07_uq_sweep.py`.

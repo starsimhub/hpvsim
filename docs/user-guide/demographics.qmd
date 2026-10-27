@@ -47,8 +47,8 @@ for ratio in (1, 10):
           f'{time.time() - t0:.1f}s')
 
 print(f'\npop_scale:        {sim.pars.pop_scale:,.0f} people per agent')
-print(f'population 1990:  {float(sim.results.n_alive[0]):,.0f}')
-print(f'population 2020:  {float(sim.results.n_alive[-1]):,.0f}')
+print(f'population 1990:  {float(sim.results.alive[0]):,.0f}')
+print(f'population 2020:  {float(sim.results.alive[-1]):,.0f}')
 ```
 
 Both runs cost the same. The second builds its cancer estimate from hundreds of trajectories rather than a dozen, which is what you want before comparing scenarios that differ by a few percent.

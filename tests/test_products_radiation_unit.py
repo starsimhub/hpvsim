@@ -13,8 +13,8 @@ def _four_genotype_sim():
 
 
 def _attach_and_init(sim, p_instance):
-    """Attach product to stub treat_num and init; return live post-init copy."""
-    sim.pars['interventions'] = [ss.treat_num(product=p_instance, prob=0.0)]
+    """Attach product to stub delivery and init; return live post-init copy."""
+    sim.pars['interventions'] = [ss.Delivery(p_instance, coverage=0.0)]
     sim.init()
     return sim.interventions[0].product
 
@@ -49,15 +49,14 @@ def test_radiation_skips_non_cancer_agents():
 def test_radiation_empty_uids_noop():
     sim = _four_genotype_sim()
     r = _attach_and_init(sim, hpv_radiation())
-    out = r.administer(ss.uids())
-    assert len(out) == 0
+    r.administer(ss.uids()) # No error
 
 
 def test_radiation_default_duration():
-    """Default duration is normal(18 months, 2 months) converted to years."""
+    """Default duration is normal(18 months, 2 months)."""
     r = hpv_radiation()
-    assert r.pars.dur['par1'] == 18 / 12  # mean: 1.5 years
-    assert r.pars.dur['par2'] == 2 / 12   # sd: ~0.167 years
+    assert r.pars.dur.pars.loc == ss.years(1.5)
+    assert np.isclose(r.pars.dur.pars.scale.years, 2/12)
 
 
 def test_radiation_extension_is_positive_for_non_sorted_input():

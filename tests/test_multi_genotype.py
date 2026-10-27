@@ -141,24 +141,24 @@ def test_hpvtotal_n_susceptible_plus_n_infected_equals_n_alive():
                   dt=1.0, rand_seed=0)
     sim.run()
     total = sim.results.all_hpv
-    n_inf = np.asarray(total.n_infected)
-    n_sus = np.asarray(total.n_susceptible)
-    n_alive = np.asarray(sim.results.n_alive)
+    n_inf = np.asarray(total.infected)
+    n_sus = np.asarray(total.susceptible)
+    alive = np.asarray(sim.results.alive)
     assert n_inf.max() > 0, 'no infections — test is vacuous'
-    assert np.array_equal(n_inf + n_sus, n_alive)
+    assert np.array_equal(n_inf + n_sus, alive)
 
 
 def test_hpvtotal_prevalence_matches_n_infected_over_n_alive():
-    """prevalence == n_infected / n_alive at every timestep."""
+    """prevalence == infected / alive at every timestep."""
     sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
                   dt=1.0, rand_seed=0)
     sim.run()
     total = sim.results.all_hpv
-    n_inf = np.asarray(total.n_infected, dtype=float)
-    n_alive = np.asarray(sim.results.n_alive, dtype=float)
+    n_inf = np.asarray(total.infected, dtype=float)
+    alive = np.asarray(sim.results.alive, dtype=float)
     prev = np.asarray(total.prevalence)
-    expected = np.divide(n_inf, n_alive,
-                         out=np.zeros_like(n_inf), where=n_alive > 0)
+    expected = np.divide(n_inf, alive,
+                         out=np.zeros_like(n_inf), where=alive > 0)
     assert prev.max() > 0, 'prevalence is identically zero — test is vacuous'
     assert np.allclose(prev, expected, atol=1e-9)
 
@@ -190,8 +190,8 @@ def test_hpvtotal_n_infected_union_bounded_by_per_genotype_sum():
     sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
                   dt=1.0, rand_seed=0)
     sim.run()
-    union = np.asarray(sim.results.all_hpv.n_infected)
-    per_g_sum = sum(np.asarray(sim.results[k].n_infected)
+    union = np.asarray(sim.results.all_hpv.infected)
+    per_g_sum = sum(np.asarray(sim.results[k].infected)
                     for k in ('hpv16', 'hpv18'))
     assert union.max() > 0, 'no infections — test is vacuous'
     assert np.all(union <= per_g_sum)

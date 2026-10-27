@@ -152,16 +152,16 @@ def plot_intervention_impact(baseline, scenario, key='cum_cancers',
 _PREV_KEYS = ('hpv_prevalence', 'precin_prevalence', 'cin_prevalence')
 
 
-def _run_top_n_trials(calib, n):
-    """Re-run the top-``n`` trials via ``make_calib_sims`` and return a list
-    of per-trial DataFrames shaped like ``calib.eval_kw['data']`` (year
-    index + dot-scoped columns). Uses ``extract_fn`` so full sims are not
-    pickled back to the parent process."""
-    from .calibration import make_calib_sims, _extract_columns
-    data = calib.eval_kw['data']
-    return make_calib_sims(
-        calib, n=n, extract_fn=lambda sim: _extract_columns(sim, data),
-    )
+def _run_top_n_trials(fit, n):
+    """Re-run the top-``n`` trials of a fit with ``ss.parallel(pars=...)`` and return a list
+    of per-trial DataFrames shaped like the sim's calibration data (year
+    index + dot-scoped columns)."""
+    from .calibration import _extract_columns
+    data = fit.sim.calib_data
+    top = fit.trials.nsmallest(min(n, len(fit.trials)), 'objective')
+    pars = [{k: row[k] for k in fit.pars} for _, row in top.iterrows()]
+    msim = ss.parallel(fit.sim, pars=pars, verbose=0)
+    return [_extract_columns(sim, data) for sim in msim.sims]
 
 
 def _group_columns(cols):
@@ -252,10 +252,10 @@ def _plot_genotype_box(ax, name, cols, expected, actual_list, top_n):
     ax.legend(fontsize=8, loc='best')
 
 
-def plot_calibration(calib, top_n=50, fig=None, ncols=None):
-    """Data-vs-fit plot for a run ``hpv.Calibration``.
+def plot_calibration(fit, top_n=50, fig=None, ncols=None):
+    """Data-vs-fit plot for a fit of a sim with calibration data (``sim.fit(gof=hpv.calibration.gof)``).
 
-    Auto-inspects ``calib.eval_kw['data']`` and renders one panel per
+    Auto-inspects the sim's data (``fit.sim.calib_data``) and renders one panel per
     (scope, name) target group, overlaying a top-``top_n``-trial model
     ribbon / box on the observed data.
 
@@ -267,19 +267,19 @@ def plot_calibration(calib, top_n=50, fig=None, ncols=None):
       - ``by_genotype.<name>.<g>`` box plot per genotype vs. data markers.
 
     Args:
-        calib: run ``hpv.Calibration``.
+        fit: the ``ss.fit.Fit`` returned by ``sim.fit()``.
         top_n (int): number of best-mismatch trials to re-run for the
             ribbon (default 50). Clamped to available trials.
         fig: matplotlib Figure to draw into (default: new).
         ncols (int): grid ncols (default: min(n_panels, 3)).
     """
-    data = (calib.eval_kw or {}).get('data')
+    data = getattr(fit.sim, 'calib_data', None)
     if data is None or data.empty:
-        raise ValueError('plot_calibration: calibration has no target data '
-                         "(expected calib.eval_kw['data']).")
+        raise ValueError('plot_calibration: the fitted sim has no calibration data '
+                         '(make it with hpv.Sim(..., data=...)).')
 
     groups = _group_columns(data.columns)
-    actual_list = _run_top_n_trials(calib, top_n)
+    actual_list = _run_top_n_trials(fit, top_n)
     top_n_actual = len(actual_list)
 
     n_panels = len(groups)

@@ -43,7 +43,7 @@ sim.run()
 ```
 
 The first argument is the list of results you want by age. The choices are
-counts (`n_infected`, `n_cin`, `n_cancerous`, `n_precin`, `hpv`), annual event
+counts (`infected`, `cin`, `cancerous`, `precin`, `hpv`), annual event
 flows (`cancers`, `cins`), and prevalences (`hpv_prevalence`,
 `cin_prevalence`, `cancer_prevalence`, `precin_prevalence`).
 
@@ -151,16 +151,17 @@ reference one.
 
 ## Write your own
 
-An analyzer is a class with two methods: `init_results` declares what it
-records, and `step` records it once per timestep. Here is one that answers a
-question a program manager would ask — how many women in the screening age
-range have never been screened?
+An analyzer is a class with two methods: `init_results` declares what it records, and `step` records it once per timestep. Here is one that answers a question a program manager would ask — how many women in the screening age range have never been screened? It also keeps a state of its own, whether each woman has been screened, from the women the screening delivery reached on each step.
 
 ```{python}
 import starsim as ss
 
 class UnscreenedWomen(ss.Analyzer):
     """Count women aged 30-49 who have never been screened."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.define_states(ss.BoolState('screened', label='Ever screened'))
 
     def init_results(self):
         super().init_results()
@@ -171,11 +172,11 @@ class UnscreenedWomen(ss.Analyzer):
 
     def step(self):
         people = self.sim.people
-        in_range = (people.alive & people.female
+        screening = self.sim.interventions.get('screening')
+        if screening is not None:
+            self.screened[screening.reached()] = True # The women it reached on this step
+        in_range = (people.alive & people.female & ~self.screened
                     & (people.age >= 30) & (people.age < 50))
-        screen = self.sim.interventions.get('screen')
-        if screen is not None:
-            in_range = in_range & ~screen.screened
         self.results.n_unscreened[self.ti] = people.scale_flows(in_range.uids)
 ```
 
@@ -186,11 +187,11 @@ handles the per-agent weighting that `ms_agent_ratio` introduces.
 Attach it like any other analyzer:
 
 ```{python}
-screen = hpv.routine_screening(product='via', prob=0.2, start_year=2015,
-                               age_range=[30, 50], name='screen')
+women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
+screening = ss.screen(hpv.dx('via'), where=women, coverage=0.2, interval=ss.years(1), start=2015)
 sim2 = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
                start=2000, stop=2030, verbose=0,
-               interventions=[screen], analyzers=[UnscreenedWomen()])
+               interventions=[screening], analyzers=[UnscreenedWomen()])
 sim2.run()
 
 gap = sim2.results.unscreenedwomen.n_unscreened

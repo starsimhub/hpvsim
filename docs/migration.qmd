@@ -13,6 +13,10 @@ This guide walks through those changes one task at a time, with before-and-after
 code you can copy. It is written for people migrating their own scripts, and is
 also laid out so an AI coding assistant can work through it change by change.
 
+::: {.callout-note}
+HPVsim 4 runs on Starsim 4. This guide is for scripts written for v2, and where HPVsim 4 differs from v3 it shows the HPVsim 4 way. The main changes from v3: interventions are Starsim's deliveries of HPVsim's products (`ss.vaccinate`, `ss.screen`, `ss.treat`), calibration is `sim.fit()`, results are named after their states (`infected`, not `n_infected`), and a MultiSim's results have the runs as their first axis. See [What's new](whats-new.md) and Starsim's [guide to version 4](https://docs.starsim.org/migration/v3_v4.html).
+:::
+
 ::: {.callout-important}
 v3 uses Starsim's random-number framework, which does **not** share a stream
 with v2. Results are therefore not bit-identical to v2 even with the same
@@ -200,7 +204,7 @@ sim.plot()
 There is no longer a `sim.short_summary` attribute. A few other renames:
 `sim.initialize()` → `sim.init()`; `sim.yearvec[sim.t]` → `sim.t.now('year')`;
 `datafile=` is not a `hpv.Sim` argument (calibration targets go to
-`hpv.Calibration`).
+`hpv.Sim(data=...)`).
 
 ## Saving and loading
 
@@ -233,51 +237,42 @@ There is no `hpv.MultiSim`; use Starsim's `MultiSim` with an `hpv.Sim`:
 ```python
 import starsim as ss
 msim = ss.MultiSim(hpv.Sim(genotypes=[16, 18]), n_runs=10).run()
-msim.median()
+msim.results.all_hpv.cum_infections.median() # The results have the runs as their first axis
 ```
 
 ## Interventions and analyzers
 
 Interventions and analyzers are passed to the sim as before, via the
 `interventions=` and `analyzers=` arguments, but they are now Starsim modules.
-Vaccination, screening, and test-and-treat cascades are configured through
-HPVsim's intervention classes; age-stratified results use `hpv.AgeResults`, and
+Vaccination, screening, triage, and treatment are Starsim's deliveries (`ss.vaccinate`, `ss.screen`, `ss.treat`) of HPVsim's products; age-stratified results use `hpv.by_age`, and
 the aggregate `hpv.HPVTotal` analyzer is added automatically. See the
 [interventions](tutorials/tut_interventions.qmd) and
-[analyzers](tutorials/tut_analyzers.qmd) tutorials for the full v3 API. The
+[analyzers](tutorials/tut_analyzers.qmd) tutorials for the full API. The
 practical changes that break most v2 cascade code:
 
+- **Programs are deliveries.** v2's (and v3's) intervention classes are gone. `hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 14], start_year=2020)` is `ss.vaccinate(hpv.vx('bivalent'), where=ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14), coverage=0.9, start=2020)`, and each person is vaccinated once. `hpv.routine_screening(product='via', prob=0.2, ...)` is `ss.screen(hpv.dx('via'), where=..., coverage=0.2, interval=ss.years(1), start=...)`, a round each year; a campaign is `at=['2022', '2023']`. Nothing is limited to women unless `where=` says so.
+- **Cascades are wired by results, not eligibility functions.** A test's results are events: `ss.screen(hpv.dx('colposcopy'), who=screening.positive, coverage=0.9)` triages those who screened positive, on the same step, and `ss.treat(hpv.tx('ablation'), who=colpo.hsil & hpv.no_cancer)` treats those with a high-grade lesion, unless they have cancer. `max_capacity=` is `capacity=`, and `hpv.treat_delay(delay=2)` is `delay=ss.years(2)`.
 - **Look-ups by name, not label.** `sim.interventions` and `sim.analyzers` are
-  keyed by each module's `name` (which defaults to the class name), not by
-  `label`. Give an explicit `name=` to anything you cross-reference. There is
+  keyed by each module's `name` (a delivery is named after the variable it is assigned to, other modules after their class), not by
+  `label`. There is
   **no `sim.get_intervention()` / `sim.get_analyzer()`** — use
   `sim.interventions[name]` / `sim.analyzers[name]`. Iterating the collection
   yields *keys*, not modules (`for a in sim.analyzers` → strings), so an
   `isinstance` filter over it is silently always-false; index by name instead.
-- **`hpv.Sim` deep-copies interventions/analyzers at construction.** The objects
+- **`hpv.Sim` copies interventions/analyzers at construction.** The objects
   you pass in are never populated by the run — always read results back from
   `sim.interventions[name]` / `sim.analyzers[name]` *after* `sim.run()`, not from
   the references you constructed. (A common cause of "my analyzer collected
   nothing.")
-- **Products are modules and need unique names.** Diagnostics, treatments,
-  vaccines (`hpv.dx`, `hpv.tx`, `hpv.vx`) are all People modules. Two products
-  sharing a name — or a treatment whose `name` equals its `product` name —
-  raise `Module <x> already added`. Use distinct names (e.g. `product='ablation'`
-  with `name='ablation_rx'`). A `df`-built `hpv.dx`/`hpv.tx` starts with
-  `name=None` and must be named before the run; its `hierarchy` is
-  most-severe-first.
+- **Products are modules.** Diagnostics, treatments, and
+  vaccines (`hpv.dx`, `hpv.tx`, `hpv.vx`) are named after the product they look up (`'via'`), and a product is renamed `<name>_product` if a delivery has the same name. A test's results are its product's, most severe first, and a treatment's are `cured`, `failed`, and `unneeded`.
 - **Renamed constructors:** `hpv.default_dx`/`default_tx`/`default_vx` →
   `hpv.dx`/`hpv.tx`/`hpv.vx`. Vaccine efficacy that v2 set via the product's
   `imm_init` is now `hpv.vx(sterilizing_p=...)`. A v2 *therapeutic* vaccine with
   per-state efficacy maps to a state-flipping `hpv.tx(df=...)`, not the
   immunity-based `hpv.txvx`.
-- **`campaign_*` signatures:** they no longer accept `annual_prob`, and
-  `campaign_vx`'s default `sex` changed from female-only (v2) to both — pass
-  `sex='f'` to reproduce v2. Eligibility callbacks must return `ss.uids` or a
-  `BoolArr`, not a Python `list`.
-- **Screening/eligibility state** moved off `people`: `sim.people.date_screened`
-  is gone; read the screening module's `screened` (BoolArr) and `ti_screened`
-  (integer timestep, NaN = never) to rebuild "never, or >N years since screened".
+- **Screening history** moved off `people`: `sim.people.date_screened`
+  is gone. A delivery remembers whether (`screening.ever`), how often (`.count`), and how long ago (`.since`, in years) it reached each person, as conditions, e.g. `where=women & (screening.since > 5)` for "never, or more than 5 years since screened".
 - **Custom analyzers:** subclass `ss.Analyzer` (was `hpv.Analyzer`); the hooks
   are `init_pre(sim)` and `step()` (were `initialize`/`apply`). `ss.Module`
   **reserves the attribute names** `results`, `pars`, `t`, `sim`, `dists` — store
@@ -335,17 +330,8 @@ Notes:
   probe that sums over agents must weight by `people.scale` (never a raw
   `.sum()` at `ms_agent_ratio > 1`) and, for absolute counts, by the population
   scale factor.
-- **Measuring prevalence under multiscale — mind the metric.** Two obvious
-  choices are both wrong in different setups. `hpv.n_infected / n_alive`
-  is **ms-dependent**: the numerator is scale-weighted but the top-level
-  `n_alive` result is a *plain* agent count, so spawned fine agents pad the
-  denominator (e.g. one country read 0.107 at `ms=3` but 0.049 at `ms=100`).
-  And `hpv.prevalence` is **`total_pop`-scaled** — a proper 0–1 fraction
-  only when `total_pop = n_agents`; if you set `total_pop` to a national
-  population it comes back ≫ 1. The robust, ms- and `total_pop`-invariant
-  prevalence is the **non-fine (level0) infected fraction**: infected-and-alive
-  agents with `~people.fine`, over alive `~people.fine` agents.
-- **Annual / age-standardized incidence.** `hpv.AgeResults` accumulates
+- **Measuring prevalence under multiscale.** `all_hpv.prevalence` is a 0–1 fraction, the same as `all_hpv.infected / alive`: every count, `alive` included, is weighted by each agent's scale, so neither depends on `ms_agent_ratio` or `total_pop`. (In v3, `alive` was a plain agent count, which made the ratio depend on `ms_agent_ratio`.)
+- **Annual / age-standardized incidence.** `hpv.by_age` accumulates
   `cancer_incidence` / `cin_incidence` across the sub-steps of each calendar
   year (v2 reports annually). A sim ending `stop=YYYY` leaves the final year
   with a single `dt`-tick, so its last-year incidence is under-counted ~`1/dt`.
@@ -365,7 +351,7 @@ a sparse, marital-dominated one can fall below R=1 and collapse.
 Choosing the lever:
 
 - **Cancer level → `transform_prob`** (the CIN→cancer transition in `cancer_fn`),
-  which is roughly *linear* in ASR. `beta` is a poor lever here: prevalence
+  which is roughly *linear* in ASR. In HPVsim 4, `sim.fit()` cannot fit it, since it is inside a dict parameter; sweep it by hand. `beta` is a poor lever here: prevalence
   saturates, so ASR is nearly insensitive to it — a flat `beta` sweep means
   you're on the wrong knob.
 - **Prevalence / transmission → the network** (participation + concurrency).
@@ -385,19 +371,13 @@ Choosing the lever:
   multiscale-CIN-regate patch is cancer-side only). And v3 is never bit-identical
   to v2 (different RNG) — compare on intervals/trends, never exact values.
 
-**Calibration API.** v3 uses Starsim's `ss.Calibration` (via `hpv.Calibration`):
-`calib_pars` are `{name: {low, high, guess, suggest_type}}` specs (the `build_fn`
-receives each as `{'value': …}`); targets go through `data=` (per-key t-indexed
-frames, `AgeResults` keys only, type-distribution keys compare *raw counts*) or a
-custom `eval_fn`. Results live in `calib.df` / `calib.best_pars`. The v2
-`analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim
-storage are gone — re-run selected parameter sets to draw uncertainty bands.
+**Calibration API.** HPVsim 4 uses Starsim's `sim.fit()`: the parameters to fit are given with bounds, as `ss.par(value, bounds=[low, high])`, through `hpv.Sim(pars=...)` (e.g. `pars=dict(beta=ss.par(0.25, bounds=[0.15, 0.35]))`), and the targets through `hpv.Sim(data=...)`; then `fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=200)`. A parameter inside a dict parameter can be fitted too, by its dotted name (e.g. `cancer_fn.transform_prob`). Results live in `fit.pars` / `fit.trials`, and `fit.project()` re-runs the fitted model to draw uncertainty bands. The v2 `analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim storage are gone.
 
 ## Known issues and tips
 
 - **Guard multi-worker calibration/parallel with `if __name__ == '__main__':`
-  (Windows).** `hpv.Calibration(...).calibrate()` with `n_workers > 1` (and any
-  `ss.MultiSim` / `sc.parallelize`) uses process *spawn* on Windows, so each
+  (Windows).** `sim.fit(..., n_workers=4)` (and any
+  `ss.MultiSim` / `ss.parallel`) uses process *spawn* on Windows, so each
   worker re-imports your driver module. Without the `__main__` guard the workers
   re-launch the calibration recursively, spawning ever more processes until the
   CPU is saturated. Also budget ~a two-minute numba warmup per fresh worker

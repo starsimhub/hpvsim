@@ -111,8 +111,8 @@ def test_hiv_shortens_time_to_reactivation():
     sim = hpv.Sim(n_agents=1000, location='nigeria', genotypes=[16],
                   start=1975, stop=2000, dt=0.5, rand_seed=0,
                   pars=dict(hpv_control_prob=1.0, hpv_reactivation=ss.probperyear(0.1)),
-                  diseases=[hpv.HIV_transmit(beta_m2f=0.02, rel_beta_f2m=1.0,
-                                              pars=dict(rel_reactivation_lo=20.0, rel_reactivation_hi=20.0))])
+                  diseases=[hpv.HIV_transmit(beta_m2f=0.02, rel_beta_f2m=1.0)],
+                  connectors=[hpv.HIVEffects(rel_reactivation_lo=20.0, rel_reactivation_hi=20.0)])
     sim.run()
     hpvmod = sim.diseases.hpv16
     hivmod = sim.diseases.hiv
@@ -131,15 +131,15 @@ def test_hiv_shortens_time_to_reactivation():
 
 def test_to_latent_is_not_a_public_result():
     """to_latent is an internal scheduling flag, so it must not auto-generate
-    a result on a genotype or on all_hpv; n_latent stays the real scaled stock."""
+    a result on a genotype or on all_hpv; latent stays the real scaled stock."""
     sim = _sim_with_forced_latency()
     mod = sim.diseases.hpv16
     pop_scale = sim.pars.pop_scale
     for res in (sim.results.hpv16, sim.results.all_hpv):
         assert 'n_to_latent' not in res
-        assert res.n_latent.scale is True
-        assert res.n_latent.sum() > 0
-        assert res.n_latent[-1] == pytest.approx(mod.latent.sum() * pop_scale)
+        assert res.latent.scale is True
+        assert res.latent.sum() > 0
+        assert res.latent[-1] == pytest.approx(mod.latent.sum() * pop_scale)
 
 
 def test_default_hpv_control_prob_reproduces_pre_latency_results():
@@ -152,8 +152,8 @@ def test_default_hpv_control_prob_reproduces_pre_latency_results():
     sim_default.run()
     sim_explicit_off.run()
     np.testing.assert_array_equal(
-        sim_default.results.hpv16.n_infected,
-        sim_explicit_off.results.hpv16.n_infected,
+        sim_default.results.hpv16.infected,
+        sim_explicit_off.results.hpv16.infected,
     )
     np.testing.assert_array_equal(
         sim_default.results.hpv16.new_cancers,

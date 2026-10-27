@@ -3,7 +3,7 @@
 Multi-layer heterosexual partnership network. A single ``SexualNetwork``
 instance holds all partnership layers (e.g. marital ``m`` + casual ``c``)
 in one ``edges`` table tagged by ``layer_id``. ``debut`` and ``participant``
-are inherited from ``ss.SexualNetwork`` as single per-agent values shared
+are inherited from ``ss.SexualNet`` as single per-agent values shared
 across all layers. ``step()`` dissolves all pairs (single ``end_pairs`` on
 the combined edges table) and then forms new pairs per layer in sequence,
 so no sibling-network coordination is needed.
@@ -53,7 +53,7 @@ def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
     return scaled
 
 
-class SexualNetwork(ss.SexualNetwork):
+class SexualNetwork(ss.SexualNet):
     """Multi-layer (marital ``m``, casual ``c``) heterosexual partnership network.
 
     Pars live flat on ``self.pars`` — see ``hpv.NetworkPars`` for the full
@@ -61,12 +61,6 @@ class SexualNetwork(ss.SexualNetwork):
     suffix; per-sex pars use ``_f`` / ``_m``. All Dist-typed pars are
     ``ss.Dist`` instances (no v2 dict form). ``init_pre`` groups them
     into ``self._layer_pars`` / ``self._debut`` for runtime access.
-
-    Overrides ``net_beta`` to compound the per-act probability across the
-    per-edge ``acts`` count: ``1 - (1 - edges.beta * disease_beta)^acts``.
-    The starsim base treats ``edges.beta`` as a final scalar
-    (``edges.beta * (1 - (1 - disease_beta)^acts)``); this override treats
-    it as a per-act probability multiplier.
     """
 
     def active(self, people):
@@ -86,12 +80,6 @@ class SexualNetwork(ss.SexualNetwork):
         if 'fine' in people.states:
             act = act & ~people.fine
         return act
-
-    def net_beta(self, disease_beta=None, inds=None, disease=None):
-        if inds is None:
-            inds = Ellipsis
-        p_per_act = self.edges.beta[inds] * disease_beta
-        return 1 - (1 - p_per_act) ** self.edges.acts[inds]
 
     def __init__(self, pars=None, **kwargs):
         super().__init__()

@@ -302,10 +302,6 @@ class HPV(ss.Infection):
                 return c
         return None
 
-    # Stocks whose auto n_* results are promoted to float and scale-weighted.
-    _STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin',
-                     'cancerous', 'undetected_cancerous', 'latent')
-
     def validate_beta(self):
         """Expand a scalar pars.beta via rel_beta/transf2m/transm2f (mirrors
         stisim's BaseSTI.validate_beta). An explicit dict pars.beta is passed
@@ -332,34 +328,21 @@ class HPV(ss.Infection):
                     betamap[net] = [0.0, 0.0]
         return betamap
 
-    def _hiv_module(self):
-        """Locate the hpv.HIV disease on the sim, if any (None when no HIV)."""
-        return misc.hiv_module(self.sim)
+    def _hiv_effects(self):
+        """HIV's effects on HPV (``hpv.HIVEffects``) in the sim, if any (None when no HIV)."""
+        return misc.hiv_effects(self.sim)
 
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
 
         ``new_cancers`` / ``new_undetected_cancers`` / ``new_cancer_deaths``
         are realized-event counters (undetected -> detected, cin -> cancerous,
-        and cancerous -> dead respectively); at the default zero-duration
-        ``dur_undetected``, the two cancer counters match per ti.
-        ``cum_*`` are populated as cumulative sums in ``finalize_results``.
-        ``sum_age_at_*`` are per-step accumulators; mean age = ``sum / count``.
-
-        Starsim auto-generates ``n_<state>`` results as ``dtype=int`` for every
-        ``BoolState``. We promote each stock result to ``dtype=float`` here so
-        that ``update_results`` can write scale-weighted values (fine agents
-        carry ``scale=1/ratio`` and must count as 1/ratio, not 1).
+        and cancerous -> dead respectively). ``cum_*`` are populated as
+        cumulative sums in ``finalize_results``. ``sum_age_at_*`` are per-step
+        accumulators; mean age = ``sum / count``. Starsim counts each state
+        (e.g. ``cin``), weighted by each agent's ``scale`` (multiscale agents).
         """
         super().init_results()
-        # Must run after super() creates them.
-        for state_name in self._STOCK_STATES:
-            key = f'n_{state_name}'
-            if key in self.results:
-                res = self.results[key]
-                res.dtype = float
-                if res.values is not None:
-                    res.values = res.values.astype(np.float64)
         self.define_results(
             ss.Result('new_cancers', dtype=float, scale=True,
                       label='New detected cancers'),
@@ -379,49 +362,6 @@ class HPV(ss.Infection):
                       label='New reactivations from latency'),
         )
         return
-
-    def update_results(self):
-        """Recompute per-step stock counts as scale-weighted floats.
-
-        Starsim's ``Module.update_results`` writes ``n_<state>[ti] =
-        state.sum()`` — a plain boolean count that treats every agent as one
-        body regardless of its ``scale``. Fine agents carry ``scale =
-        1/ms_agent_ratio``, so they must count as ``1/ratio``, not 1.
-
-        We call ``super().update_results()`` first so the starsim pipeline
-        runs normally (prevalence, new_infections, etc.), then overwrite
-        each stock slot with ``people.scale_flows(uids_in_state)``.
-
-        After the stock overwrite, ``prevalence`` is re-derived from the
-        corrected scale-weighted ``n_infected`` divided by the
-        scale-weighted alive-agent total. ``Infection.update_results``
-        (called via super) computed ``prevalence`` from the stale plain-count
-        ``n_infected``, so at ``ms_agent_ratio>1`` it would be inflated by
-        roughly the ratio. Re-deriving here is a no-op at ratio==1 (where
-        ``scale_flows == len``).
-        """
-        super().update_results()
-        ti = self.ti
-        ppl = self.sim.people
-        auids = ppl.auids
-        for state_name in self._STOCK_STATES:
-            key = f'n_{state_name}'
-            if key not in self.results:
-                continue
-            state_arr = getattr(self, state_name)
-            uids_in = auids[state_arr.values]
-            self.results[key][ti] = (
-                ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
-            )
-
-        # Denominator must be alive-masked: auids still includes agents who died
-        # this step, since remove_dead runs after update_results.
-        if 'prevalence' in self.results and 'n_infected' in self.results:
-            n_alive_sw = ppl.scale_flows(ppl.alive.uids)
-            self.results['prevalence'][ti] = (
-                self.results['n_infected'][ti] / n_alive_sw
-                if n_alive_sw > 0 else 0.0
-            )
 
     def finalize_results(self):
         super().finalize_results()
@@ -484,10 +424,10 @@ class HPV(ss.Infection):
             CIN -> cancerous transition and request_death fire from step_state.
 
         Initial seeding via ``init_post -> set_prognoses`` flows through here
-        so init_prev-seeded agents get ti_first_infection set at ti=0.
+        so init_prev-seeded agents get ti_first_infection set at the first step.
         """
         super().set_prognoses(uids, sources)
-        ti = self.ti
+        ti = self.ti # The initial infections are dated by the first step too (ss.Infection does so)
         p = self.pars
 
         first_uids = uids[self.ti_first_infection.isnan[uids]]
@@ -517,7 +457,7 @@ class HPV(ss.Infection):
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
         # HIV co-infection scales progression severity (gated no-op when no HIV).
-        hivc = self._hiv_module()
+        hivc = self._hiv_effects()
         if hivc is not None:
             rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
         sev_imm_uids = self.sev_imm[uids]
@@ -805,7 +745,7 @@ class HPV(ss.Infection):
 
                 # HIV co-infection reduces conferred immunity (gated no-op).
                 # hiv_rel_imm is one dt stale: step_state runs before the connector.
-                hivc = self._hiv_module()
+                hivc = self._hiv_effects()
                 if hivc is not None:
                     imm_factor = hivc.hiv_rel_imm[f_cleared]
                     nab_all = nab_all * imm_factor
@@ -832,7 +772,7 @@ class HPV(ss.Infection):
         latent_uids = (self.latent & (self.ti_latent < ti)).uids
         if len(latent_uids):
             sev_imm_uids = self.sev_imm[latent_uids]
-            hivc = self._hiv_module()
+            hivc = self._hiv_effects()
             if hivc is not None:
                 rel_reactivation_uids = hivc.hiv_rel_reactivation[latent_uids]
             else:
@@ -915,3 +855,17 @@ class HPV(ss.Infection):
         self.susceptible[uids] = False
         self.latent[uids] = False
         self.to_latent[uids] = False
+
+    def clear_infection(self, uids):
+        """Clear the precin, CIN, and cancer of this genotype, on treatment (e.g. ``hpv.tx``, or ``ss.Treatment``):
+        the infection clears at the module's next step, to susceptible (not latency)"""
+        self.cin[uids] = False
+        self.precin[uids] = False
+        self.cancerous[uids] = False
+        self.undetected_cancerous[uids] = False
+        self.ti_cin[uids] = np.nan
+        self.ti_cancerous[uids] = np.nan
+        self.ti_cancer_detection[uids] = np.nan
+        self.ti_clearance[uids] = self.ti + 1
+        self.to_latent[uids] = False
+        return

@@ -1,140 +1,92 @@
-"""Integration smoke tests for hpv.routine_screening / campaign_screening / triage."""
+"""Integration tests for screening and triage: ss.screen() delivering hpv.dx products."""
 import numpy as np
 import starsim as ss
 import hpvsim as hpv
 
+women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
 
-def _baseline_sim_with(interventions):
+
+def _baseline_sim_with(interventions, analyzers=None):
     return hpv.Sim(
         n_agents=500, start=2020, stop=2025, location='nigeria',
         diseases=[hpv.HPV(g) for g in ('hpv16', 'hpv18', 'hi5', 'ohr')],
-        interventions=interventions,
+        interventions=interventions, analyzers=analyzers, verbose=0,
     )
 
 
-def test_routine_screening_flips_screened():
-    intv = hpv.routine_screening(
-        name='primary',
-        product='via',
-        prob=0.5,
-        age_range=[30, 50],
-        sex='f',
-        start_year=2021,
-        end_year=2024,
-    )
-    sim = _baseline_sim_with([intv])
+def _tracker(*names):
+    """A function analyzer recording the agents each delivery reached, and the dict it records into"""
+    reached = {name: [] for name in names}
+    def track(sim):
+        for name, uids in reached.items():
+            uids.extend(sim.interventions[name].reached().tolist())
+    return track, reached
+
+
+def test_routine_screening_reaches_women_in_age_range():
+    """Screening rounds reach some people, all of them women aged 30-50 when screened."""
+    primary = ss.screen(hpv.dx('via'), where=women, coverage=0.5, interval=ss.years(1), start=2021, stop=2024, name='primary')
+    ages = []
+    def track(sim):
+        uids = sim.interventions.primary.reached()
+        assert sim.people.female[uids].all()
+        ages.extend(sim.people.age[uids].tolist())
+    sim = _baseline_sim_with([primary], analyzers=track)
     sim.run()
-    # Access the LIVE post-init copy via sim.interventions
-    live_intv = sim.interventions['primary']
-    assert live_intv.screened.uids.size > 0
-
-
-def test_routine_screening_targets_female_only():
-    intv = hpv.routine_screening(
-        name='primary', product='via', prob=1.0,
-        age_range=[30, 50], sex='f',
-        start_year=2021, end_year=2022,
-    )
-    sim = _baseline_sim_with([intv])
-    sim.run()
-    live_intv = sim.interventions['primary']
-    for u in live_intv.screened.uids[:20]:
-        assert sim.people.female[u]
+    assert sim.results.primary.delivered.sum() > 0
+    assert len(ages) and min(ages) >= 30 and max(ages) < 50
 
 
 def test_campaign_screening_runs():
-    intv = hpv.campaign_screening(
-        name='campaign', product='via', prob=0.5,
-        age_range=[30, 50], sex='f', years=[2022],
-    )
-    sim = _baseline_sim_with([intv])
+    campaign = ss.screen(hpv.dx('via'), where=women, coverage=0.5, at=['2022'], name='campaign')
+    sim = _baseline_sim_with([campaign])
     sim.run()
-    live_intv = sim.interventions['campaign']
-    assert live_intv.screened.uids.size > 0
+    delivered = np.asarray(sim.results.campaign.delivered)
+    assert delivered.sum() > 0
+    assert (delivered > 0).sum() == 1 # One round
 
 
-def test_routine_triage_consumes_screen_outcomes():
-    """A triage with eligibility=screen-positives only fires on positives."""
-    screen = hpv.routine_screening(
-        name='primary', product='via', prob=1.0,
-        age_range=[30, 50], sex='f',
-        start_year=2021, end_year=2022,
-    )
-    triage = hpv.routine_triage(
-        name='triage',
-        product='colposcopy',
-        prob=1.0,
-        eligibility=lambda s: s.interventions['primary'].outcomes['positive'],
-        start_year=2021,
-        end_year=2022,
-    )
-    sim = _baseline_sim_with([screen, triage])
+def test_triage_consumes_screen_outcomes():
+    """A triage triggered by screen-positives reaches only positives, on the same step."""
+    primary = ss.screen(hpv.dx('via'), where=women, coverage=1.0, interval=ss.years(1), start=2021, stop=2022, name='primary')
+    triage = ss.screen(hpv.dx('colposcopy'), who=primary.positive, coverage=1.0, name='triage')
+    track, reached = _tracker('primary', 'triage')
+    sim = _baseline_sim_with([primary, triage], analyzers=track)
     sim.run()
-    # Triage screened set is <= screen screened set
-    assert sim.interventions['triage'].screened.uids.size <= sim.interventions['primary'].screened.uids.size
+    r = sim.results
+    assert np.allclose(np.asarray(r.triage.delivered), np.asarray(r.primary.positive))
+    assert set(reached['triage']) <= set(reached['primary'])
 
 
-def test_cytology_primary_screen_populates_new_dx():
-    """Regression: a screening product with no plain 'positive' outcome
-    (cytology's ascus/abnormal) works as a PRIMARY screen.
-
-    Upstream ss.BaseScreening.step hardcodes outcomes['positive'] for new_dx,
-    which KeyErrors for such products; hpv.BaseScreening overrides step to
-    count any non-negative result instead.
-    """
-    intv = hpv.routine_screening(
-        name='primary', product='lbc', prob=1.0,
-        age_range=[30, 50], sex='f', start_year=2021, end_year=2024,
-    )
-    sim = _baseline_sim_with([intv])
-    sim.run()  # must not raise KeyError: 'positive'
-    live = sim.interventions['primary']
-    new_screens = np.asarray(live.results['new_screens'])
-    new_dx = np.asarray(live.results['new_dx'])
-    assert new_screens.sum() > 0
-    assert new_dx.sum() > 0                 # ascus/abnormal are counted as diagnosed
-    assert (new_dx <= new_screens).all()     # diagnosed is a subset of screened
+def test_cytology_primary_screen_counts_results():
+    """A product with several results (cytology's abnormal, ascus, normal) as a primary screen:
+    each result is counted, and positive is any but the last"""
+    primary = ss.screen(hpv.dx('lbc'), where=women, coverage=1.0, interval=ss.years(1), start=2021, stop=2024, name='primary')
+    sim = _baseline_sim_with([primary])
+    sim.run()
+    r = sim.results.primary
+    delivered = np.asarray(r.delivered)
+    assert delivered.sum() > 0
+    assert np.allclose(delivered, np.asarray(r.abnormal) + np.asarray(r.ascus) + np.asarray(r.normal))
+    assert np.asarray(r.ascus).sum() > 0 # ASCUS is drawn for 10% of women with no lesion
 
 
 def test_hpv_type_primary_screen_runs():
     """hpv_type (positive_1618/positive_ohr, no plain 'positive') as a primary screen."""
-    intv = hpv.routine_screening(
-        name='primary', product='hpv_type', prob=1.0,
-        age_range=[30, 50], sex='f', start_year=2021, end_year=2024,
-    )
-    sim = _baseline_sim_with([intv])
-    sim.run()  # must not raise
-    live = sim.interventions['primary']
-    new_screens = np.asarray(live.results['new_screens'])
-    new_dx = np.asarray(live.results['new_dx'])
-    assert new_screens.sum() > 0
-    assert (new_dx <= new_screens).all()
-
-
-def test_via_primary_new_dx_unchanged():
-    """A product WITH 'positive' (via) still records new_dx as the positive count."""
-    intv = hpv.routine_screening(
-        name='primary', product='via', prob=1.0,
-        age_range=[30, 50], sex='f', start_year=2021, end_year=2024,
-    )
-    sim = _baseline_sim_with([intv])
+    primary = ss.screen(hpv.dx('hpv_type'), where=women, coverage=1.0, interval=ss.years(1), start=2021, stop=2024, name='primary')
+    sim = _baseline_sim_with([primary])
     sim.run()
-    live = sim.interventions['primary']
-    new_screens = np.asarray(live.results['new_screens'])
-    new_dx = np.asarray(live.results['new_dx'])
-    assert new_dx.sum() > 0
-    assert (new_dx <= new_screens).all()
+    r = sim.results.primary
+    delivered = np.asarray(r.delivered)
+    assert delivered.sum() > 0
+    assert np.allclose(delivered, np.asarray(r.positive_1618) + np.asarray(r.positive_ohr) + np.asarray(r.negative))
 
 
-def test_routine_screening_string_product_resolves_via_dx():
-    """product='via' should resolve through hpv.dx(name='via')."""
-    intv = hpv.routine_screening(
-        name='primary', product='via', prob=0.1,
-        age_range=[30, 50], sex='f', start_year=2021, end_year=2022,
-    )
-    # Access via sim.interventions after init
-    sim = _baseline_sim_with([intv])
-    sim.init()
-    live = sim.interventions['primary']
-    assert live.product.__class__.__name__ == 'dx'
-    assert live.product.name == 'via'
+def test_via_yields_by_state():
+    """VIA's results follow products_dx.csv: positive for 15% of women with no lesion"""
+    primary = ss.screen(hpv.dx('via'), where=women, coverage=1.0, interval=ss.years(1), start=2021, stop=2024, name='primary')
+    sim = hpv.Sim(n_agents=3000, start=2020, stop=2025, location='nigeria', genotypes=[16], interventions=[primary], verbose=0)
+    sim.run()
+    r = sim.results.primary
+    share = np.asarray(r.positive).sum()/np.asarray(r.delivered).sum()
+    assert 0.12 < share < 0.2, share # Mostly susceptible women, at 0.15
