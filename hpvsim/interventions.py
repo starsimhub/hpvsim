@@ -71,7 +71,9 @@ class dynamic_pars(ss.Intervention):
           3. sim.pars (by key)             e.g. 'rand_seed' -> sim.pars.rand_seed
         Diseases and interventions require at least one tail segment (the attribute
         to set on the resolved module). sim.pars accepts a single segment (set
-        directly on sim.pars). Raises KeyError if the head doesn't resolve anywhere.
+        directly on sim.pars), though Starsim raises RuntimeError for that once the
+        sim is initialized, since its settings are then fixed for the run. Raises
+        KeyError if the head doesn't resolve anywhere.
         """
         parts = dotted_path.split('.')
         head, tail = parts[0], parts[1:]

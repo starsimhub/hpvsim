@@ -329,14 +329,14 @@ class HPVTotal(ss.Analyzer):
         defs.append(ss.Result('cum_infections_unique', dtype=int,
                               label='Cumulative agents ever infected with any genotype'))
         # Rates: stored per-ti already annualized (event/dt/headcount * 1e5);
-        # summarize_by='mean' collapses sub-annual quarters to the annual rate.
-        defs.append(ss.Result('asr_cancer_incidence', dtype=float, scale=False, summarize_by='mean',
+        # as ratios (summarized by mean), sub-annual quarters collapse to the annual rate.
+        defs.append(ss.Result('asr_cancer_incidence', dtype=float, scale=False, kind='ratio',
                               label='Age-standardized cervical cancer incidence '
                                     '(WHO 2000, per 100,000 person-years)'))
-        defs.append(ss.Result('asr_cancer_mortality', dtype=float, scale=False, summarize_by='mean',
+        defs.append(ss.Result('asr_cancer_mortality', dtype=float, scale=False, kind='ratio',
                               label='Age-standardized cervical cancer mortality '
                                     '(WHO 2000, per 100,000 person-years)'))
-        defs.append(ss.Result('cancer_incidence', dtype=float, scale=False, summarize_by='mean',
+        defs.append(ss.Result('cancer_incidence', dtype=float, scale=False, kind='ratio',
                               label='Crude cervical cancer incidence '
                                     '(per 100,000 women per year)'))
         if self.hiv_module is not None:
@@ -344,13 +344,13 @@ class HPVTotal(ss.Analyzer):
             # annualize heuristic (matches ``new_cancers``).
             defs.append(ss.Result('new_cancers_with_hiv', dtype=float, label='New cancers (HIV+)'))
             defs.append(ss.Result('new_cancers_no_hiv', dtype=float, label='New cancers (HIV-)'))
-            defs.append(ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False, summarize_by='mean',
+            defs.append(ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False, kind='ratio',
                                   label='Cervical cancer incidence '
                                         '(per 100,000 women with HIV per year)'))
-            defs.append(ss.Result('cancer_incidence_no_hiv', dtype=float, scale=False, summarize_by='mean',
+            defs.append(ss.Result('cancer_incidence_no_hiv', dtype=float, scale=False, kind='ratio',
                                   label='Cervical cancer incidence '
                                         '(per 100,000 women without HIV per year)'))
-            defs.append(ss.Result('cancer_rate_ratio', dtype=float, scale=False, summarize_by='mean',
+            defs.append(ss.Result('cancer_rate_ratio', dtype=float, scale=False, kind='ratio',
                                   label='Cancer incidence rate ratio (HIV+/HIV-)'))
         self.define_results(*defs)
 
@@ -409,7 +409,7 @@ class HPVTotal(ss.Analyzer):
 
         Each rate is stored as ``events_this_ti / dt / headcount * 1e5`` --
         i.e. the annualized rate at this instant. The Results carry
-        ``summarize_by='mean'``, so a downstream ``annualize()`` averages
+        ``kind='ratio'`` (summarized by mean), so resampling to years averages
         the sub-annual quarters back to the annual rate (exact at constant
         population, ~0.03% error at realistic Rwanda-scale growth).
         """

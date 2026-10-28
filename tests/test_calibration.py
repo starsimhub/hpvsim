@@ -27,8 +27,8 @@ def test_build_sim_routes_top_level_pars():
     broadcasts to every HPV disease."""
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
                   genotypes=[16, 18])
-    sim.init()
-    out = hpv.calibration.build_sim(sim, calib_pars={'rand_seed': 7, 'ms_agent_ratio': 3})
+    out = hpv.calibration.build_sim(sim, calib_pars={'rand_seed': 7, 'ms_agent_ratio': 3}) # Before init, after which the sim's settings are fixed
+    out.init()
     assert out.pars.rand_seed == 7
     for d in (out.diseases.hpv16, out.diseases.hpv18):
         assert d.pars.ms_agent_ratio == 3
@@ -54,8 +54,7 @@ def test_build_sim_raises_on_unknown_key():
 def test_build_sim_does_not_mutate_base():
     """build_sim mutates only the sim handed to it, leaving the original the
     copy was taken from untouched — as a copy of a sim for each trial would."""
-    sim_base = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
-    sim_base.init()
+    sim_base = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0) # Not initialized, after which the sim's settings are fixed
     original_seed = sim_base.pars.rand_seed
     sim_copy = sc.dcp(sim_base)
     hpv.calibration.build_sim(sim_copy, calib_pars={'rand_seed': 999})

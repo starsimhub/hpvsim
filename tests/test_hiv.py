@@ -21,6 +21,12 @@ _RWANDA_HIV_DATA = Path(__file__).parent / 'regression' / 'data' / 'hiv' / 'rwan
 def _tiny(**kw):
     return dict(n_agents=300, start=2000, stop=2001, dt=0.25, location='nigeria', **kw)
 
+def _make_latent(hivmod, uids):
+    """Infect these agents with HIV, in latent infection"""
+    hivmod.set_prognoses(uids)
+    hivmod.acute[uids] = False
+    hivmod.latent[uids] = True
+
 # --------------------------------------------------------------------------- #
 # Wiring: gating
 # --------------------------------------------------------------------------- #
@@ -45,8 +51,8 @@ def test_hiv_gating():
 def test_hiv_transmission():
     """HIV transmits per act on the SexualNetwork, at beta_m2f (and beta_m2f*rel_beta_f2m from women to men)."""
     h = hpv.HIV_transmit(beta_m2f=0.0035, rel_beta_f2m=0.5)
-    assert np.isclose(h.value('beta_m2f'), 0.0035)
-    assert np.isclose(h.value('rel_beta_f2m'), 0.5)
+    assert np.isclose(h.pars.beta_m2f, 0.0035)
+    assert np.isclose(h.pars.rel_beta_f2m, 0.5)
     assert 'sexualnetwork' in h.hetero_networks
     infections = []
     for beta in [0.0, 0.2]:
@@ -134,7 +140,7 @@ def test_hiv_results_are_scale_weighted():
     person would over-report every HIV stock once multiplied by pop_scale;
     STIsim counts each agent by its weight when weights differ.
     """
-    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=2000, rand_seed=1, # Seed 1: 8 infected fine agents (seed 0 has none)
+    sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=2000, rand_seed=1, # Seed 1: 4 infected fine agents (about 7 on average)
                   start=1990, stop=2005, dt=1.0, ms_agent_ratio=10,
                   model_hiv='transmission', verbose=0)
     sim.run()
@@ -150,8 +156,11 @@ def test_hiv_results_are_scale_weighted():
     raw = float(infected.sum())
     assert wtd < raw, 'fine agents should weigh less than whole people'
     assert np.isclose(float(r['infected'][-1]), wtd * scale, rtol=0.02)
-    # The uncorrected value would have been the raw count x pop_scale.
-    assert not np.isclose(float(r['infected'][-1]), raw * scale, rtol=0.02)
+    # The uncorrected value would have been the raw count x pop_scale. The two
+    # differ by the share of the infected who are fine agents, x0.9: about 2% on
+    # average, and at least 0.25% once any fine agent is infected (0.3% the least
+    # in 40 seeds), so 0.1% fails only with none infected (about 1 in 1,000 seeds).
+    assert not np.isclose(float(r['infected'][-1]), raw * scale, rtol=0.001)
 
     # Prevalence is a scale-weighted fraction, and stays a fraction.
     n_alive = float((w * alive).sum())
@@ -231,7 +240,7 @@ def test_hiv_effect():
     sim.init()
     females = sim.people.female.uids
     half = ss.uids(females[::2])
-    sim.diseases.hiv.move(half, sim.diseases.hiv.latent)
+    _make_latent(sim.diseases.hiv, half)
     sim.diseases.hiv.cd4_latent[half] = 100.0  # lo stratum
     sim.diseases.hiv.step_state()
     sim.diseases.hpv16.set_prognoses(females)
@@ -320,7 +329,7 @@ def test_hiv_rel_imm_effect():
         hivmod = sim.diseases.hiv
         uid = sim.people.auids[sim.people.female[sim.people.auids]][0]
         if make_positive:
-            hivmod.move(ss.uids([uid]), hivmod.latent)
+            _make_latent(hivmod, ss.uids([uid]))
             hivmod.cd4_latent[uid] = 100.0  # lo stratum
         hivmod.step_state()  # their CD4 count
         sim.connectors.hiv_effects.step()  # populate hiv_rel_imm before clearance reads it
@@ -352,7 +361,7 @@ def test_hiv_rel_imm_effect():
         hivmod = sim.diseases.hiv
         females = sim.people.auids[sim.people.female[sim.people.auids]]
         uid_pos, uid_neg = females[0], females[1]
-        hivmod.move(ss.uids([uid_pos]), hivmod.latent)
+        _make_latent(hivmod, ss.uids([uid_pos]))
         hivmod.cd4_latent[uid_pos] = 100.0
         hivmod.step_state()
         sim.connectors.hiv_effects.step()
@@ -372,7 +381,7 @@ def test_hiv_reactivation_effect():
     hivmod = sim.diseases.hiv
     effects = sim.connectors.hiv_effects
     uid_lo, uid_hi = (~hivmod.infected).uids[:2] # Not infected at the start, whose CD4 the HIV module sets itself
-    hivmod.move(ss.uids([uid_lo, uid_hi]), hivmod.latent)
+    _make_latent(hivmod, ss.uids([uid_lo, uid_hi]))
     hivmod.cd4_latent[uid_lo] = 100.0  # lo stratum
     hivmod.cd4_latent[uid_hi] = 350.0  # hi stratum
     hivmod.step_state()
@@ -427,7 +436,7 @@ def test_model_hiv_sim_assembly():
     hpvmod = sim_raw.diseases.hpv16
     hivmod = sim_raw.diseases.hiv
     uid = (~hivmod.infected).uids[0]
-    hivmod.move(ss.uids([uid]), hivmod.latent)
+    _make_latent(hivmod, ss.uids([uid]))
     hivmod.cd4_latent[uid] = 50.0
     hivmod.step_state()
     hpvmod.step_state()  # Resets rel_sus

@@ -108,10 +108,6 @@ class by_age(ss.Analyzer):
     def _result_name(key, lo, hi):
         return f'{key}_{int(lo)}_{int(hi)}'
 
-    def _summarize_by(self, key):
-        # FLOW keys annualize by sum (event counts); COUNT/PREV by mean.
-        return 'sum' if key in self._FLOW_KEYS else 'mean'
-
     def init_pre(self, sim):
         from .hpv import HPV
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
@@ -121,13 +117,11 @@ class by_age(ss.Analyzer):
         super().init_results()
         defs = []
         for key in self.keys:
-            scale = (key in self._COUNT_KEYS or key in self._DEMO_KEYS
-                     or key in self._FLOW_KEYS)
-            sby = self._summarize_by(key)
+            kind = 'flow' if key in self._FLOW_KEYS else 'ratio' if key in self._PREV_KEYS else 'stock'
             for lo, hi, label in zip(self.edges[:-1], self.edges[1:], self.bin_labels):
                 defs.append(ss.Result(
                     self._result_name(key, lo, hi),
-                    dtype=float, scale=scale, summarize_by=sby,
+                    dtype=float, scale=kind != 'ratio', kind=kind,
                     label=f'{key} ({label})',
                 ))
         self.define_results(*defs)

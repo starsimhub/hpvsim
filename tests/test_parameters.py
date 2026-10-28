@@ -157,8 +157,8 @@ def test_hiv_par_routing():
     effects = sim.connectors.hiv_effects
     assert effects.pars.rel_sus_lo == 0.4
     assert effects.pars.rel_sus_hi == 0.5
-    assert sim.diseases.hiv.value('beta_m2f') == 0.01
-    assert sim.diseases.hiv.value('rel_beta_f2m') == 0.7
+    assert sim.diseases.hiv.pars.beta_m2f == 0.01
+    assert sim.diseases.hiv.pars.rel_beta_f2m == 0.7
 
 
 def test_bare_beta_does_not_broadcast_to_hiv():
@@ -168,7 +168,7 @@ def test_bare_beta_does_not_broadcast_to_hiv():
     forms may touch HIV's pars."""
     sim = make_sim(genotypes=[16], model_hiv='transmission', pars=dict(beta=0.2))
     sim.init()
-    assert sim.diseases.hiv.value('beta_m2f') == hpv.HIV_transmit().value('beta_m2f')
+    assert sim.diseases.hiv.pars.beta_m2f == hpv.HIV_transmit().pars.beta_m2f
     assert sim.diseases.hpv16.pars.beta == 0.2
 
 
@@ -229,8 +229,8 @@ def test_sim_key_source_of_truth_consistent():
     route_pars directly (as calibration does) and constructing via
     pars= must both accept the same sim-level keys."""
     sim = make_sim(genotypes=[16])
+    hpv.route_pars(sim, pars={'pop_scale': 2}) # Before init, after which the sim's settings are fixed
     sim.init()
-    hpv.route_pars(sim, pars={'pop_scale': 2})
     assert sim.pars.pop_scale == 2
 
     sim2 = make_sim(genotypes=[16], pars=dict(pop_scale=2))

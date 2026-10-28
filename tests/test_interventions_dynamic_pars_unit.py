@@ -56,15 +56,15 @@ def test_dynamic_pars_unresolvable_path_raises_at_step():
 
 
 def test_dynamic_pars_single_segment_sim_pars_path():
-    """Single-segment paths address sim.pars directly (e.g. 'rand_seed')."""
+    """Single-segment paths address sim.pars directly (e.g. 'rand_seed'), whose
+    settings Starsim fixes once the sim is initialized, so setting one raises."""
     sim = hpv.Sim(
         n_agents=100, start=2020, stop=2021, location='nigeria',
         diseases=[hpv.HPV(g) for g in ('hpv16',)],
     )
     sim.init()
-    # Setting via dynamic_pars._set_dotted should mutate sim.pars in place.
-    hpv.dynamic_pars._set_dotted(sim, 'rand_seed', 42)
-    assert sim.pars.rand_seed == 42
+    with pytest.raises(RuntimeError, match='once the sim is initialized'):
+        hpv.dynamic_pars._set_dotted(sim, 'rand_seed', 42)
 
 
 def test_dynamic_pars_extrapolation_clamps_to_endpoints():
