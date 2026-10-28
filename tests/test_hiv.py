@@ -129,7 +129,7 @@ def test_hiv_results_are_scale_weighted():
     update_results to fix the all-age quantities.
     """
     sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=1000, rand_seed=0,
-                  start=1990, stop=2000, dt=1.0, ms_agent_ratio=10,
+                  start=1990, stop=2010, dt=1.0, ms_agent_ratio=10,
                   model_hiv='transmission', verbose=0)
     sim.run()
     r, ppl, hiv = sim.results.hiv, sim.people, sim.diseases.hiv
@@ -354,6 +354,49 @@ def test_hiv_rel_imm_effect():
     product.administer(sim.people, np.array([uid_pos, uid_neg]))
     hpvmod = sim.diseases.hpv16
     assert float(hpvmod.vax_imm[uid_pos]) < float(hpvmod.vax_imm[uid_neg])
+
+def test_hpv_progs_refresh_on_late_hiv_acquisition():
+    """A woman who acquires HIV after HPV infection gains the CD4-stratum
+    rel_sev multiplier retroactively: HIV.step_state detects the hiv_rel_sev
+    change and calls HPV.refresh_prognoses on the affected uids, re-drawing
+    the still-future portion of their HPV trajectory.
+
+    Matched-cohort design: all females get HPV at ti=0 while HIV-; half are
+    then given HIV+/CD4=100 (lo stratum, rel_sev=1.5) two steps later. The
+    HIV+ half should accumulate more cancers by sim end than the HIV- half.
+    Without refresh the trajectories stay frozen and the two halves end up
+    at parity (modulo noise)."""
+    n_agents = 4000
+    incidence = pd.DataFrame({'age': [20, 20], 'sex': ['f', 'm'], 'year': [1990, 1990],
+                               'incidence': [0.0, 0.0]})
+    sim = hpv.Sim(n_agents=n_agents, start=1990, stop=2020, dt=0.5, location='nigeria',
+                  genotypes=[16], rand_seed=0, ms_agent_ratio=5,
+                  diseases=[hpv.HIV_incidence(incidence=incidence)])
+    sim.init()
+    females = sim.people.female.uids
+    # Infect every female with HPV while HIV- (baseline rel_sev = 1.0).
+    sim.diseases.hpv16.set_prognoses(females)
+    # Advance so a non-trivial amount of trajectory is "already drawn".
+    for _ in range(2):
+        sim.run_one_step()
+    # Flip half of them to HIV+ with low CD4 (lo stratum, rel_sev=1.5).
+    half = ss.uids(females[::2])
+    other = ss.uids(females[1::2])
+    sim.diseases.hiv.infected[half] = True
+    sim.diseases.hiv.cd4[half] = 100.0
+    sim.run()
+
+    hpv16 = sim.diseases.hpv16
+    # Count agents who were ever scheduled for cancer, not just those currently
+    # cancerous at sim end -- most cancer agents die from cancer before stop.
+    hiv_pos_cancers = int(np.sum(~hpv16.ti_cancerous.isnan[half]))
+    hiv_neg_cancers = int(np.sum(~hpv16.ti_cancerous.isnan[other]))
+    assert hiv_pos_cancers > hiv_neg_cancers * 1.3, (
+        f'HIV+ cohort cancer count ({hiv_pos_cancers}) was not meaningfully '
+        f'higher than HIV- ({hiv_neg_cancers}); HPV trajectories are not being '
+        f'refreshed when HIV status changes.'
+    )
+
 
 def test_hiv_reactivation_effect():
     """rel_reactivation defaults to a no-op (1.0) with no HIV+ agents, and can

@@ -82,13 +82,27 @@ class HIV(sti.HIV):
         hiv_pos = infected & ~np.isnan(cd4) & (cd4 < self.pars.cd4_upper)
         is_hi = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
         n = len(auids)
-        self.hiv_rel_sus[auids] = self._factor_array('rel_sus', hiv_pos, is_hi, n)
-        self.hiv_rel_sev[auids] = self._factor_array('rel_sev', hiv_pos, is_hi, n)
-        self.hiv_rel_imm[auids] = self._factor_array('rel_imm', hiv_pos, is_hi, n)
-        self.hiv_rel_reactivation[auids] = self._factor_array('rel_reactivation', hiv_pos, is_hi, n)
+        new_rel_sus = self._factor_array('rel_sus', hiv_pos, is_hi, n)
+        new_rel_sev = self._factor_array('rel_sev', hiv_pos, is_hi, n)
+        new_rel_imm = self._factor_array('rel_imm', hiv_pos, is_hi, n)
+        new_rel_reactivation = self._factor_array('rel_reactivation', hiv_pos, is_hi, n)
+        # Snapshot the prior severity multiplier before overwriting, so refresh
+        # fires only for agents whose stratum actually changed (CD4 drift within
+        # a stratum stays no-op; cost scales with new-infections + ART resets).
+        prev_rel_sev = np.asarray(self.hiv_rel_sev[auids]).copy()
+        self.hiv_rel_sus[auids] = new_rel_sus
+        self.hiv_rel_sev[auids] = new_rel_sev
+        self.hiv_rel_imm[auids] = new_rel_imm
+        self.hiv_rel_reactivation[auids] = new_rel_reactivation
         # Written for all agents; starsim only samples it for susceptibles.
         for m in self.hpv_modules:
             m.rel_sus[auids] = m.rel_sus[auids] * self.hiv_rel_sus[auids]
+        # Dispatch HPV trajectory refresh for agents whose rel_sev stratum changed.
+        changed = new_rel_sev != prev_rel_sev
+        if changed.any():
+            changed_uids = auids[changed]
+            for m in self.hpv_modules:
+                m.refresh_prognoses(changed_uids)
 
         # No testing cascade: diagnose every living HIV+ agent each step.
         undiagnosed = self.infected & ~self.diagnosed & self.sim.people.alive
