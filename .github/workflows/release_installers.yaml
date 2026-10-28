@@ -1,0 +1,26 @@
+name: Attach installers to release
+
+# Makes the installers downloadable from a stable URL, e.g.
+# https://github.com/starsimhub/hpvsim/releases/latest/download/install.bat
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach installers to'
+        required: true
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - run: gh release upload "$TAG" install/install.bat install/install.sh --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
