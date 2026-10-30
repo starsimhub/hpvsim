@@ -317,10 +317,11 @@ class HPVTotal(ss.Analyzer):
                 continue
             # Union stocks are scale-weighted floats; the rest mirror per-genotype.
             result_dtype = float if key in self._UNION_STATES else src.dtype
-            defs.append(ss.Result(key, dtype=result_dtype,
+            # kind=src.kind: a float result is otherwise guessed to be a ratio, and left unscaled.
+            defs.append(ss.Result(key, dtype=result_dtype, kind=src.kind,
                                   label=f'{src.label} (any genotype)'))
         # Derived results (computed in step()).
-        defs.append(ss.Result('susceptible', dtype=float,
+        defs.append(ss.Result('susceptible', dtype=float, kind='stock',
                               label='Currently uninfected with any genotype'))
         # scale=False: prevalence is a ratio, not a count.
         defs.append(ss.Result('prevalence', dtype=float, scale=False,

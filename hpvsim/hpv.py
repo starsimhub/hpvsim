@@ -424,18 +424,18 @@ class HPV(ss.Infection):
             CIN -> cancerous transition and request_death fire from step_state.
 
         Initial seeding via ``init_post -> set_prognoses`` flows through here
-        so init_prev-seeded agents get ti_first_infection set at the first step.
+        so init_prev-seeded agents get ti_first_infection set too (at ti=0).
         """
         super().set_prognoses(uids, sources)
-        ti = self.ti # The initial infections are dated by the first step too (ss.Infection does so)
+        ti = self.ti + 1 # Infected at the end of this step, so the course starts at the next (as ss.Infection schedules; the seeds are dated at ti=0)
         p = self.pars
 
         first_uids = uids[self.ti_first_infection.isnan[uids]]
-        self.ti_first_infection[first_uids] = ti
+        self.ti_first_infection[first_uids] = self.ti
 
         self.susceptible[uids] = False
         self.infected[uids] = True
-        self.ti_infected[uids] = ti
+        self.ti_infected[uids] = self.ti
         self.precin[uids] = True
 
         # Clear stale schedules from a prior infection.
@@ -587,7 +587,7 @@ class HPV(ss.Infection):
             return
         p = self.pars
         ppl = self.sim.people
-        ti = self.ti
+        ti = self.ti + 1 # The course starts at the next step, as in set_prognoses()
         cancer_scale = 1.0 / ratio
 
         # Shrink base agents that drew their own cancer.
@@ -647,8 +647,8 @@ class HPV(ss.Infection):
         self.cin[new_uids] = False
         self.cancerous[new_uids] = False
         self.undetected_cancerous[new_uids] = False
-        self.ti_infected[new_uids] = ti
-        self.ti_first_infection[new_uids] = ti
+        self.ti_infected[new_uids] = self.ti
+        self.ti_first_infection[new_uids] = self.ti
         self.ti_clearance[new_uids] = np.nan
         # Durations are in years; convert to steps via /dt_yr before rounding.
         ti_cin = ti + self._randround(new_dur_precin / dt_yr, new_uids,

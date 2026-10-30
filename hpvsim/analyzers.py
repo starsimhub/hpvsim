@@ -196,10 +196,10 @@ class by_age(ss.Analyzer):
         annual_bins = []
         year_index = None
         for lo, hi in zip(self.edges[:-1], self.edges[1:]):
-            r = self.results[self._result_name(key, lo, hi)].resample('year')
+            r = self.results[self._result_name(key, lo, hi)].resample('year', use_years=True) # Labeled by the calendar year each period covers (not its end, 1 January of the next)
             annual_bins.append(np.asarray(r.values))
             if year_index is None:
-                year_index = np.floor(np.asarray(r.timevec.years)).astype(int)
+                year_index = np.asarray(r.timevec)
         arr = np.stack(annual_bins, axis=1)
         df = pd.DataFrame(arr, columns=self.bin_labels,
                           index=pd.Index([float(y) for y in year_index], name='t'))
