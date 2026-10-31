@@ -63,6 +63,20 @@ class SexualNetwork(ss.SexualNet):
     into ``self._layer_pars`` / ``self._debut`` for runtime access.
     """
 
+    def transmit(self, rel_trans, rel_sus, edge_beta, rng, prob=None):
+        """Each edge transmits with probability ``rel_sus*(1 - (1 - beta)**acts)``: susceptibility scales the chance
+        over the acts of the step, not each act, which is how HPVsim's immunity is defined and calibrated.
+
+        WORKAROUND: a declared disease scales each act's hazard by ``rel_sus``, with no way to say otherwise
+        (``ss.solvers.Agents.transmit_acts()``), so the chance it gives is taken back to the hazard and scaled here.
+        """
+        if prob is None:
+            return super().transmit(rel_trans, rel_sus, edge_beta, rng)
+        def over_acts(d, inds, src, trg):
+            sus = rel_sus[trg]
+            return sus*-np.expm1(np.log1p(-np.minimum(prob(d, inds, src, trg), 1 - 1e-15))/sus)
+        return super().transmit(rel_trans, rel_sus, edge_beta, rng, prob=over_acts)
+
     def active(self, people):
         """Network participation requires a non-fine (level0) agent.
 
@@ -106,7 +120,7 @@ class SexualNetwork(ss.SexualNet):
                 cross_f=ss.bernoulli(p=0.5, name=f'{lkey}_cross_f'),
                 cross_m=ss.bernoulli(p=0.5, name=f'{lkey}_cross_m'),
                 participate=ss.bernoulli(p=0.5, name=f'{lkey}_participate'),
-                choose_m=ss.choice(a=2, replace=False, name=f'{lkey}_choose_m'),
+                choose_m=ss.random(name=f'{lkey}_choose_m'),
             )
             for lkey in self.layers
         }
@@ -236,10 +250,9 @@ class SexualNetwork(ss.SexualNet):
             return ss.uids(), np.array([], dtype=int)
         p1 = np.asarray(self.edges.p1)[mask]
         p2 = np.asarray(self.edges.p2)[mask]
-        endpoints = np.concatenate([p1, p2])
-        partnered = ss.uids(np.unique(endpoints))
-        counts = np.bincount(endpoints)[partnered]
-        return partnered, counts
+        counts = np.bincount(np.concatenate([p1, p2]))
+        partnered = ss.uids(np.flatnonzero(counts))
+        return partnered, counts[partnered]
 
     def _other_layer_partner_uids(self, lkey):
         """ss.uids of agents partnered in any layer OTHER than ``lkey``.
@@ -252,7 +265,7 @@ class SexualNetwork(ss.SexualNet):
             return ss.uids()
         p1 = np.asarray(self.edges.p1)[mask]
         p2 = np.asarray(self.edges.p2)[mask]
-        return ss.uids(np.unique(np.concatenate([p1, p2])))
+        return ss.uids(np.flatnonzero(np.bincount(np.concatenate([p1, p2]))))
 
     def _participation_filter(self, inds, age, layer_probs, bins, dist):
         """Apply age-bin Bernoulli participation filter using ``dist`` (a
@@ -260,15 +273,8 @@ class SexualNetwork(ss.SexualNet):
         """
         if not len(inds):
             return np.array([], dtype=int)
-        age_bins = np.digitize(age[inds], bins=bins) - 1
-        participating = np.array([], dtype=int)
-        for ab in np.unique(age_bins):
-            bin_inds = inds[age_bins == ab]
-            dist.set(p=float(layer_probs[ab]))
-            participating = np.concatenate(
-                [participating, dist.filter(bin_inds)]
-            )
-        return participating
+        dist.set(p=np.asarray(layer_probs, dtype=float)[np.digitize(age[inds], bins=bins) - 1])
+        return dist.filter(inds)
 
     def _add_pairs_for_layer(self, lkey):
         """Form new partnerships in layer ``lkey`` for one timestep.
@@ -313,9 +319,10 @@ class SexualNetwork(ss.SexualNet):
             dists['cross_m'].set(p=m_cross_p)
             f_winners = dists['cross_f'].filter(other_f)
             m_winners = dists['cross_m'].filter(other_m)
-            cross_winners = np.concatenate([f_winners, m_winners])
-            cross_losers = ss.uids(np.setdiff1d(other_uids, cross_winners))
-            eligible[cross_losers] = False
+            cross_winners = ss.uids(np.concatenate([f_winners, m_winners]))
+            still_eligible = eligible[cross_winners]
+            eligible[other_uids] = False
+            eligible[cross_winners] = still_eligible
 
         # Split eligible by sex.
         elig_uids = eligible.uids
@@ -370,11 +377,11 @@ class SexualNetwork(ss.SexualNet):
                     nm = f_selected.size
                 else:
                     f_selected = f_inds
-                norm_w = this_weighting_nonzero / this_weighting_nonzero.sum()
-                dists['choose_m'].set(a=len(this_weighting_nonzero), p=norm_w)
-                m_selected = m_participants[
-                    males_nonzero[dists['choose_m'].rvs(nm)]
-                ]
+                # Weighted sampling without replacement: the nm largest of log(u)/w, in random order.
+                m_candidates = m_participants[males_nonzero]
+                keys = np.log(dists['choose_m'].rvs(m_candidates)) / this_weighting_nonzero
+                top = np.argpartition(keys, -nm)[-nm:]
+                m_selected = m_candidates[top[np.argsort(keys[top])]]
                 paired_m[ss.uids(m_selected)] = True
                 m_arr = np.concatenate((m_arr, m_selected))
                 f_arr = np.concatenate((f_arr, f_selected))

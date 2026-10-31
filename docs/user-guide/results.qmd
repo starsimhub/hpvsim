@@ -2,9 +2,9 @@
 title: "Results and analyzers"
 ---
 
-Results are grouped by the module that produced them, because each module records what it can see. `sim.results.hpv16` holds HPV16's own time series; `sim.results.agemigration` holds migration flows; `sim.results.all_hpv` holds the pooled HPV totals. A named intervention appears under its own name.
+Results are grouped by the module that produced them, because each module records what it can see. `sim.results.hpv16` holds HPV16's own time series; `sim.results.agemigration` holds migration flows; `sim.results.hpv` holds the family's unions and sums over the genotypes, and `sim.results.all_hpv` the pooled HPV totals with their rates. A named intervention appears under its own name.
 
-Every genotype module records the same set: the stocks `susceptible`, `infected`, `precin`, `cin`, `cancerous`, `latent`; the flows `new_infections`, `new_cancers`, `new_cancer_deaths`, `new_reactivations`; their cumulative counterparts; and `prevalence`. Two accumulators, `sum_age_at_cancer` and `sum_age_at_cancer_death`, let you recover mean age at diagnosis or death: divide by `new_cancers` or `new_cancer_deaths` over the period you care about.
+Every genotype module records the same set: the stocks `susceptible`, `infected`, `precin`, `cin`, `cancerous`, `latent`; the flows `infection`, `new_cancers`, `new_undetected_cancers`, `new_cancer_deaths`, `new_reactivations`, and one for each transition; `cum_cancers` and `cum_cancer_deaths` (any flow has `.cum`, e.g. `res.infection.cum`); and `prevalence`. Two accumulators, `sum_age_at_cancer` and `sum_age_at_cancer_death`, let you recover mean age at diagnosis or death: divide by `new_cancers` or `new_cancer_deaths` over the period you care about.
 
 ## Pooling across genotypes
 
@@ -12,7 +12,7 @@ Every genotype module records the same set: the stocks `susceptible`, `infected`
 
 - **Stocks are counted per person.** A woman with HPV16 and HPV18 counts once in `all_hpv.infected`. `prevalence` and `susceptible` follow from that, and `cum_infections_unique` counts women ever infected with anything.
 - **Cancer flows are exact sums.** Each cancer is attributed to a single genotype, so `all_hpv.new_cancers` is the true total.
-- **Infection flows are plain sums, and overcount.** `all_hpv.new_infections` adds the genotypes together, so a woman who acquires two genotypes in one timestep contributes two. Use `cum_infections_unique` when you mean people.
+- **Infection flows are plain sums, and overcount.** `all_hpv.infection` adds the genotypes together, so a woman who acquires two genotypes in one timestep contributes two. Use `cum_infections_unique` when you mean people.
 
 `all_hpv` also carries `asr_cancer_incidence` and `asr_cancer_mortality`: age-standardized rates per 100,000 person-years against the WHO 2000 world standard population. These are the figures comparable to a cancer registry or to GLOBOCAN, and no analyzer is needed to get them. They are computed once per calendar year, and every timestep in that year carries the same value.
 

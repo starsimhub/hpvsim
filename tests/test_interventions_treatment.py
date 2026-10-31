@@ -77,8 +77,6 @@ def test_ablation_cures_cin():
     sim.diseases.hpv16.infected[women] = True
     sim.diseases.hpv16.susceptible[women] = False
     sim.diseases.hpv16.cin[women] = True
-    sim.diseases.hpv16.ti_cin[women] = 0
-    sim.diseases.hpv16.ti_clearance[women] = np.inf
     sim.run()
     r = sim.results.rx
     cured, failed = np.asarray(r.cured).sum(), np.asarray(r.failed).sum()

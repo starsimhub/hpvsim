@@ -6,7 +6,7 @@ import hpvsim as hpv
 
 def _cascade_sim(intvs):
     return hpv.Sim(
-        n_agents=500, start=2020, stop=2025, location='nigeria',
+        n_agents=4000, start=2020, stop=2025, location='nigeria',
         diseases=[hpv.HPV(g) for g in ('hpv16', 'hpv18', 'hi5', 'ohr')],
         interventions=intvs, verbose=0,
     )

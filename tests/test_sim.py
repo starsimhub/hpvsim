@@ -212,7 +212,7 @@ def test_stop_without_end_does_not_warn():
 
 def test_genotypes_plus_other_disease_merges():
     """A non-HPV disease passed via diseases= merges with genotype-built HPV."""
-    other = ss.SIS()  # any non-HPV ss.Disease as a stand-in
+    other = ss.SIS(beta=ss.peract(0.05))  # any non-HPV ss.Disease as a stand-in
     sim = hpv.Sim(**_tiny(genotypes=[16, 18], diseases=[other]))
     sim.init()
     hpv_mods = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)]

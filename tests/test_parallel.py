@@ -31,7 +31,7 @@ def _tiny_sim(rand_seed=0, label=None):
 def _short_summary(sim):
     """Tiny summary suitable for bit-equality assertions."""
     return {
-        'cum_inf': float(sim.results.hpv16.cum_infections[-1]),
+        'cum_inf': float(sim.results.hpv16.infection.cum[-1]),
         'alive': float(sim.results['alive'][-1]),
     }
 
@@ -59,8 +59,8 @@ def test_parallel_inplace_true_default_mutates_originals():
     s1 = _tiny_sim(rand_seed=0, label='a')
     s2 = _tiny_sim(rand_seed=1, label='b')
     ss.parallel(s1, s2, verbose=0)
-    assert float(s1.results.hpv16.cum_infections[-1]) >= 0
-    assert float(s2.results.hpv16.cum_infections[-1]) >= 0
+    assert float(s1.results.hpv16.infection.cum[-1]) >= 0
+    assert float(s2.results.hpv16.infection.cum[-1]) >= 0
 
 
 def test_parallel_inplace_false_leaves_originals_unrun():
@@ -71,7 +71,7 @@ def test_parallel_inplace_false_leaves_originals_unrun():
     # ti is None until a sim is initialized.
     assert s1.ti is None
     assert s2.ti is None
-    assert float(msim.sims[0].results.hpv16.cum_infections[-1]) >= 0
+    assert float(msim.sims[0].results.hpv16.infection.cum[-1]) >= 0
 
 
 def test_parallel_copy_inputs_independent_after_construction():
@@ -97,8 +97,8 @@ def test_parallel_copy_inputs_independent_after_construction():
     assert s2_mod is not shared_hpv_list[0], 'Sim must not reuse input module reference'
 
     ss.parallel(s1, s2, verbose=0)
-    assert float(s1.results.hpv16.cum_infections[-1]) >= 0
-    assert float(s2.results.hpv16.cum_infections[-1]) >= 0
-    r1 = float(s1.results.hpv16.cum_infections[-1])
-    r2 = float(s2.results.hpv16.cum_infections[-1])
+    assert float(s1.results.hpv16.infection.cum[-1]) >= 0
+    assert float(s2.results.hpv16.infection.cum[-1]) >= 0
+    r1 = float(s1.results.hpv16.infection.cum[-1])
+    r2 = float(s2.results.hpv16.infection.cum[-1])
     assert r1 != r2, 'Sims with different seeds must not contaminate each other'

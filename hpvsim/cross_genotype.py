@@ -1,19 +1,20 @@
 """Cross-genotype coordination for multi-genotype HPV.
 
-Two modules that operate across HPV genotypes:
+The genotypes of a sim are a family (``hpv.make_family()``), which keeps one
+cancer per person, unions and sums over the genotypes, and the protection of
+``nab_imm``. Two modules do what it does not:
 
-  - ``CrossImmunity`` (``ss.Connector``): per-step, reads each registered
-    HPV's ``nab_imm`` / ``cell_imm`` and writes per-target ``rel_sus`` /
-    ``sev_imm`` via a cross-protection matrix. Runs between
-    ``Disease.step_state`` and ``Disease.step_infect``. Convention: row =
+  - ``CrossImmunity`` (``ss.Connector``): per-step, applies the rest of the
+    immunity that crosses genotypes, and owns the cross-protection matrices.
+    Runs between ``Disease.step_state`` and ``Disease.step``. Convention: row =
     target genotype, col = source genotype. Effective immunity to target
     ``g`` is ``sum_k cross[g, k] * source[uid, k]``. Diagonals must lie in
     [0, 1].
 
   - ``HPVTotal`` (``ss.Analyzer``): post-hoc, pools per-genotype results
-    into Sim-level totals. Auto-added by ``hpv.Sim`` whenever HPV modules
-    are present; accessible at ``sim.results.all_hpv`` (the analyzer's ``name``
-    defaults to ``'all_hpv'``).
+    into Sim-level totals, with the rates that need the people. Auto-added by
+    ``hpv.Sim`` whenever HPV modules are present; accessible at
+    ``sim.results.all_hpv`` (the analyzer's ``name`` defaults to ``'all_hpv'``).
 """
 
 import numpy as np
@@ -22,6 +23,7 @@ import starsim as ss
 from . import misc
 from .hpv import HPV
 from .parameters import GENOTYPE_KEYS
+from .utils import any_genotype
 
 
 __all__ = ['CrossImmunity', 'HPVTotal']
@@ -55,27 +57,28 @@ def _build_cross_matrix(keys, scalar_med, scalar_high, own_imm_hr):
 class CrossImmunity(ss.Connector):
     """Cross-immunity + shared HPV-agent state for multi-genotype HPV.
 
-    Per-step, reads each registered ``HPV`` instance's clearance-conferred
-    ``nab_imm`` / ``cell_imm`` and writes per-target ``sev_imm`` and a
-    nab-based susceptibility reduction via cross-protection matrices.
-    Vaccine-conferred ``vax_imm`` is combined with the nab contribution as an
-    independent-protection path — it is not matrix-multiplied, so the CSV
-    per-genotype ``rel_imm`` values are the complete vaccine cross-protection
-    profile. Therapeutic-conferred ``txvx_sev_imm`` is likewise pre-scaled per
-    target genotype, and adds to the severity term rather than passing through
-    the matrix.
+    Owns the cross-protection matrices. ``nab_imm`` protects through the
+    family's ``ss.immunity``, by ``cross_imm_sus``. Each ``HPV`` instance's
+    clearance-conferred ``cell_imm`` gives per-target ``sev_imm`` by
+    ``cross_imm_sev``, written here each step, which ``HPV`` reads at infection,
+    once (an ``ss.immunity`` on ``dur=`` would apply it as it changes during the
+    stay). Vaccine-conferred ``vax_imm`` is applied here too, as an independent-protection path:
+    it is not matrix-multiplied, so the CSV per-genotype ``rel_imm`` values are
+    the complete vaccine cross-protection profile. Therapeutic-conferred
+    ``txvx_sev_imm`` is likewise pre-scaled per target genotype, and adds to
+    the severity term rather than passing through the matrix.
 
     Combining formulas:
-        sus_imm_nab[target] = sum_k cross_imm_sus[target, k] * nab_imm[uid, k]
+        sus_imm_nab[target] = min(1, sum_k cross_imm_sus[target, k] * nab_imm[uid, k])
         rel_sus[target]     = (1 - sus_imm_nab[target]) * (1 - vax_imm[target])
         sev_imm[target]     = sum_k cross_imm_sev[target, k] * cell_imm[uid, k]
                               + txvx_sev_imm[target]
 
-    Also owns per-agent ``rel_sev`` — an intrinsic biological severity
-    scaler sampled once per agent and shared across every genotype's
-    progression, so each agent has a single intrinsic progression speed.
-    It lives on the connector rather than per HPV module so that all
-    genotypes read the same per-agent draw from ``set_prognoses``.
+    Also owns per-agent ``rel_sev``: an intrinsic biological severity scaler,
+    drawn once per agent and shared across every genotype's progression, so
+    each agent has a single intrinsic progression speed. It lives on the
+    connector rather than per HPV module so that all genotypes read the same
+    per-agent draw.
     """
 
     def __init__(self, cross_imm_sus=None, cross_imm_sev=None, pars=None, **kwargs):
@@ -85,13 +88,8 @@ class CrossImmunity(ss.Connector):
         self.cross_imm_sev = cross_imm_sev
         self.hpv_modules = None
         self.genotype_index = None
-        self.define_states(
-            # Shared across genotypes; sampled once on first need.
-            ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
-            ss.BoolState('rel_sev_sampled', default=False),
-        )
         self.define_pars(
-            # Folded normal: ensure_rel_sev takes abs(), so a lower loc is safe.
+            # Folded normal: HPV takes abs(), so a lower loc is safe.
             rel_sev=ss.normal(loc=1.0, scale=0.2),
             # Scalars make_cross_immunity() uses when no explicit matrix is passed.
             cross_imm_sus_med=0.3,
@@ -101,6 +99,10 @@ class CrossImmunity(ss.Connector):
             own_imm_hr=0.9,
         )
         self.update_pars(pars=pars, **kwargs)
+        self.define_states(
+            # Shared across genotypes; drawn once per agent.
+            ss.FloatArr('rel_sev', label='Relative severity (biological)', default=self.pars.rel_sev),
+        )
 
     def make_cross_immunity(self, keys=None):
         """Return ``(m_sus, m_sev)`` matrices built from ``self.pars`` scalars
@@ -153,52 +155,31 @@ class CrossImmunity(ss.Connector):
                     f'[0, 1]; got {diag}'
                 )
 
-    def ensure_rel_sev(self, uids):
-        """Sample ``rel_sev`` for any of ``uids`` that don't have a sample yet.
-
-        Called from each HPV module's ``set_prognoses`` so that each agent
-        is sampled exactly once, at first need, regardless of module init
-        order. Subsequent calls for the same uids are no-ops.
-        """
-        if len(uids) == 0:
-            return
-        unset_mask = ~self.rel_sev_sampled[uids]
-        if not unset_mask.any():
-            return
-        unset = uids[unset_mask]
-        self.rel_sev[unset] = np.abs(self.pars.rel_sev.rvs(unset))
-        self.rel_sev_sampled[unset] = True
+        # The family reads its matrix with rows from the source genotype, the other way round
+        for family in sim.diseases.values():
+            if isinstance(family, ss.strains.Family):
+                family.immunity[0].values['rel_sus'] = self.cross_imm_sus.T.astype(float)
 
     def step(self):
-        # Catch births/immigrants before HPV.step_infect samples new infections.
-        self.ensure_rel_sev(self.sim.people.alive.uids)
         if not self.hpv_modules:
             return
-        # Clearance-conferred immunity — flows through cross-protection matrix.
-        nab  = np.column_stack([m.nab_imm.values  for m in self.hpv_modules])
         cell = np.column_stack([m.cell_imm.values for m in self.hpv_modules])
         # Vaccine immunity applies directly per target genotype, not via the matrix.
-        vax   = np.column_stack([m.vax_imm.values   for m in self.hpv_modules])
+        vax = np.column_stack([m.vax_imm.values for m in self.hpv_modules])
         # Therapeutic-conferred severity immunity: already scaled per target
         # genotype by the product's rel_imm, so it adds to the matrix product
         # rather than passing through it. Mirrors v2, where the therapeutic
         # occupied its own immunity source and cross_immunity_sev supplied the
         # per-genotype scaling; summed with clearance immunity, then clipped.
         txvx_sev = np.column_stack([m.txvx_sev_imm.values for m in self.hpv_modules])
-        sus_imm_nab = nab  @ self.cross_imm_sus.T
-        sev_imm     = cell @ self.cross_imm_sev.T + txvx_sev
-        np.clip(sus_imm_nab, 0.0, 1.0, out=sus_imm_nab)
-        np.clip(sev_imm,     0.0, 1.0, out=sev_imm)
-        np.clip(vax,         0.0, 1.0, out=vax)
+        sev_imm = cell @ self.cross_imm_sev.T + txvx_sev
+        np.clip(sev_imm, 0.0, 1.0, out=sev_imm)
+        np.clip(vax, 0.0, 1.0, out=vax)
         auids = self.sim.people.auids
         for i, m in enumerate(self.hpv_modules):
-            # Two susceptibility paths: clearance-conferred nabs and the
-            # prophylactic vaccine. The therapeutic acts on severity, not
-            # acquisition, so it does not appear here.
-            m.rel_sus[auids] = m.rel_sus[auids] * (
-                (1.0 - sus_imm_nab[:, i])
-                * (1.0 - vax[:, i])
-            )
+            # The second susceptibility path (the family applies the first,
+            # from nabs). The therapeutic acts on severity, not acquisition.
+            m.rel_sus[auids] = m.rel_sus[auids] * (1.0 - vax[:, i])
             m.sev_imm[auids] = sev_imm[:, i]
 
 
@@ -210,8 +191,8 @@ class HPVTotal(ss.Analyzer):
     each per-genotype result. Three aggregation strategies are applied:
 
       - **People-level union** for per-agent state counts listed in
-        ``_UNION_STATES``: boolean OR across each module's BoolState array,
-        then counted (an agent infected with any genotype counts once).
+        ``_UNION_STATES``: read from the family (an agent infected with any
+        genotype counts once), and ``undetected_cancerous``, which it does not know.
       - **Custom derivation** for results that need it: ``susceptible``
         (= alive - infected), ``prevalence`` (= infected / alive),
         and the extra ``cum_infections_unique`` (people-level cumulative
@@ -229,15 +210,8 @@ class HPVTotal(ss.Analyzer):
         kwargs.setdefault('name', 'all_hpv')
         super().__init__(*args, **kwargs)
 
-    # HPV result key -> BoolState name, aggregated by boolean OR across modules.
-    _UNION_STATES = {
-        'infected':               'infected',
-        'precin':                 'precin',
-        'cin':                    'cin',
-        'cancerous':              'cancerous',
-        'undetected_cancerous':   'undetected_cancerous',
-        'latent':                 'latent',
-    }
+    # The results that are unions over the genotypes, from the family.
+    _UNION_STATES = ('infected', 'precin', 'cin', 'cancerous', 'latent', 'blocked')
 
     # WHO 2000 World Standard Population weights per 5-year band (0-4 to 100+).
     # Sum is 100_035, not 100_000; ASR normalizes by weights.sum().
@@ -282,7 +256,7 @@ class HPVTotal(ss.Analyzer):
     _DERIVED = ('susceptible', 'prevalence')
 
     # HPV result keys not aggregated (bookkeeping artifacts).
-    _SKIP = ('timevec',)
+    _SKIP = ('timevec', 'undetected_cancerous')
 
     def init_pre(self, sim):
         """Discover HPV modules once at init; mirrors CrossImmunity's pattern.
@@ -292,6 +266,7 @@ class HPVTotal(ss.Analyzer):
         which reads them.
         """
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        self.family = next((d for d in sim.diseases.values() if isinstance(d, ss.strains.Family)), None)
         self.hiv_module = misc.hiv_module(sim)
         super().init_pre(sim)
 
@@ -313,7 +288,7 @@ class HPVTotal(ss.Analyzer):
         template = hpvs[0].results
         defs = []
         for key, src in template.items():
-            if key in self._SKIP or key in self._DERIVED:
+            if key in self._SKIP or key in self._DERIVED or '.' in key: # A flow to one destination of a transition is on the family
                 continue
             # Union stocks are scale-weighted floats; the rest mirror per-genotype.
             result_dtype = float if key in self._UNION_STATES else src.dtype
@@ -321,6 +296,8 @@ class HPVTotal(ss.Analyzer):
             defs.append(ss.Result(key, dtype=result_dtype, kind=src.kind,
                                   label=f'{src.label} (any genotype)'))
         # Derived results (computed in step()).
+        defs.append(ss.Result('undetected_cancerous', dtype=float, kind='stock',
+                              label='Undetected invasive cancer (any genotype)'))
         defs.append(ss.Result('susceptible', dtype=float, kind='stock',
                               label='Currently uninfected with any genotype'))
         # scale=False: prevalence is a ratio, not a count.
@@ -379,19 +356,10 @@ class HPVTotal(ss.Analyzer):
         # auids holds agents who died this step, so the alive mask is needed.
         auids = people.auids
         alive_mask = people.alive.values
-        union_arrays = {}
-        for key, attr in self._UNION_STATES.items():
-            # Boolean union across all HPV modules, filtered to alive agents.
-            in_state = np.zeros(len(auids), dtype=bool)
-            for m in hpvs:
-                in_state |= getattr(m, attr).values
-            in_state &= alive_mask
-            uids_in = auids[in_state]
-            union_arrays[key] = uids_in
-            # Scale-weighted count: fine agents count as 1/ratio, not 1.
-            self.results[key][ti] = (
-                people.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
-            )
+        for key in self._UNION_STATES:
+            self.results[key][ti] = self.family.results[key][ti]
+        undetected = auids[any_genotype(self.sim, 'undetected_cancerous') & alive_mask]
+        self.results['undetected_cancerous'][ti] = people.scale_flows(undetected) if len(undetected) else 0.0
         # Derived from scale-weighted infected.
         sw_inf = float(self.results['infected'][ti])
         self.results['susceptible'][ti] = n_alive_sw - sw_inf
@@ -420,40 +388,37 @@ class HPVTotal(ss.Analyzer):
         w = getattr(people, 'scale', None)
         dt = self.t.dt_year
 
-        # Denominator: per-bin alive-female headcount.
-        wts_af = w[female] if w is not None else None
-        females_by_bin = np.histogram(ages[female], bins=edges, weights=wts_af)[0]
-
         # Numerator: cancers DETECTED this step, across genotypes. Matches
         # HPV.results.new_cancers and real-world diagnosed counts; onset is
         # available via ti_cancerous / new_undetected_cancers.
         new_cancer = np.zeros_like(people.alive)
         for m in hpvs:
-            new_cancer |= ((m.ti_cancer_detection == ti) & m.cancerous)
+            new_cancer |= (m.ti_cancer_detection.isclose(ti) & m.cancerous)
         new_cancer &= people.alive
-        wts_nc = w[new_cancer] if w is not None else None
-        cancers_by_bin = np.histogram(ages[new_cancer], bins=edges, weights=wts_nc)[0]
 
         # Numerator: cancer deaths this step. Agents are still marked alive at
         # ti, since remove_dead runs after analyzers.
         new_cd = np.zeros_like(people.alive)
         for m in hpvs:
-            new_cd |= (m.ti_dead_cancer == ti)
+            new_cd |= m.ti_cancer_death.isclose(ti)
         new_cd &= people.alive
-        wts_cd = w[new_cd] if w is not None else None
-        cd_by_bin = np.histogram(ages[new_cd], bins=edges, weights=wts_cd)[0]
 
-        # ASR = weighted sum of per-bin rates; the 1/dt factor annualizes the
-        # per-quarter event count so mean-over-year recovers the annual rate.
-        self.results['asr_cancer_incidence'][ti] = self.compute_asr(
-            cancers_by_bin / dt, females_by_bin, edges)
-        self.results['asr_cancer_mortality'][ti] = self.compute_asr(
-            cd_by_bin / dt, females_by_bin, edges)
+        if new_cancer.any() or new_cd.any(): # Most steps of a run have neither, so all of these are 0
+            hist = lambda mask: np.histogram(ages[mask], bins=edges, weights=w[mask] if w is not None else None)[0]
+            females_by_bin = hist(female) # Denominator: per-bin alive-female headcount.
+            cancers_by_bin = hist(new_cancer)
 
-        # Crude annualized incidence.
-        n_f = females_by_bin.sum()
-        self.results['cancer_incidence'][ti] = (
-            cancers_by_bin.sum() / dt / n_f * 1e5 if n_f else 0.0)
+            # ASR = weighted sum of per-bin rates; the 1/dt factor annualizes the
+            # per-quarter event count so mean-over-year recovers the annual rate.
+            self.results['asr_cancer_incidence'][ti] = self.compute_asr(
+                cancers_by_bin / dt, females_by_bin, edges)
+            self.results['asr_cancer_mortality'][ti] = self.compute_asr(
+                hist(new_cd) / dt, females_by_bin, edges)
+
+            # Crude annualized incidence.
+            n_f = females_by_bin.sum()
+            self.results['cancer_incidence'][ti] = (
+                cancers_by_bin.sum() / dt / n_f * 1e5 if n_f else 0.0)
 
         if self.hiv_module is not None:
             self.update_hiv_cancer_results(ti, people, new_cancer, dt)
@@ -499,6 +464,6 @@ class HPVTotal(ss.Analyzer):
                                 'cancer_rate_ratio'}
         template = hpvs[0].results
         for key in template.keys():
-            if key in self._SKIP or key in handled_in_step:
+            if key in self._SKIP or key in handled_in_step or '.' in key:
                 continue
             self.results[key][:] = sum(m.results[key] for m in hpvs)

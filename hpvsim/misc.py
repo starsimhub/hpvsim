@@ -782,6 +782,12 @@ def hiv_module(sim):
         (d for d in sim.diseases.values() if isinstance(d, cls)), None)
 
 
+def cross_immunity(sim):
+    """The ``hpv.CrossImmunity`` connector in ``sim``, or ``None`` if there isn't one."""
+    from .cross_genotype import CrossImmunity
+    return next((c for c in sim.connectors.values() if isinstance(c, CrossImmunity)), None)
+
+
 def hiv_effects(sim):
     """HIV's effects on HPV (the ``hpv.HIVEffects`` connector) in ``sim``, or ``None`` if there isn't one."""
     if hiv_class() is None:

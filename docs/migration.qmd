@@ -188,11 +188,11 @@ sim.results['cancers']
 
 ```python
 # per genotype
-sim.results.hpv16.cum_infections
+sim.results.hpv16.infection.cum
 sim.results.hpv16.new_cancers
 
 # aggregate across all genotypes
-sim.results.all_hpv.cum_infections
+sim.results.all_hpv.infection.cum
 ```
 
 Plotting is unchanged in spirit:
@@ -237,7 +237,7 @@ There is no `hpv.MultiSim`; use Starsim's `MultiSim` with an `hpv.Sim`:
 ```python
 import starsim as ss
 msim = ss.MultiSim(hpv.Sim(genotypes=[16, 18]), n_runs=10).run()
-msim.results.all_hpv.cum_infections.median() # The results have the runs as their first axis
+msim.results.all_hpv.infection.cum.median() # The results have the runs as their first axis
 ```
 
 ## Interventions and analyzers

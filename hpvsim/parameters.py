@@ -407,8 +407,8 @@ def route_pars(sim, pars=None, calib_pars=None, verbose=True, strict=True, **_):
         all_connectors = list(sim.connectors.values())
         networks = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
     else:
-        diseases = {d.name: d for d in sc.tolist(sim.pars.get('diseases'))
-                    if isinstance(d, disease_types)}
+        given = [m for d in sc.tolist(sim.pars.get('diseases')) for m in d.expand()] # The genotypes of a family, before the sim takes them
+        diseases = {d.name: d for d in given if isinstance(d, disease_types)}
         all_connectors = sc.tolist(sim.pars.get('connectors'))
         networks = [n for n in sc.tolist(sim.pars.get('networks'))
                     if isinstance(n, SexualNetwork)]

@@ -16,8 +16,8 @@ A simulation is a set of modules that share one population. Each layer answers a
 |---|---|---|
 | Population | Holds age, sex and every per-agent state; adds births, removes deaths, pins the age pyramid to the country's trajectory | `ss.People`, `hpv.Births`, `ss.Deaths`, `hpv.AgeMigration` |
 | Sexual network | Forms and dissolves marital and casual partnerships, and sets how many sex acts each partnership has per year | `hpv.SexualNetwork` |
-| Disease | One module per genotype: transmission, clearance, latency, precancer, cancer, cancer death | `hpv.HPV` |
-| Cross-genotype | Turns immunity earned against one genotype into protection against the others; pools per-genotype results into totals | `hpv.CrossImmunity`, `hpv.HPVTotal` |
+| Disease | One disease whose strains are the genotypes, each a declared module with a course of its own: transmission, clearance, latency, precancer, cancer, cancer death | `hpv.HPV`, `hpv.make_family()` (`ss.strains.Family`) |
+| Cross-genotype | Turns immunity earned against one genotype into protection against the others (with the family); pools per-genotype results into totals | `hpv.CrossImmunity`, `hpv.HPVTotal` |
 | Interventions | Deliver a product (vaccine, screening test, treatment) to a chosen group of people | `ss.vaccinate(hpv.vx(...))`, `ss.screen(hpv.dx(...))`, `ss.treat(hpv.tx(...))` |
 | Analyzers | Watch the population and record things the disease modules do not; they never change the run | `hpv.by_age`, `hpv.dalys`, `hpv.age_pyramid`, … |
 | HIV (optional) | Raises HPV acquisition, speeds progression, and weakens immunity, by CD4 stratum | `hpv.HIV_transmit`, `hpv.HIV_incidence` |
@@ -38,7 +38,7 @@ print('connectors:  ', list(sim.connectors.keys()))
 print('analyzers:   ', list(sim.analyzers.keys()))
 ```
 
-One disease module per genotype is the central design choice. Genotypes differ in how well they transmit, how fast they progress, and how well vaccines cover them, and each of those needs its own per-agent record. Because the modules share one population, a woman can carry HPV16 and HPV18 at the same time — and when one genotype takes her to cancer, the other genotypes' pending progression is cancelled, so she is counted as one cancer case, not two.
+One course per genotype is the central design choice: `sim.diseases` has a module for each genotype, followed by `hpv`, the family that runs them together. Genotypes differ in how well they transmit, how fast they progress, and how well vaccines cover them, and each of those needs its own per-agent record. Because the modules share one population, a woman can carry HPV16 and HPV18 at the same time — and when one genotype takes her to cancer, the other genotypes' pending progression is cancelled, so she is counted as one cancer case, not two.
 
 ## What happens in a timestep
 

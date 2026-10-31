@@ -168,8 +168,8 @@ def test_hiv_results_are_scale_weighted():
     assert 0 <= r['prevalence'][-1] <= 1
     assert 0 <= r['prevalence_15_49'][-1] <= 1
     # Cumulative flows are rebuilt from the corrected per-step series.
-    assert np.isclose(float(r['cum_infections'][-1]),
-                      float(np.sum(r['new_infections'])), rtol=1e-6)
+    assert np.isclose(float(r['infection'].cum[-1]),
+                      float(np.sum(r['infection'])), rtol=1e-6)
 
 def test_hiv_prevalence_by_sex():
     """prevalence_f/_m are scale-weighted adult (15-49) HIV prevalence
@@ -333,14 +333,7 @@ def test_hiv_rel_imm_effect():
             hivmod.cd4_latent[uid] = 100.0  # lo stratum
         hivmod.step_state()  # their CD4 count
         sim.connectors.hiv_effects.step()  # populate hiv_rel_imm before clearance reads it
-        hpvmod.infected[uid] = True
-        hpvmod.precin[uid] = True
-        hpvmod.cin[uid] = False
-        hpvmod.cancerous[uid] = False
-        hpvmod.nab_imm[uid] = 0.0
-        hpvmod.cell_imm[uid] = 0.0
-        hpvmod.ti_clearance[uid] = sim.ti
-        hpvmod.step_state()
+        hpvmod.clear_infection(ss.uids([uid]))
         return float(hpvmod.nab_imm[uid]), float(hpvmod.cell_imm[uid])
 
     nab_neg, cell_neg = _build(seed=1, make_positive=False)

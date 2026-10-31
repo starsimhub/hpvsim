@@ -23,7 +23,7 @@ def test_sim_genotypes_sugar_single():
         genotypes=[16],
     )
     sim.run()
-    assert list(sim.diseases.keys()) == ['hpv16']
+    assert list(sim.diseases.keys()) == ['hpv16', 'hpv']
     # Connector auto-added and named 'crossimmunity'.
     assert any('crossimmunity' in k.lower() for k in sim.connectors.keys()), \
         f'No CrossImmunity connector found; got {list(sim.connectors.keys())}'
@@ -36,7 +36,7 @@ def test_sim_genotypes_sugar_two():
         genotypes=[16, 18],
     )
     sim.init()
-    assert list(sim.diseases.keys()) == ['hpv16', 'hpv18']
+    assert list(sim.diseases.keys()) == ['hpv16', 'hpv18', 'hpv']
 
 
 def test_sim_rejects_diseases_plus_genotypes():
@@ -71,7 +71,7 @@ def test_four_genotype_sim_runs():
     for key in ('hpv16', 'hpv18', 'hi5', 'ohr'):
         res = sim.results[key]
         # Each genotype gets cum_infections via Starsim auto-stratification.
-        assert 'cum_infections' in res or 'new_infections' in res, \
+        assert 'infection' in res, \
             f'{key} missing infection results'
 
 
@@ -93,14 +93,14 @@ def test_genotypes_sugar_matches_explicit_diseases():
     )
     sim_b.run()
     for key in ('hpv16', 'hpv18'):
-        a_inf = float(np.asarray(sim_a.results[key].new_infections).sum())
-        b_inf = float(np.asarray(sim_b.results[key].new_infections).sum())
+        a_inf = float(np.asarray(sim_a.results[key].infection).sum())
+        b_inf = float(np.asarray(sim_b.results[key].infection).sum())
         assert a_inf == pytest.approx(b_inf), \
             f'sugar vs explicit drift for {key}: {a_inf} vs {b_inf}'
 
 
 def test_hpvtotal_cum_infections():
-    """HPVTotal.cum_infections counts agents ever infected with any genotype."""
+    """HPVTotal.infection.cum counts agents ever infected with any genotype."""
     sim = hpv.Sim(
         n_agents=500, location='nigeria',
         start=1990, stop=1995, dt=1.0, rand_seed=0,
@@ -108,9 +108,9 @@ def test_hpvtotal_cum_infections():
     )
     sim.run()
     total = sim.results['all_hpv']
-    any_cum = float(np.asarray(total['cum_infections']).max())
-    h16_cum = float(np.asarray(sim.results['hpv16'].new_infections).sum())
-    h18_cum = float(np.asarray(sim.results['hpv18'].new_infections).sum())
+    any_cum = float(np.asarray(total.infection.cum).max())
+    h16_cum = float(np.asarray(sim.results['hpv16'].infection).sum())
+    h18_cum = float(np.asarray(sim.results['hpv18'].infection).sum())
     # Boolean-OR is at most the sum (equal iff no co-infections).
     assert any_cum > 0
     assert any_cum <= h16_cum + h18_cum + 1e-6
@@ -180,7 +180,7 @@ def test_hpvtotal_cum_infections_unique_bounded_by_sum_of_flows_end_of_sim():
     sim.run()
     total = sim.results.all_hpv
     unique_end = float(np.asarray(total.cum_infections_unique)[-1])
-    sof_end = float(np.asarray(total.cum_infections)[-1])
+    sof_end = float(np.asarray(total.infection.cum)[-1])
     assert unique_end > 0, 'no infections — test is vacuous'
     assert unique_end <= sof_end, f'unique={unique_end} > sof={sof_end}'
 

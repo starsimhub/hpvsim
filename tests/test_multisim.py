@@ -37,7 +37,7 @@ def test_multisim_n_runs_distinct_seeds():
     assert len(set(seeds)) == 4, f'Expected 4 distinct seeds, got {seeds}'
     # Every run produced finite total infections.
     for s in msim.sims:
-        cum_inf = float(s.results.hpv16.cum_infections[-1])
+        cum_inf = float(s.results.hpv16.infection.cum[-1])
         assert np.isfinite(cum_inf)
         assert cum_inf >= 0
 
@@ -46,8 +46,8 @@ def test_multisim_quantiles_shape_and_nonneg():
     """A MultiSim's results have a run axis first; their median and 10/90 quantiles are non-negative for counts."""
     sim = _tiny_sim(rand_seed=0)
     msim = ss.MultiSim(sim, n_runs=5).run(verbose=0)
-    pre_len = len(msim.sims[0].results.hpv16.cum_infections)
-    res = msim.results.hpv16.cum_infections
+    pre_len = len(msim.sims[0].results.hpv16.infection.cum)
+    res = msim.results.hpv16.infection.cum
     assert np.shape(res) == (5, pre_len)
     low, mid, high = [np.asarray(q) for q in res.quantiles([0.1, 0.5, 0.9])]
     for q in (low, mid, high):

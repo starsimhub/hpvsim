@@ -112,11 +112,10 @@ def test_by_age_cancers_matches_all_hpv_new_cancers():
     sim.run()
     ar = sim.analyzers['by_age']
     df = ar.to_dataframe('cancers')
-    all_hpv = np.asarray(sim.results.all_hpv.new_cancers)
-    tvy = sim.timevec.years
+    all_hpv = sim.results.all_hpv.new_cancers.resample('year', use_years=True)
+    tvy = np.asarray(all_hpv.timevec, dtype=float) # A flow in the step that ends a year is that year's
     for year in df.index:
-        ticks = np.where((tvy >= year) & (tvy < year + 1))[0]
-        expected = float(all_hpv[ticks].sum())
+        expected = float(np.asarray(all_hpv.values)[tvy == year].sum())
         actual = float(df.loc[year].sum())
         assert np.isclose(actual, expected, rtol=1e-6, atol=1e-6), (
             f'year {year}: by_age sum={actual}, all_hpv.new_cancers sum={expected}')

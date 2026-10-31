@@ -21,7 +21,7 @@ def _make_tiny_vx_sim(coverage):
 def test_demo_pipeline_runs_end_to_end():
     """ss.parallel(*sims, n_runs=) and quantiles by scenario work on hpv.Sim."""
     msim = ss.parallel(_make_tiny_vx_sim(0.3), _make_tiny_vx_sim(0.6), n_runs=2, verbose=0)
-    res = msim.results.hpv16.cum_infections
+    res = msim.results.hpv16.infection.cum
     assert np.shape(res)[0] == 4 # Runs
     q = np.asarray(res.quantiles([0.1, 0.5, 0.9])).reshape(2, 3, -1) # One row per scenario and quantile
     low, mid, high = q[:, 0], q[:, 1], q[:, 2]

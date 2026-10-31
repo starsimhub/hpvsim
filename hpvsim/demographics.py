@@ -26,6 +26,8 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 
+from .utils import iter_hpv_modules
+
 
 __all__ = ['AgeMigration', 'Births', 'AnnualBirths']
 
@@ -59,7 +61,7 @@ class AgeMigration(ss.Demographics):
         self._n_emi = 0                             # Emigrants requested this step (for results.new_emigrants).
         self._pop_by_year = None                    # {year: per-year pyramid DataFrame}, built in init_pre.
         # CRN-safe emigrant selection — domain set per call.
-        self._emi_select = ss.choice(replace=False)
+        self._emi_select = ss.random()
         # Per-band emigration hazard for fine agents; p set per band per call.
         self._fine_emi_bern = ss.bernoulli(p=0.0)
         # Spreads year-N immigrants across [N, N+1) so cohorts don't age in lockstep.
@@ -254,8 +256,8 @@ class AgeMigration(ss.Demographics):
         if n <= 0 or len(band_uids) == 0:
             return
         n_pick = min(int(n), len(band_uids))
-        self._emi_select.set(a=band_uids)
-        chosen_uids = ss.uids(self._emi_select.rvs(n_pick))
+        keys = self._emi_select.rvs(band_uids) # The n_pick smallest of a random number for each is n_pick chosen at random
+        chosen_uids = band_uids[np.argpartition(keys, n_pick - 1)[:n_pick]]
         self.sim.people.request_removal(chosen_uids)
         return
 
@@ -276,10 +278,8 @@ class AgeMigration(ss.Demographics):
         if len(chosen) == 0:
             return
         pending = np.ones(len(chosen), dtype=bool)
-        for dis in self.sim.diseases.values():
-            canc = getattr(dis, 'cancerous', None)
-            if canc is not None:
-                pending &= ~np.asarray(canc[chosen], dtype=bool)
+        for dis in iter_hpv_modules(self.sim):
+            pending &= ~np.asarray(dis.cancerous[chosen], dtype=bool)
         to_remove = chosen[pending]
         if len(to_remove):
             self.sim.people.request_removal(to_remove)

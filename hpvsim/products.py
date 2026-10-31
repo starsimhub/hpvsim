@@ -7,9 +7,8 @@ Contains:
   - hpv.txvx: therapeutic vaccine product
   - hpv.radiation: cancer treatment product
 
-Each is a product written as code (an ``ss.Product`` with an ``administer()``), since the
-genotypes are diseases written as code, whose states v4's ``ss.Diagnostic`` and ``ss.Treatment``
-cannot key their results by (see ``v4_port_oct26.md``, HP70). Each returns its outcomes from
+Each is a product written as code (an ``ss.Product`` with an ``administer()``), since each uses a
+table by state and genotype, or per-agent immunity. Each returns its outcomes from
 ``administer()``, so they are results and events of the delivery (e.g. ``screening.positive``).
 """
 import functools
@@ -200,7 +199,7 @@ def _default_name(product, name):
     """Name a product after the product it looks up (e.g. 'via'), as its default name: if a delivery has the same name
     (``ablation = ss.treat(hpv.tx('ablation'))``), the sim renames the product (``ablation_product``); ``module_name=`` names it for good"""
     if name is not None and product._default_name:
-        product.name = product.label = name
+        product.name = product.label = 'hpv_dna' if name == 'hpv' else name # 'hpv' is the disease
     return
 
 
@@ -319,6 +318,10 @@ class dx(ss.Product):
         genotypes = list(df.genotype.unique())
         self._all_genotype = genotypes == ['all']
         self._genotypes = genotypes
+        self.probs = {} # By state and genotype, the probability of each result
+        for (state, genotype), sub in df.groupby(['state', 'genotype'], sort=False):
+            probs = np.array([sub.probability[sub.result == r].sum() for r in self.hierarchy])
+            self.probs[(state, genotype)] = probs/probs.sum()
         return
 
     def outcome_names(self):
@@ -333,9 +336,7 @@ class dx(ss.Product):
                 rows = [(_state_uids_for_module(m, state, uids), m.genotype) for m in iter_hpv_modules(self.sim) if m.genotype in self._genotypes]
             for these, genotype in rows:
                 if len(these):
-                    sub = self.df[(self.df.state == state) & (self.df.genotype == genotype)]
-                    probs = np.array([sub.probability[sub.result == r].sum() for r in self.hierarchy])
-                    self.result_dist.set(p=probs/probs.sum())
+                    self.result_dist.set(p=self.probs[(state, genotype)])
                     results.loc[these] = np.minimum(self.result_dist.rvs(these), results.loc[these])
         return {k: ss.uids(results.index[results == i].to_numpy()) for i, k in enumerate(self.hierarchy)}
 
@@ -361,6 +362,9 @@ class tx(ss.Product):
         _default_name(self, name)
         self.df = df
         self.health_states = list(df.state.unique())
+        self.efficacy = {} # By state and genotype, the first row of each
+        for state, genotype, efficacy in zip(df.state, df.genotype, df.efficacy.astype(float)):
+            self.efficacy.setdefault((state, genotype), efficacy)
         self.efficacy_dist = ss.bernoulli(p=0)
         return
 
@@ -372,12 +376,12 @@ class tx(ss.Product):
         treated = []
         for state in self.health_states:
             for module in iter_hpv_modules(self.sim):
-                rows = self.df[(self.df.state == state) & ((self.df.genotype == module.genotype) | (self.df.genotype == 'all'))]
+                efficacy = self.efficacy.get((state, module.genotype), self.efficacy.get((state, 'all')))
                 these = _state_uids_for_module(module, state, uids)
-                if len(rows) == 0 or len(these) == 0:
+                if efficacy is None or len(these) == 0:
                     continue
                 treated.append(these)
-                self.efficacy_dist.set(p=float(rows['efficacy'].values[0]))
+                self.efficacy_dist.set(p=efficacy)
                 eff = self.efficacy_dist.filter(these)
                 if len(eff):
                     cured.append(eff)
@@ -439,7 +443,7 @@ class txvx(tx):
 
 
 class radiation(ss.Product):
-    """HPV cancer-treatment product: extends ``ti_dead_cancer`` per cancerous genotype.
+    """HPV cancer-treatment product: delays the cancer death of each cancerous genotype.
 
     Default duration: normal(mean=18 months, sd=2 months).
 
@@ -459,5 +463,5 @@ class radiation(ss.Product):
         for module in iter_hpv_modules(self.sim):
             cancer_uids = module.cancerous.uids.intersect(uids)
             if len(cancer_uids):
-                module.ti_dead_cancer[cancer_uids] += np.ceil(self.pars.dur.rvs(cancer_uids)) # In the module's steps
+                module.extend_cancer(cancer_uids, np.ceil(self.pars.dur.rvs(cancer_uids))) # In the module's steps
         return
