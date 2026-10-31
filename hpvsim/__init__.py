@@ -1,6 +1,6 @@
 """hpvsim — HPV simulation tools (Starsim-based).
 
-Public API: ``Sim``, ``HPV``, ``make_family``, ``SexualNetwork``, ``AgeMigration``,
+Public API: ``Sim``, ``HPV``, ``SexualNetwork``, ``AgeMigration``,
 ``SimPars``, ``GenotypePars``, ``get_genotype_pars``, ``data``.
 """
 
@@ -15,9 +15,9 @@ from . import misc
 from . import utils
 
 from .data.country import load_country
-from .hpv import HPV, make_family, _normalize_genotype
+from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
-from .seeding import total_init_prev
+from .seeding import _ExclusiveSeeder
 from .sim import Sim
 from .demographics import AgeMigration, AnnualBirths, Births
 from .cross_genotype import CrossImmunity, HPVTotal
@@ -31,7 +31,7 @@ from .examples import demo
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
-    'HPV', 'make_family', 'SexualNetwork', 'Sim', 'AgeMigration', 'AnnualBirths', 'CrossImmunity', 'HPVTotal',
+    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'AnnualBirths', 'CrossImmunity', 'HPVTotal',
     'by_age', 'snapshot', 'age_pyramid', 'age_causal_infection', 'dalys', 'results_by_genotype',
     'calibration',
     'plot_by_age', 'plot_by_genotype', 'plot_type_distribution', 'plot_sim', 'plot_intervention_impact', 'plot_calibration',

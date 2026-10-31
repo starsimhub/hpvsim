@@ -53,19 +53,19 @@ def test_init_prev_seeds_initial_cases():
 
 
 def test_set_prognoses_flips_state():
-    """infect() moves agents from susceptible to infected, and schedules their exit."""
+    """set_prognoses moves agents from susceptible to infected, sets ti_clearance > ti."""
     sim, hpv = _minimal_sim()
     sim.init()
     sus_uids = hpv.susceptible.uids
     assert len(sus_uids) >= 3
     target = sus_uids[:3]
-    hpv.infect(target)
+    hpv.set_prognoses(target, sources=None)
     assert (~hpv.susceptible[target]).all()
     assert hpv.infected[target].all()
-    assert (hpv.ti_exit_precin[target] >= hpv.ti).all()
+    assert (hpv.ti_clearance[target] > hpv.ti).all()
 
 
-def test_clearance_returns_to_susceptible():
+def test_step_state_clears_at_ti_clearance():
     """Cleared agents return to susceptible=True, infected=False.
     Post-clearance immunity (nab_imm > 0) is only granted to females who
     seroconvert (males get no immunity; first-clearance is gated
@@ -78,8 +78,9 @@ def test_clearance_returns_to_susceptible():
     female_uids = female.uids
     assert len(female_uids) >= 5, 'need at least 5 female agents for this test'
     target = female_uids[:10]
-    hpv.infect(target)
-    hpv.clear_infection(target)
+    hpv.set_prognoses(target, sources=None)
+    hpv.ti_clearance[target] = hpv.ti
+    hpv.step_state()
     assert hpv.susceptible[target].all(), "cleared agents should return to susceptible"
     assert (~hpv.infected[target]).all(), "cleared agents must not remain infected"
     # With sero_prob=0.75 and 10 females, expect ~7-8 seroconverters.

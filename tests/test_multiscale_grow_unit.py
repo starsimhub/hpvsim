@@ -124,7 +124,8 @@ def test_grow_creates_fine_cancer_agents_at_ratio(grown_sim):
     flagged = np.zeros(len(fine_uids), dtype=bool)
     for dis in sim.diseases.values():
         if isinstance(dis, hpv.HPV):
-            flagged |= np.asarray(dis.ca_fate[fine_uids]) == 1
+            sched = ~np.isnan(np.asarray(dis.ti_cancerous[fine_uids]))
+            flagged |= (np.asarray(dis.cancerous[fine_uids]) | sched)
     assert flagged.all()
 
 def test_fine_agents_excluded_from_network(grown_sim):

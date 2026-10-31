@@ -23,7 +23,7 @@ def test_sim_genotypes_sugar_single():
         genotypes=[16],
     )
     sim.run()
-    assert list(sim.diseases.keys()) == ['hpv16', 'hpv']
+    assert list(sim.diseases.keys()) == ['hpv16']
     # Connector auto-added and named 'crossimmunity'.
     assert any('crossimmunity' in k.lower() for k in sim.connectors.keys()), \
         f'No CrossImmunity connector found; got {list(sim.connectors.keys())}'
@@ -36,7 +36,7 @@ def test_sim_genotypes_sugar_two():
         genotypes=[16, 18],
     )
     sim.init()
-    assert list(sim.diseases.keys()) == ['hpv16', 'hpv18', 'hpv']
+    assert list(sim.diseases.keys()) == ['hpv16', 'hpv18']
 
 
 def test_sim_rejects_diseases_plus_genotypes():

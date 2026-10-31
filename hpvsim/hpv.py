@@ -4,25 +4,23 @@ Scope note: HPVsim only models cervical cancer outcomes. HPV is also
 associated with anal, oropharyngeal, penile, vaginal, and vulvar cancers
 (the first three of which can occur in males); those are out of scope here.
 
-Models the natural history of one genotype as a declared Starsim disease:
+Models the natural-history pipeline as a Starsim Infection:
 
-    susceptible -> precin -> (susceptible | latent | cin)
-    cin -> (susceptible | latent | cancerous -> death)
-    latent -> precin
-
-The genotypes of a sim are the strains of one disease (``make_family()``, which
-``hpv.Sim`` calls), each with a course of its own (``ss.strains.Family``). Cancer is
-shared: entering it in one genotype ends the others (in ``blocked``). Clearing a
-genotype gives ``nab_imm``, which protects against each genotype through the
-cross-immunity matrix (``ss.immunity``).
+    susceptible -> precin -> (clear | CIN -> (clear | cancerous -> death))
 
 Females are eligible for the full progression; males clear from precin without
-entering CIN/cancer. Clearance gives females partial immunity: beta samples
-accumulate as a running max into ``nab_imm`` (humoral) and ``cell_imm``
-(cell-mediated). Vaccine-conferred immunity is stored separately in ``vax_imm`` and
-does NOT flow through the cross-immunity matrix: the CSV's per-genotype ``rel_imm``
-is the complete vaccine cross-protection profile. The ``CrossImmunity`` connector
-applies ``vax_imm`` and works out ``sev_imm`` each step.
+entering CIN/cancer. Clearance grants partial same-genotype immunity: per-agent
+beta samples accumulate as a running max into ``nab_imm`` (humoral) and
+``cell_imm`` (cell-mediated). Vaccine-conferred immunity is stored separately
+in ``vax_imm`` and does NOT flow through the cross-immunity matrix — the
+CSV's per-genotype ``rel_imm`` is the complete vaccine cross-protection
+profile. The ``CrossImmunity`` connector reads ``nab_imm`` / ``cell_imm``
+each step, matrix-multiplies to derive cross-genotype ``rel_sus`` / ``sev_imm``,
+then combines with ``vax_imm`` via independent-protection paths.
+
+Multi-genotype runs instantiate one HPV per genotype, all sharing the People
+and going through the same Connector path; a 1-genotype run uses a 1×1
+identity matrix on the Connector.
 """
 
 import numpy as np
@@ -48,14 +46,15 @@ def _clone_agents(sim, src_uids, new_uids):
     """Copy every per-agent Arr from src_uids to new_uids.
 
     starsim registers every module's per-agent states into ``people.states``
-    under combined names, so one loop clones ALL per-agent state (People,
-    network, demographics, disease, connector), except the identity keys in
-    ``_NO_CLONE_STATES``. Cloning network/demographics state is harmless: fine
-    agents are excluded from those subsystems, so those values are inert.
-
-    The values are read raw, since a time reads as the step it happened in, which
-    is not what is stored (see ``ss.TimeArr``), and set as usual, which keeps the
-    engines' counts of who is in each state.
+    under combined names, so the first loop over ``ppl.states`` already clones
+    ALL per-agent state (People, network, demographics, disease, connector) —
+    except the identity keys in ``_NO_CLONE_STATES``. The second loop over
+    disease + connector ``state_list`` is therefore a redundant belt-and-
+    suspenders re-copy (idempotent — same source values written twice); it is
+    kept so the clone stays correct even if a starsim version stops flattening
+    module states into ``people.states``. Cloning network/demographics state is
+    harmless: fine agents are excluded from those subsystems, so those values
+    are inert.
 
     Lifecycle states in ``_RESET_ON_CLONE`` (``ti_dead``/``ti_removed``/``alive``)
     are then reset to fresh-agent defaults so a clone never inherits its source's
@@ -66,8 +65,12 @@ def _clone_agents(sim, src_uids, new_uids):
     """
     ppl = sim.people
     for key, arr in ppl.states.items():
-        if key not in _NO_CLONE_STATES:
-            arr[new_uids] = arr.raw[src_uids]
+        if key in _NO_CLONE_STATES:
+            continue
+        arr[new_uids] = arr[src_uids]
+    for mod in list(sim.diseases.values()) + list(sim.connectors.values()):
+        for st in mod.state_list:
+            st[new_uids] = st[src_uids]
     for name, val in _RESET_ON_CLONE.items():
         if name in ppl.states:
             ppl.states[name][new_uids] = val
@@ -126,43 +129,30 @@ def _normalize_genotype(key):
     )
 
 
-def _in_years(v):
-    """A duration's number of years, or a plain number"""
-    return v.years if hasattr(v, 'years') else v
+class HPV(ss.Infection):
+    """Per-genotype HPV disease module.
 
-
-
-
-class HPV(ss.Disease):
-    """The natural history of one genotype of HPV.
-
-    Declared, so its results and its place in a family come from its states and
-    transitions; ``make_family()`` ties the genotypes of a sim together. How long
-    someone stays in ``precin`` and ``cin`` decides what comes next (the longer, the
-    likelier progression): see ``p_cin()`` and ``p_cancer()``, read as people leave.
-
-    Args:
-        genotype (str): 'hpv16', 'hpv18', 'hi5', or 'ohr'
-        pars (dict): parameters, as for the keywords
-        init_prev (Dist): who starts infected; by default, this genotype's curve by age and sex; None if the family seeds it
-        kwargs (dict): parameters (see below), or ``name``
+    The ``genotype`` attribute identifies which strain this instance models.
+    The CrossImmunity connector reads each registered HPV's nab_imm/cell_imm
+    (clearance-conferred) each step, matrix-multiplies to derive per-target
+    rel_sus/sev_imm, then combines with vax_imm (vaccine-conferred, per-target
+    direct) via independent-protection paths. Vaccine immunity does NOT flow
+    through the cross-immunity matrix.
     """
 
-    def __init__(self, genotype='hpv16', pars=None, init_prev='curve', **kwargs):
+    def __init__(self, genotype='hpv16', pars=None, **kwargs):
         if genotype not in _KNOWN_GENOTYPES:
             raise ValueError(
                 f'genotype must be one of {list(_KNOWN_GENOTYPES)}; got {genotype!r}.'
             )
         self.genotype = genotype
-        super().__init__(name=kwargs.pop('name', genotype))
-        S, P, C, Ca, L, X = ss.states('susceptible precin cin cancerous latent blocked')
-        L.keep_time = True
-        S.label, P.label, C.label, Ca.label, L.label = 'Susceptible', 'Precancerous infection', 'Cervical intraepithelial neoplasia', 'Invasive cancer', 'Latent infection'
-        X.label = 'Cancer of another genotype' # Where the family moves them (see ss.strains.Family.step())
-        self.define_states(S, P, C, Ca, L, X)
+        if 'name' not in kwargs:
+            kwargs['name'] = genotype
+        super().__init__()
         # Natural-history defaults come from GenotypePars.
         gpars = get_genotype_pars(genotype)
         self.define_pars(
+            init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
             # Scalar beta; validate_beta() expands it. A dict bypasses expansion.
             beta=gpars.beta,
             dur_precin=gpars.dur_precin,
@@ -193,53 +183,63 @@ class HPV(ss.Disease):
 
         # A duration without ss.years() is read in timesteps, not years.
         self._validate_duration_units()
-
-        # A parameter that is a function is read for the people concerned; see the methods
-        par = lambda func: ss.par(func, name=func.__name__)
-        beta = dict(sexualnetwork=ss.peract(m2f=self.beta_m2f, f2m=self.beta_f2m), default=0)
-        infection = ss.Transition(S, P, rate=ss.par(beta, name='beta_by_net')*(P + C))
-        progression = ss.Transition(P, [C, L, S], dur=ss.par(self.pars.dur_precin, name='dur_precin')*par(self.rel_dur_precin),
-                                    p=[self.p_cin, self.p_latent_precin, None], where=ss.ppl.female)
-        male_clearance = ss.Transition(P, S, dur=ss.par(self.pars.dur_inf_male, name='dur_inf_male'), where=~ss.ppl.female)
-        transformation = ss.Transition(C, [Ca, L, S], dur=ss.par(self.pars.dur_cin, name='dur_cin')*par(self.rel_dur_cin),
-                                       p=[self.p_cancer, self.p_latent_cin, None])
-        reactivation = ss.Transition(L, P, rate=ss.par(self.pars.hpv_reactivation, name='hpv_reactivation')*par(self.rel_reactivation))
-        cancer_death = ss.Transition(Ca, ss.null, dur=ss.par(self.pars.dur_cancer, name='dur_cancer'))
-        cure = ss.Transition([P, C], S) # Only by treatment: see clear_infection()
-        self.define_transitions(infection=infection, progression=progression, male_clearance=male_clearance, transformation=transformation,
-                                reactivation=reactivation, cancer_death=cancer_death, cure=cure)
-        cleared = progression.to(S) | transformation.to(S) | cure # Females only: men clear by male_clearance, with no immunity
-        self.declare(kwargs=dict(
-            infected=P + C,
-            # Fixed at infection, for the course that follows
-            rel_sev=ss.attr(par(self.rel_sev_now), on=P.enter, label='Relative severity at infection'),
-            # Running max over clearances; an HIV-reduced draw can fail to boost immunity but never erases it. sero_prob
-            # gates nab_imm until a woman has seroconverted, and never gates cell_imm
-            sero=ss.attr(ss.bernoulli(p=self.p_sero), on=cleared, combine='max', init=0, label='Whether seroconverted'),
-            nab_imm=ss.attr(ss.par(self.pars.imm_init, name='imm_init')*par(self.rel_nab), on=cleared, combine='max', init=0, label='Humoral immunity (clearance-conferred, source genotype)'),
-            cell_imm=ss.attr(ss.par(self.pars.cell_imm_init, name='cell_imm_init')*par(self.rel_imm), on=cleared, combine='max', init=0, label='Cell-mediated immunity (source genotype)'),
-        ))
-        init_prev = _make_init_prev_fn(genotype) if isinstance(init_prev, str) else init_prev.pars.p if isinstance(init_prev, ss.bernoulli) else init_prev
-        if init_prev is not None:
-            self.declare(kwargs=dict(init_prev=init_prev))
-
+        # ss.Infection already provides susceptible/infected/rel_sus/rel_trans/ti_infected.
         self.define_states(
-            # A subset of cancerous: onset has happened and detection has not
-            ss.BoolArr('undetected_cancerous', label='Undetected invasive cancer'),
-            ss.TimeArr('ti_cancer_detection', label='Time of cancer detection'),
-            ss.TimeArr('ti_cancer_death', label='Time of cancer-caused death'),
+            ss.FloatArr('ti_clearance', label='Time of natural clearance'),
+            # Set on first infection only; ti_infected is overwritten on reinfection.
+            ss.FloatArr('ti_first_infection', label='Time of first infection'),
+            ss.BoolState('precin', label='Precancerous infection'),
+            ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
+            ss.BoolState('cancerous', label='Invasive cancer'),
+            # Subset of cancerous: cancer onset has fired but detection has not.
+            # Flipped True at cin -> cancerous, False when ti >= ti_cancer_detection.
+            ss.BoolState('undetected_cancerous', label='Undetected invasive cancer'),
+            ss.BoolState('latent', label='Latent infection'),
+            # Set in set_prognoses, cleared by step_state once ti_latent is stamped.
+            # BoolArr, not BoolState: an internal scheduling flag, so it must not
+            # auto-generate a public n_to_latent result (which would also be
+            # summed into all_hpv, where it is meaningless).
+            ss.BoolArr('to_latent', label='Pending transition into latency'),
+            ss.FloatArr('ti_latent', label='Time latency began'),
             ss.FloatArr('ti_reactivation', label='Time of reactivation from latency'),
+            ss.FloatArr('ti_cin', label='Time of CIN onset'),
+            ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
+            ss.FloatArr('ti_cancer_detection', label='Time of cancer detection'),
+            ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
+            # Running max over clearances; shortens future dur_precin by (1 - sev_imm).
+            ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
+            # Per-source: immunity conferred by clearing this genotype, which
+            # CrossImmunity matrix-multiplies into per-target rel_sus/sev_imm.
+            ss.FloatArr('nab_imm', label='Humoral immunity (clearance-conferred, source genotype)', default=0.0),
+            ss.FloatArr('cell_imm', label='Cell-mediated immunity (source genotype)', default=0.0),
             # Per-target: protection against this genotype, applied directly in
             # CrossImmunity.step() and never through the cross-immunity matrix.
             ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (against this/target genotype)', default=0.0),
             ss.FloatArr('txvx_sev_imm', label='Therapeutic-conferred severity immunity (against this/target genotype)', default=0.0),
-            ss.FloatArr('sev_imm', label='Severity immunity', default=0.0), # From CrossImmunity: shortens dur_precin at infection
-            ss.FloatArr('ca_fate', label='Whether cancer follows CIN, if decided at its onset'), # See _grow_fine_agents()
         )
+        # p is overwritten via .set(p=...) at each use site.
+        self._cin_bern = ss.bernoulli(p=0.5)
+        self._cancer_bern = ss.bernoulli(p=0.5)
+        self._sero_bern = ss.bernoulli(p=0.5)
+        # One rounding dist per ti_<event> so the round-up draws stay independent.
+        self._round_clear_precin_bern = ss.bernoulli(p=0.5)
+        self._round_cin_bern = ss.bernoulli(p=0.5)
+        self._round_clear_cin_bern = ss.bernoulli(p=0.5)
+        self._round_cancer_bern = ss.bernoulli(p=0.5)
         self._round_detection_bern = ss.bernoulli(p=0.5)
+        self._round_dead_bern = ss.bernoulli(p=0.5)
+        # Latency entry roll and reactivation hazard get their own streams.
+        self._latent_bern = ss.bernoulli(p=0.5)
+        self._reactivation_bern = ss.bernoulli(p=0.5)
         # Separate RNG streams so growing fine agents doesn't perturb real agents' draws.
-        self._fate_unif = ss.random()
-        self._extra_dur_cin = ss.lognorm_ex(mean=_in_years(self.pars.dur_cin.pars['mean']), std=_in_years(self.pars.dur_cin.pars['std']))
+        # .years keeps these unitless: .rvs() returns years, not timesteps.
+        def _yr(v):
+            return v.years if hasattr(v, 'years') else v
+        pc = self.pars.dur_precin.pars
+        cn = self.pars.dur_cin.pars
+        self._extra_dur_precin = ss.lognorm_ex(mean=_yr(pc['mean']), std=_yr(pc['std']))
+        self._extra_dur_cin = ss.lognorm_ex(mean=_yr(cn['mean']), std=_yr(cn['std']))
+        self._extra_cin_unif = ss.random()
         self._extra_cancer_unif = ss.random()
         return
 
@@ -279,144 +279,88 @@ class HPV(ss.Disease):
                 )
         return
 
-    def init_pre(self, sim):
-        self.male_clearance.after = ss.years(sim.t.dt_year/2) # Male clearance rounds up to a whole step, half a step on average, where the rest round to nearest
-        super().init_pre(sim)
-        del self.infected # So that it is read by __getattr__()
-        self.add_callback('progression', self.on_progression)
-        self.add_callback('transformation', self.on_transformation)
-        self.add_callback('cancer_death', self.on_cancer_death)
-        self.add_callback('reactivation', self.on_reactivation)
+    def init_post(self):
+        # rel_sev must be sampled before super() seeds init_prev, which reads it.
+        cross = self._cross_immunity_connector()
+        if cross is not None:
+            cross.ensure_rel_sev(self.sim.people.alive.uids)
+        super().init_post()
         return
 
-    @property
-    def ti_infected(self):
-        """The time of the latest infection (or reactivation), which starts a course"""
-        return self.ti_precin
+    def _cross_immunity_connector(self):
+        """Locate the CrossImmunity connector on the sim, if any.
 
-    @property
-    def ti_first_infection(self):
-        """Whether, as a time, each person has ever been infected: the time of the latest"""
-        return self.ti_precin
-
-    @property
-    def ti_dead_cancer(self):
-        """The time of cancer-caused death, once scheduled"""
-        return self.ti_exit_cancerous
-
-    def __getattr__(self, attr):
-        """``infected`` is a named sum of states; in a sim, it is the array of who is in it, as for a state"""
-        if attr == 'infected':
-            return self.precin | self.cin
-        return super().__getattr__(attr)
+        Returns None if no CrossImmunity is registered (single-genotype
+        sims without cross-immunity get a 1x1 identity connector by
+        default, but defensive against future configurations that disable
+        it). When None, rel_sev stays at its default 1.0.
+        """
+        # Avoid circular import at module load.
+        from .cross_genotype import CrossImmunity
+        for c in self.sim.connectors.values():
+            if isinstance(c, CrossImmunity):
+                return c
+        return None
 
     def validate_beta(self):
-        """Expand a scalar pars.beta via rel_beta/transf2m/transm2f, as [f2m, m2f] (mirrors
-        stisim's BaseSTI.validate_beta). An explicit dict pars.beta is passed through unchanged."""
+        """Expand a scalar pars.beta via rel_beta/transf2m/transm2f (mirrors
+        stisim's BaseSTI.validate_beta). An explicit dict pars.beta is passed
+        through unchanged. A bare (unattached) module has no self.sim to
+        validate networks against, so skip super() and expand/pass-through
+        directly."""
         beta = self.pars.beta
-        if not sc.isnumber(beta):
+        if self.sim is None:
+            if sc.isnumber(beta):
+                base = beta * self.pars.rel_beta
+                return {'sexualnetwork': _clip_beta(
+                    base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
+                )}
             return dict(beta)
-        base = beta * self.pars.rel_beta
-        betamap = {} if self.sim is None else {ss.networks.standardize_netkey(net): [0.0, 0.0] for net in self.sim.networks.keys()}
-        return betamap | {'sexualnetwork': _clip_beta(base * self.pars.transf2m, base * self.pars.transm2f, self.genotype)}
-
-    # What the transitions read (see __init__())
-
-    def beta_f2m(self, sim):
-        return self.validate_beta()['sexualnetwork'][0]
-
-    def beta_m2f(self, sim):
-        return self.validate_beta()['sexualnetwork'][1]
+        betamap = super().validate_beta()
+        if sc.isnumber(beta):
+            base = beta * self.pars.rel_beta
+            for net in betamap:
+                if net == 'sexualnetwork':
+                    betamap[net] = _clip_beta(
+                        base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
+                    )
+                else:
+                    betamap[net] = [0.0, 0.0]
+        return betamap
 
     def _hiv_effects(self):
         """HIV's effects on HPV (``hpv.HIVEffects``) in the sim, if any (None when no HIV)."""
         return misc.hiv_effects(self.sim)
 
-    def _hiv_factor(self, key, uids):
-        """One of HIV's effects on HPV for some people, which is 1 without HIV"""
-        effects = self._hiv_effects()
-        return np.ones(len(uids)) if effects is None else effects[key][uids]
-
-    def rel_dur_precin(self, sim, uids):
-        """Severity immunity shortens dur_precin, fixed at infection"""
-        return 1.0 - self.sev_imm[uids]
-
-    def rel_dur_cin(self, sim, uids):
-        """age_risk's multiplier on dur_cin, by the age at infection. A smooth ramp: a hard step at 30
-        would carve the cancer-age distribution into two visible modes at ~25 and ~30."""
-        return _age_risk_ramp(self.sim.people.age[uids] - self._stay('precin', uids), self.pars.age_risk)
-
-    def rel_reactivation(self, sim, uids):
-        """Relative factors scale the rate, never the probability"""
-        return (1.0 - self.sev_imm[uids]) * self._hiv_factor('hiv_rel_reactivation', uids)
-
-    def rel_sev_now(self, sim, uids):
-        """rel_sev is shared across genotypes via CrossImmunity; HIV co-infection scales it (gated no-op when no HIV)"""
-        cross = misc.cross_immunity(sim)
-        rel_sev = np.ones(len(uids)) if cross is None else np.abs(cross.rel_sev[uids])
-        return rel_sev * self._hiv_factor('hiv_rel_sev', uids)
-
-    def rel_imm(self, sim, uids):
-        """HIV co-infection reduces conferred immunity (gated no-op); one dt stale, as the connector steps first"""
-        return self._hiv_factor('hiv_rel_imm', uids)
-
-    def p_sero(self, module, sim, uids):
-        return np.full(len(uids), float(self.pars.sero_prob))
-
-    def rel_nab(self, sim, uids):
-        return self.sero[uids] * self.rel_imm(sim, uids)
-
-    def _stay(self, state, uids):
-        """The years people leaving a state spent in it (0 for those moved through it at once)"""
-        return np.maximum(self.engine.ti - self[f'ti_{state}'].raw[uids], 0.0) * self.t.dt_year
-
-    def p_cin(self, sim, uids):
-        """P(CIN) from the years in precin; rel_sev applies separately from sev_imm, which shortened them"""
-        return np.clip(compute_severity(self._stay('precin', uids), rel_sev=self.rel_sev[uids], pars=self.pars.cin_fn), 0, 1)
-
-    def p_cancer(self, sim, uids):
-        """P(cancer) from the years in CIN; sev_imm is not applied here, only rel_sev. If it was decided at CIN onset, as it was"""
-        p = np.clip(compute_severity(self._stay('cin', uids), rel_sev=self.rel_sev[uids], pars=self.pars.cancer_fn), 0, 1)
-        fate = self.ca_fate[uids]
-        return np.where(np.isnan(fate), p, fate)
-
-    def p_latent_precin(self, sim, uids):
-        """Of the women who would clear, the share who enter latency instead (no-op unless hpv_control_prob>0)"""
-        ctrl = self.pars.hpv_control_prob
-        return (1.0 - self.p_cin(sim, uids)) * ctrl if ctrl else 0.0
-
-    def p_latent_cin(self, sim, uids):
-        ctrl = self.pars.hpv_control_prob
-        return (1.0 - self.p_cancer(sim, uids)) * ctrl if ctrl else 0.0
-
-    # Results
-
     def init_results(self):
-        """The results that are not a state or a transition's: ``new_cancers`` counts detection, and
-        ``sum_age_at_*`` are per-step accumulators, whose mean age is ``sum / count``"""
+        """Per-step Results emitted from ``step_state``.
+
+        ``new_cancers`` / ``new_undetected_cancers`` / ``new_cancer_deaths``
+        are realized-event counters (undetected -> detected, cin -> cancerous,
+        and cancerous -> dead respectively). ``cum_*`` are populated as
+        cumulative sums in ``finalize_results``. ``sum_age_at_*`` are per-step
+        accumulators; mean age = ``sum / count``. Starsim counts each state
+        (e.g. ``cin``), weighted by each agent's ``scale`` (multiscale agents).
+        """
         super().init_results()
         self.define_results(
-            ss.Result('undetected_cancerous', dtype=float, scale=True, kind='stock', label='Undetected invasive cancer'),
-            ss.Result('new_cancers', dtype=float, scale=True, kind='flow', label='New detected cancers'),
-            # Other names for flows, which are scaled already. WORKAROUND: as ss.outcome() these would be drawn as whole numbers from the weights of fine agents (ss.solvers.Agents.weighted_events())
-            ss.Result('new_undetected_cancers', dtype=float, scale=False, kind='flow', label='New cancer onsets (pre-detection)'),
-            ss.Result('new_cancer_deaths', dtype=float, scale=False, kind='flow', label='New cancer deaths'),
-            ss.Result('new_reactivations', dtype=float, scale=False, kind='flow', label='New reactivations from latency'),
-            ss.Result('cum_cancers', dtype=float, scale=True, kind='stock', label='Cumulative cancers'),
-            ss.Result('cum_cancer_deaths', dtype=float, scale=True, kind='stock', label='Cumulative cancer deaths'),
-            ss.Result('sum_age_at_cancer', dtype=float, scale=True, kind='flow', label='Sum of ages at cancer onset'),
-            ss.Result('sum_age_at_cancer_death', dtype=float, scale=True, kind='flow', label='Sum of ages at cancer death'),
+            ss.Result('new_cancers', dtype=float, scale=True,
+                      label='New detected cancers'),
+            ss.Result('new_undetected_cancers', dtype=float, scale=True,
+                      label='New cancer onsets (pre-detection)'),
+            ss.Result('new_cancer_deaths', dtype=float, scale=True,
+                      label='New cancer deaths'),
+            ss.Result('cum_cancers', dtype=float, scale=True,
+                      label='Cumulative cancers'),
+            ss.Result('cum_cancer_deaths', dtype=float, scale=True,
+                      label='Cumulative cancer deaths'),
+            ss.Result('sum_age_at_cancer', dtype=float, scale=True,
+                      label='Sum of ages at cancer onset'),
+            ss.Result('sum_age_at_cancer_death', dtype=float, scale=True,
+                      label='Sum of ages at cancer death'),
+            ss.Result('new_reactivations', dtype=float, scale=True,
+                      label='New reactivations from latency'),
         )
-        return
-
-    def update_results(self):
-        super().update_results()
-        people = self.sim.people
-        res, ti = self.results, self.ti
-        res.undetected_cancerous[ti] = people.scale_flows((self.undetected_cancerous & people.alive).uids)
-        res.new_undetected_cancers[ti] = res['transformation.cancerous'][ti]
-        res.new_cancer_deaths[ti] = res.cancer_death[ti]
-        res.new_reactivations[ti] = res.reactivation[ti]
         return
 
     def finalize_results(self):
@@ -424,63 +368,6 @@ class HPV(ss.Disease):
         res = self.results
         res.cum_cancers[:] = np.cumsum(res.new_cancers)
         res.cum_cancer_deaths[:] = np.cumsum(res.new_cancer_deaths)
-        return
-
-    # What happens around the declared transitions
-
-    def step_state(self):
-        """Every genotype's moves, before any of them transmits, and detect cancers, whose onset was earlier. Reset
-        rel_sus so CrossImmunity and HIV multiply, not overwrite.
-
-        WORKAROUND: a declared disease takes its moves and its transmission together, in its ``step()``, one
-        genotype at a time. A woman can be reinfected by her partner in the step she clears, so a family stepped
-        that way protects her against the genotypes earlier in the order by less than against those later,
-        which then favors the earlier ones. Taking the moves here is as agents only, which HPVsim is.
-        """
-        super().step_state()
-        self.engine.step_state()
-        self.run_callbacks()
-        self.rel_sus[:] = 1.0
-        detected = (self.undetected_cancerous & self.cancerous & (self.ti_cancer_detection <= self.ti)).uids
-        if len(detected):
-            self.undetected_cancerous[detected] = False
-            self.results.new_cancers[self.ti] = self.sim.people.scale_flows(detected)
-        return
-
-    def step(self):
-        """The transmission (see ``step_state()``)"""
-        self.engine.step()
-        self.engine.step_funcs()
-        return
-
-    def on_progression(self, uids):
-        """Multiscale: women reaching CIN, in this step or the last one's transmission, even if their stay in it has ended already"""
-        if self.pars.ms_agent_ratio > 1:
-            reached = self.ti_cin.raw[uids] >= self.ti - 2 # In the engine's time (see ss.TimeArr)
-            if reached.any():
-                self._grow_fine_agents(uids[reached].unique())
-        return
-
-    def on_transformation(self, uids):
-        """Cancer onset: the detection lag is drawn here, so a screening-lag scenario (dur_undetected>0)
-        can defer new_cancers without changing biology."""
-        uids = uids[self.cancerous[uids]]
-        if len(uids):
-            ppl = self.sim.people
-            self.undetected_cancerous[uids] = True
-            self.ti_cancer_detection[uids] = self.ti + self._randround(self.pars.dur_undetected.rvs(uids), uids, self._round_detection_bern)
-            self.results.sum_age_at_cancer[self.ti] += float((ppl.age[uids] * ppl.scale[uids]).sum())
-        return
-
-    def on_reactivation(self, uids):
-        self.ti_reactivation[uids] = self.ti
-        return
-
-    def on_cancer_death(self, uids):
-        """+dt_yr: this runs before ages advance, so this is age at step end"""
-        ppl = self.sim.people
-        self.ti_cancer_death[uids] = self.ti
-        self.results.sum_age_at_cancer_death[self.ti] += float(((ppl.age[uids] + self.t.dt_year) * ppl.scale[uids]).sum())
         return
 
     @staticmethod
@@ -493,52 +380,248 @@ class HPV(ss.Disease):
         deterministic, per-uid draw under CRN. ``dist`` must be a dedicated
         Bernoulli created in ``__init__`` and used only at this call site.
         ``values`` and ``uids`` must align element-wise.
+
+        Defensively clamps ``values`` to >= 0 before computing the fractional
+        Bernoulli probability — a negative ``frac`` would crash the Bernoulli.
         """
         if len(uids) == 0:
             return np.zeros(0, dtype=int)
         values = np.maximum(values, 0.0)
         floor = np.floor(values)
-        dist.set(p=values - floor)
-        return (floor + dist.rvs(uids)).astype(int)
+        frac = values - floor
+        dist.set(p=frac)
+        bumps = dist.rvs(uids)
+        return (floor + bumps).astype(int)
 
-    def _grow_fine_agents(self, cin_uids):
-        """Grow up to ratio-1 extra real fine cancer agents per woman reaching CIN.
+    def _roll_latency(self, female_uids):
+        """Roll hpv_control_prob for female agents about to clear.
 
-        Whether cancer follows is decided here for these women (``ca_fate``), from
-        the stay in CIN just scheduled, so that those transforming can be shrunk
-        to scale 1/ratio before they count. For every CIN reacher, ratio-1 extra
-        stays are drawn (age_risk-modified dur_cin), cancer is drawn for each
-        extra, and one real fine agent is grown per extra-cancer success (full
-        cross-genotype clone of the source, then this genotype's cancer-bound
-        stay in CIN written). No-op at ms_agent_ratio<=1.
+        Called from both clearance-scheduling branches in set_prognoses (precin-
+        only clearance, and post-CIN clearance) so the roll applies to any
+        clearance event, matching v2.2.6 semantics. Agents who hit are flagged
+        to_latent=True; step_state redirects their scheduled clearance into
+        latency instead of susceptibility. No-op when hpv_control_prob==0 (the
+        default), keeping the feature a true no-op unless calibrated on.
+        """
+        if len(female_uids) == 0 or self.pars.hpv_control_prob == 0:
+            return
+        p = np.full(len(female_uids), self.pars.hpv_control_prob)
+        self._latent_bern.set(p=p)
+        latent_uids = self._latent_bern.filter(female_uids)
+        if len(latent_uids):
+            self.to_latent[latent_uids] = True
 
-        RNG: the extra draws come from dedicated dists registered in __init__ --
+    def set_prognoses(self, uids, sources=None):
+        """Sample full natural-history trajectory for newly-infected agents.
+
+          - dur_precin sampled for everyone; males then clear after
+            dur_inf_male without entering CIN/cancer.
+          - For females, P(CIN) = compute_severity(dur_precin, cin_fn).
+            Non-CIN agents clear after dur_precin.
+          - For CIN agents, P(cancer) = compute_severity(dur_cin, cancer_fn).
+            Non-cancer agents clear after dur_precin + dur_cin.
+          - Cancer agents get ti_cancerous and ti_dead_cancer scheduled; the
+            CIN -> cancerous transition and request_death fire from step_state.
+
+        Initial seeding via ``init_post -> set_prognoses`` flows through here
+        so init_prev-seeded agents get ti_first_infection set too (at ti=0).
+        """
+        super().set_prognoses(uids, sources)
+        ti = self.ti + 1 # Infected at the end of this step, so the course starts at the next (as ss.Infection schedules; the seeds are dated at ti=0)
+        p = self.pars
+
+        first_uids = uids[self.ti_first_infection.isnan[uids]]
+        self.ti_first_infection[first_uids] = self.ti
+
+        self.susceptible[uids] = False
+        self.infected[uids] = True
+        self.ti_infected[uids] = self.ti
+        self.precin[uids] = True
+
+        # Clear stale schedules from a prior infection.
+        self.ti_clearance[uids] = np.nan
+        self.ti_cin[uids] = np.nan
+        self.ti_cancerous[uids] = np.nan
+        self.ti_cancer_detection[uids] = np.nan
+        self.ti_dead_cancer[uids] = np.nan
+        self.undetected_cancerous[uids] = False
+        self.to_latent[uids] = False
+        self.latent[uids] = False
+
+        female_all = self.sim.people.female[uids]
+        # rel_sev is shared across genotypes via CrossImmunity, sampled on first touch.
+        cross = self._cross_immunity_connector()
+        if cross is not None:
+            cross.ensure_rel_sev(uids)
+            rel_sev_uids = cross.rel_sev[uids]
+        else:
+            rel_sev_uids = np.ones(len(uids), dtype=float)
+        # HIV co-infection scales progression severity (gated no-op when no HIV).
+        hivc = self._hiv_effects()
+        if hivc is not None:
+            rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
+        sev_imm_uids = self.sev_imm[uids]
+
+        # 1. Precin durations: females get sample * (1 - sev_imm), males get
+        #    dur_inf_male with no immunity reduction. rel_sev applies separately.
+        dur_precin = p.dur_precin.rvs(uids) * (1.0 - sev_imm_uids)
+        if (~female_all).any():
+            male_uids = uids[~female_all]
+            dur_inf_male = p.dur_inf_male.rvs(male_uids)
+            dur_precin[~female_all] = dur_inf_male
+
+        # 2. P(CIN) per female. Dists return timesteps; cin_fn expects years.
+        dt_yr = self.t.dt_year
+        p_cin = compute_severity(dur_precin * dt_yr,
+                                   rel_sev=rel_sev_uids, pars=p.cin_fn)
+        self._cin_bern.set(p=p_cin)
+        cin_draw = self._cin_bern.rvs(uids)
+        cin_mask = cin_draw & female_all
+        cin_uids = uids[cin_mask]
+        nocin_uids = uids[~cin_mask]
+
+        # 3. Branch A: clearance from precin. Females get the CRN-safe stochastic
+        #    round (_randround), males np.ceil (which biases them a dt late).
+        nocin_dur = dur_precin[~cin_mask]
+        nocin_female = female_all[~cin_mask]
+        rounded_dur = np.empty(len(nocin_dur), dtype=int)
+        if nocin_female.any():
+            rounded_dur[nocin_female] = self._randround(
+                nocin_dur[nocin_female],
+                nocin_uids[nocin_female],
+                self._round_clear_precin_bern,
+            )
+        if (~nocin_female).any():
+            rounded_dur[~nocin_female] = np.ceil(
+                nocin_dur[~nocin_female]
+            ).astype(int)
+        self.ti_clearance[nocin_uids] = ti + rounded_dur
+        self._roll_latency(nocin_uids[nocin_female])
+
+        if len(cin_uids) == 0:
+            return
+
+        # 4. Branch B: progression to CIN.
+        self.ti_cin[cin_uids] = ti + self._randround(
+            dur_precin[cin_mask], cin_uids, self._round_cin_bern,
+        )
+        dur_cin = p.dur_cin.rvs(cin_uids)
+        # age_risk multiplier on dur_cin: smooth ramp from 1 at age_risk['age']
+        # to age_risk['risk'] at age_risk['age_end']. Below age, multiplier=1;
+        # above age_end, multiplier=risk. A hard step at 30 would carve the
+        # cancer-age distribution into two visible modes at ~25 and ~30.
+        ages_at_cin = self.sim.people.age[cin_uids]
+        age_mod = _age_risk_ramp(ages_at_cin, p.age_risk)
+        dur_cin = dur_cin * age_mod
+
+        # 5. P(cancer) given dur_cin. sev_imm is not applied here, only rel_sev.
+        rel_sev_cin = rel_sev_uids[cin_mask]
+        p_cancer = compute_severity(dur_cin * dt_yr,
+                                      rel_sev=rel_sev_cin, pars=p.cancer_fn)
+        self._cancer_bern.set(p=p_cancer)
+        cancer_draw = self._cancer_bern.rvs(cin_uids)
+        cancer_uids = cin_uids[cancer_draw]
+        nocancer_uids = cin_uids[~cancer_draw]
+
+        # 5a. Clear after CIN (no cancer).
+        self.ti_clearance[nocancer_uids] = (
+            self.ti_cin[nocancer_uids] + self._randround(
+                dur_cin[~cancer_draw], nocancer_uids, self._round_clear_cin_bern,
+            )
+        )
+        self._roll_latency(nocancer_uids)  # already all-female (CIN branch is female-only)
+
+        # 5b. Progression to cancer. Guard is local: step 6 must still run over
+        #     all cin_uids even when no base agent drew cancer.
+        if len(cancer_uids):
+            self.ti_cancerous[cancer_uids] = (
+                self.ti_cin[cancer_uids] + self._randround(
+                    dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+                )
+            )
+            # Detection lag from onset. At the default ss.constant(ss.years(0))
+            # this rounds to 0 steps, so detection fires the same step as onset.
+            dur_undetected = p.dur_undetected.rvs(cancer_uids)
+            self.ti_cancer_detection[cancer_uids] = (
+                self.ti_cancerous[cancer_uids] + self._randround(
+                    dur_undetected, cancer_uids, self._round_detection_bern,
+                )
+            )
+            dur_cancer = p.dur_cancer.rvs(cancer_uids)
+            self.ti_dead_cancer[cancer_uids] = (
+                self.ti_cancerous[cancer_uids] + self._randround(
+                    dur_cancer, cancer_uids, self._round_dead_bern,
+                )
+            )
+
+        # 6. Multiscale: grow real fine cancer agents.
+        self._grow_fine_agents(cin_uids, cancer_uids, dur_cin, age_mod,
+                               rel_sev_cin, sev_imm_uids[cin_mask], dt_yr)
+
+    def _grow_fine_agents(self, cin_uids, cancer_uids, dur_cin, age_mod,
+                          rel_sev_cin, sev_imm_cin, dt_yr):
+        """Grow ratio-1 extra real fine cancer agents per CIN agent.
+
+        The transforming base agents are shrunk to scale 1/ratio; for every CIN
+        reacher, ratio-1 extra trajectories are drawn (age_risk-modified
+        dur_cin; CIN-conditional rejection-sampled dur_precin), cancer is drawn
+        for each extra, and one real fine agent is grown per extra-cancer
+        success (full cross-genotype clone of the source, then this genotype's
+        cancer-bound trajectory written). No-op at ms_agent_ratio<=1.
+
+        Units: the extra-trajectory dists (``_extra_dur_precin``/``_extra_dur_cin``)
+        are built unitless from the live dists' year-parameterized mean/std, so
+        ``.rvs`` returns YEARS and ``compute_severity`` receives YEARS directly.
+        Scheduling via ``_randround`` needs STEPS, so durations are divided by
+        ``dt_yr`` first. ``p.dur_cancer.rvs`` returns STEPS already, so it is
+        passed to ``_randround`` unscaled (matches the base path in set_prognoses).
+
+        RNG: the extra draws come from dedicated dists registered in __init__ —
         SEPARATE streams from the live natural-history dists, so growing fine
         agents never perturbs the real agents' draws (keeps ratio==1 bit-identical
         and incidence flat across ratios). Drawn by size (non-CRN).
         """
         ratio = int(self.pars.ms_agent_ratio)
+        n = len(cin_uids)
+        if ratio <= 1 or n == 0:
+            return
         p = self.pars
         ppl = self.sim.people
+        ti = self.ti + 1 # The course starts at the next step, as in set_prognoses()
         cancer_scale = 1.0 / ratio
-        rel_sev = self.rel_sev[cin_uids]
-        dt_yr = self.t.dt_year
 
-        # Base agents: their fate from the stay they have, and shrink those that drew their own cancer.
-        in_cin = self.cin[cin_uids]
-        dur_cin = (self.ti_exit_cin.raw[cin_uids[in_cin]] - self.ti_cin.raw[cin_uids[in_cin]]) * dt_yr
-        pcanc = compute_severity(dur_cin, rel_sev=rel_sev[in_cin], pars=p.cancer_fn)
-        fate = self._fate_unif.rvs(cin_uids[in_cin]) < pcanc
-        self.ca_fate[cin_uids[in_cin]] = fate
-        ppl.scale[cin_uids[in_cin][fate]] = cancer_scale
+        # Shrink base agents that drew their own cancer.
+        if len(cancer_uids):
+            ppl.scale[cancer_uids] = cancer_scale
 
-        # CIN -> cancer for every extra (years), with age_risk.
-        size = (len(cin_uids), ratio - 1)
-        extra_dur_cin = self._extra_dur_cin.rvs(size) * self.rel_dur_cin(self.sim, cin_uids)[:, None]
-        pcanc = compute_severity(extra_dur_cin, rel_sev=rel_sev[:, None] * np.ones(size), pars=p.cancer_fn)
+        m = ratio - 1
+        size = (n, m)
+        amod = age_mod[:, None]
+        rel = rel_sev_cin[:, None] * np.ones(size)
+        sevimm = sev_imm_cin[:, None] * np.ones(size)
+
+        # age_risk-modified extra dur_cin (years).
+        extra_dur_cin = self._extra_dur_cin.rvs(size) * amod
+        # CIN-conditional (length-biased) extra dur_precin: rejection-sample.
+        extra_dur_precin = self._extra_dur_precin.rvs(size) * (1.0 - sevimm)
+        pending = np.ones(size, dtype=bool)
+        for _ in range(64):
+            if not pending.any():
+                break
+            cinp = compute_severity(extra_dur_precin, rel_sev=rel, pars=p.cin_fn)
+            passed = (self._extra_cin_unif.rvs(size) < cinp) & pending
+            pending &= ~passed
+            if pending.any():
+                redraw = self._extra_dur_precin.rvs(int(pending.sum())) \
+                    * (1.0 - sevimm[pending])
+                extra_dur_precin[pending] = redraw
+
+        # CIN -> cancer for every extra (all are CIN now).
+        pcanc = compute_severity(extra_dur_cin, rel_sev=rel, pars=p.cancer_fn)
         extra_cancer = self._extra_cancer_unif.rvs(size) < pcanc
         # Existing fine agents never spawn more fine agents (level0 guard).
-        extra_cancer &= ~ppl.fine[cin_uids][:, None]
+        not_fine = ~ppl.fine[cin_uids]
+        extra_cancer &= not_fine[:, None]
         counts = extra_cancer.sum(axis=1)
         n_new = int(counts.sum())
         if n_new == 0:
@@ -546,6 +629,8 @@ class HPV(ss.Disease):
 
         # Broadcast source uids per success and grow.
         src_uids = ss.uids(np.repeat(np.asarray(cin_uids), counts))
+        new_dur_precin = extra_dur_precin[extra_cancer]   # years
+        new_dur_cin = extra_dur_cin[extra_cancer]         # years
         new_uids = ppl.grow(n_new)
 
         # Full cross-genotype clone; _clone_agents also resets lifecycle states.
@@ -555,46 +640,232 @@ class HPV(ss.Disease):
         ppl.fine[new_uids] = True
         ppl.scale[new_uids] = cancer_scale
 
-        # This genotype's cancer-bound stay in CIN, in place of the source's (who may have left it already).
-        left = new_uids[~self.cin[new_uids]]
-        states = self.graph.states
-        self.engine.move_states(left, [s for s in self.graph.people_states if s is not states.cin], states.cin)
-        self.ca_fate[new_uids] = True
-        self.ti_exit_cin.raw[new_uids] = self.ti_cin.raw[new_uids] + self.engine.whole_steps(new_uids, extra_dur_cin[extra_cancer])
+        # This genotype's fresh cancer-bound trajectory (overwrites cloned).
+        self.susceptible[new_uids] = False
+        self.infected[new_uids] = True
+        self.precin[new_uids] = True
+        self.cin[new_uids] = False
+        self.cancerous[new_uids] = False
+        self.undetected_cancerous[new_uids] = False
+        self.ti_infected[new_uids] = self.ti
+        self.ti_first_infection[new_uids] = self.ti
+        self.ti_clearance[new_uids] = np.nan
+        # Durations are in years; convert to steps via /dt_yr before rounding.
+        ti_cin = ti + self._randround(new_dur_precin / dt_yr, new_uids,
+                                      self._round_cin_bern)
+        self.ti_cin[new_uids] = ti_cin
+        ti_canc = ti_cin + self._randround(new_dur_cin / dt_yr, new_uids,
+                                           self._round_cancer_bern)
+        self.ti_cancerous[new_uids] = ti_canc
+        dur_undetected = p.dur_undetected.rvs(new_uids)  # steps (module dist)
+        self.ti_cancer_detection[new_uids] = ti_canc + self._randround(
+            dur_undetected, new_uids, self._round_detection_bern)
+        dur_cancer = p.dur_cancer.rvs(new_uids)  # steps (module dist)
+        self.ti_dead_cancer[new_uids] = ti_canc + self._randround(
+            dur_cancer, new_uids, self._round_dead_bern)
         return
 
-    def clear_infection(self, uids):
-        """Clear the precin and CIN of this genotype, on treatment (e.g. ``hpv.tx``, or ``ss.Treatment``), to susceptible (not latency);
-        cancer of it leaves no course to return to, so it ends in ``blocked``, as if of another genotype"""
-        uids = ss.uids(uids)
-        self.engine.force(uids, self.cure, self.cure.dst[0])
-        cancerous = uids[self.cancerous[uids]]
-        if len(cancerous):
-            self.undetected_cancerous[cancerous] = False
-            self.engine.move_states(cancerous, [self.graph.states.cancerous], self.graph.states.blocked)
-        return
+    def _cancel_other_genotype_progression_for(self, uids):
+        """Cancel pending cancer progression in all other genotypes for these uids.
 
-    def extend_cancer(self, uids, steps):
-        """Delay the cancer deaths of some people by some steps (e.g. by radiation)"""
-        self.ti_exit_cancerous.raw[uids] += steps
-        return
+        When this module fires cin->cancerous for uids, all OTHER HPV
+        modules in the sim must have their pending cancer progression
+        cancelled and their state cleared for these agents. Without this,
+        agents with multi-genotype CIN can be counted as multiple cancer
+        cases (one per genotype) — biologically incorrect.
+        """
+        if len(uids) == 0:
+            return
+        for module in self.sim.diseases.values():
+            if not isinstance(module, HPV) or module is self:
+                continue
+            module.ti_cancerous[uids] = np.nan
+            module.ti_cancer_detection[uids] = np.nan
+            module.ti_dead_cancer[uids] = np.nan
+            module.undetected_cancerous[uids] = False
+            # Clear both precin and cin so nothing re-promotes on a cancerous body.
+            module.precin[uids] = False
+            module.cin[uids] = False
+            module.ti_cin[uids] = np.nan
+            # These infections won't clear naturally; the agent is dying of cancer.
+            module.ti_clearance[uids] = np.nan
+            module.susceptible[uids] = False
+            module.infected[uids] = False
+
+    def step_state(self):
+        """Advance agents through the natural-history compartment chain.
+
+        Order matters: clearance fires first so a just-cleared agent isn't
+        re-flipped by a forward transition at the same timestep.
+
+          1. Clearance from precin or CIN (partial-immunity path)
+          2. precin -> CIN
+          3. CIN -> cancerous (stops transmitting; flagged undetected)
+          4. undetected_cancerous -> detected (registers new_cancers)
+          5. Cancer death (via people.request_death)
+
+        Steps 3 and 4 fire the same tick at the default ``dur_undetected=0``.
+        """
+        self.rel_sus[:] = 1.0  # reset so CrossImmunity/HIV multiply, not overwrite
+        ti = self.ti
+
+        # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
+        # infected is mutually exclusive with cancerous, so it implies precin|cin.
+        cleared = (self.infected & (self.ti_clearance <= ti)).uids
+        if len(cleared):
+            self.infected[cleared] = False
+            self.precin[cleared] = False
+            self.cin[cleared] = False
+
+            # Agents redirected into latency leave precin/cin/infected but do not
+            # become susceptible and gain no clearance-conferred immunity.
+            to_latent_uids = cleared[self.to_latent[cleared]]
+            to_susceptible_uids = cleared[~self.to_latent[cleared]]
+
+            self.susceptible[to_susceptible_uids] = True
+
+            if len(to_latent_uids):
+                self.latent[to_latent_uids] = True
+                self.ti_latent[to_latent_uids] = ti
+                self.to_latent[to_latent_uids] = False
+
+            # Females only. sero_prob gates the first clearance; repeats always
+            # take the running max.
+            female = self.sim.people.female
+            f_cleared = to_susceptible_uids[female[to_susceptible_uids]]
+            if len(f_cleared):
+                has_prior_imm = self.nab_imm[f_cleared] > 0
+                first_mask  = ~has_prior_imm
+                first_uids  = f_cleared[first_mask]
+                repeat_uids = f_cleared[has_prior_imm]
+
+                p = self.pars
+                nab_all  = p.imm_init.rvs(f_cleared)
+                cell_all = p.cell_imm_init.rvs(f_cleared)
+
+                # HIV co-infection reduces conferred immunity (gated no-op).
+                # hiv_rel_imm is one dt stale: step_state runs before the connector.
+                hivc = self._hiv_effects()
+                if hivc is not None:
+                    imm_factor = hivc.hiv_rel_imm[f_cleared]
+                    nab_all = nab_all * imm_factor
+                    cell_all = cell_all * imm_factor
+
+                if len(first_uids):
+                    self._sero_bern.set(p=float(p.sero_prob))
+                    seroconvert = self._sero_bern.rvs(first_uids)
+                    # nab_imm is gated on seroconversion; cell_imm is not, so all
+                    # first-clearance females get severity protection.
+                    self.nab_imm[first_uids]  = seroconvert * nab_all[first_mask]
+                    self.cell_imm[first_uids] = np.maximum(self.cell_imm[first_uids], cell_all[first_mask])
+
+                # Running max: an HIV-reduced increment can fail to boost immunity
+                # but never erases what a prior clearance conferred.
+                if len(repeat_uids):
+                    self.nab_imm[repeat_uids] = np.maximum(
+                        self.nab_imm[repeat_uids], nab_all[has_prior_imm])
+                    self.cell_imm[repeat_uids] = np.maximum(
+                        self.cell_imm[repeat_uids], cell_all[has_prior_imm])
+
+        # --- 1b. Reactivation from latent (per-timestep hazard) ---
+        # ti_latent < ti, not <=: no same-step clear-into-latent-then-reactivate.
+        latent_uids = (self.latent & (self.ti_latent < ti)).uids
+        if len(latent_uids):
+            sev_imm_uids = self.sev_imm[latent_uids]
+            hivc = self._hiv_effects()
+            if hivc is not None:
+                rel_reactivation_uids = hivc.hiv_rel_reactivation[latent_uids]
+            else:
+                rel_reactivation_uids = np.ones(len(latent_uids))
+            # Relative factors scale the rate via scale=, never the probability:
+            # the rate -> probability conversion happens once, in .to_prob().
+            combined_rel = (1.0 - sev_imm_uids) * rel_reactivation_uids
+            p_react = self.pars.hpv_reactivation.to_prob(self.t.dt, scale=combined_rel)
+            self._reactivation_bern.set(p=p_react)
+            reactivated = self._reactivation_bern.filter(latent_uids)
+            if len(reactivated):
+                self.latent[reactivated] = False
+                self.ti_reactivation[reactivated] = ti
+                # Fresh trajectory; immunity carries over. set_prognoses bumps
+                # the infection flow unconditionally, so back it out here.
+                ppl = self.sim.people
+                n_react = ppl.scale_flows(reactivated)
+                self.set_prognoses(reactivated)
+                self.results.infection[ti] -= n_react
+                self.results.new_reactivations[ti] = n_react
+
+        # --- 2. precin -> CIN ---
+        to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
+        if len(to_cin):
+            self.precin[to_cin] = False
+            self.cin[to_cin] = True
+
+        # --- 3. CIN -> cancerous (no longer infectious, no longer re-infectable) ---
+        # Cancer body flips at onset; detection is a separate transition in step 4,
+        # so a screening-lag scenario (dur_undetected>0) can defer new_cancers
+        # without changing biology (transmission, death schedule, cross-genotype
+        # cancellation, or the age-at-cancer aggregator).
+        to_cancerous = (self.cin & ~self.cancerous & (self.ti_cancerous <= ti)).uids
+        if len(to_cancerous):
+            self.cin[to_cancerous] = False
+            self.cancerous[to_cancerous] = True
+            self.undetected_cancerous[to_cancerous] = True
+            self.infected[to_cancerous] = False
+            self.susceptible[to_cancerous] = False
+            self.rel_trans[to_cancerous] = 0.0
+            self.ti_clearance[to_cancerous] = np.nan  # cancer supersedes clearance
+            ppl = self.sim.people
+            ages_at_cancer = ppl.age[to_cancerous]
+            w = ppl.scale[to_cancerous]
+            self.results.new_undetected_cancers[ti] = ppl.scale_flows(to_cancerous)
+            self.results.sum_age_at_cancer[ti] = float((ages_at_cancer * w).sum())
+            self._cancel_other_genotype_progression_for(to_cancerous)
+
+        # --- 4. Detected: undetected_cancerous -> detected ---
+        # Same-step at default dur_undetected=0 (constant), so new_cancers matches
+        # new_undetected_cancers per ti; a delay shifts new_cancers into the future.
+        to_detected = (self.undetected_cancerous
+                        & (self.ti_cancer_detection <= ti)).uids
+        if len(to_detected):
+            self.undetected_cancerous[to_detected] = False
+            self.results.new_cancers[ti] = self.sim.people.scale_flows(to_detected)
+
+        # --- 5. Cancer death (routed through starsim's people death pipeline) ---
+        to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
+        if len(to_dead):
+            # +dt_yr: step_state runs before ages advance, so this is age at step end.
+            dt_yr = self.t.dt_year
+            ppl = self.sim.people
+            ages_at_death = ppl.age[to_dead] + dt_yr
+            w = ppl.scale[to_dead]
+            self.results.new_cancer_deaths[ti] = ppl.scale_flows(to_dead)
+            self.results.sum_age_at_cancer_death[ti] = float((ages_at_death * w).sum())
+            self.sim.people.request_death(to_dead)
 
     def step_die(self, uids):
+        """ Set states to False for the newly-dead. 
+        IMPORTANT: if you add any new states, remember to add them here!
+        """
         super().step_die(uids)
+        self.precin[uids] = False
+        self.cin[uids] = False
+        self.cancerous[uids] = False
         self.undetected_cancerous[uids] = False
+        self.infected[uids] = False
+        self.susceptible[uids] = False
+        self.latent[uids] = False
+        self.to_latent[uids] = False
+
+    def clear_infection(self, uids):
+        """Clear the precin, CIN, and cancer of this genotype, on treatment (e.g. ``hpv.tx``, or ``ss.Treatment``):
+        the infection clears at the module's next step, to susceptible (not latency)"""
+        self.cin[uids] = False
+        self.precin[uids] = False
+        self.cancerous[uids] = False
+        self.undetected_cancerous[uids] = False
+        self.ti_cin[uids] = np.nan
+        self.ti_cancerous[uids] = np.nan
+        self.ti_cancer_detection[uids] = np.nan
+        self.ti_clearance[uids] = self.ti + 1
+        self.to_latent[uids] = False
         return
-
-
-def make_family(members, init_prev=None, split=None, name='hpv'):
-    """The genotypes of a sim, as the strains of one disease, each with a course of its own: one cancer per person,
-    the protection of ``nab_imm`` between them, and, with ``init_prev``, each person seeded getting one
-
-    Args:
-        members (list): the ``HPV`` modules, one for each genotype
-        init_prev (func): the probability that each person starts infected, as ``fn(sim, uids)``, if the family seeds them
-        split (list): the share of each genotype among those seeded (default: equal)
-        name (str): the name of the disease
-    """
-    n = len(members)
-    immunity = ss.immunity(due_to='nab_imm', rel_sus=np.ones((n, n)), combine='sum') # The matrix is CrossImmunity's: set in its init_pre()
-    return ss.Disease(name=name, init_prev=init_prev, strains=ss.Strains(members, shared=['cancerous'], immunity=immunity, split=split, name='genotype'))

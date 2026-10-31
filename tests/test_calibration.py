@@ -18,8 +18,8 @@ def test_fit_shared_beta():
     sim = hpv.Sim(n_agents=200, start=2017, stop=2019, dt=1.0, rand_seed=0, genotypes=[16, 18], data=df,
                   pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])), verbose=0)
     fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
-    assert len(fit.pars) == 1 # Named with a genotype's name, since every declared disease has one of that name
-    assert 0.1 <= fit.pars[0] <= 0.3
+    assert list(fit.pars.keys()) == ['beta']
+    assert 0.1 <= fit.pars.beta <= 0.3
 
 
 def test_build_sim_routes_top_level_pars():

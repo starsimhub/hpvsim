@@ -8,7 +8,7 @@ Within a genotype, a woman moves through: infection, a precancerous phase (`prec
 
 ## Duration drives progression
 
-The order of decisions is the thing to understand. HPVsim first **draws how long the infection will last** — `dur_precin`, lognormal, mean 3 years for HPV16 and 2.5 for the others, standard deviation 9 years. It then asks how likely that duration is to produce precancer: `cin_fn` is a logistic curve of the drawn duration, rising from zero at infection to one at 50 years (`ttc=50`), with `k` setting its steepness (0.3 for HPV16, 0.25 for HPV18, 0.2 for the pools).
+The order of decisions is the thing to understand. On infection, HPVsim first **draws how long the infection will last** — `dur_precin`, lognormal, mean 3 years for HPV16 and 2.5 for the others, standard deviation 9 years. It then asks how likely that duration is to produce precancer: `cin_fn` is a logistic curve of the drawn duration, rising from zero at infection to one at 50 years (`ttc=50`), with `k` setting its steepness (0.3 for HPV16, 0.25 for HPV18, 0.2 for the pools).
 
 Persistence is therefore the risk factor, not a separate roll. A woman who clears in eight months almost never progresses; one whose infection would run for a decade very probably does.
 
@@ -28,7 +28,7 @@ Some infections neither clear nor progress: the virus persists undetectably and 
 
 Set `hpv_control_prob` above zero and that fraction of the women who would have cleared enter a `latent` state instead. Latent women neither transmit nor can be reinfected with that genotype. Each timestep they face the reactivation hazard `hpv_reactivation` — an `ss.probperyear(0.025)`, scaled by `1 - sev_imm` (strong cell-mediated immunity means less reactivation) and by HIV's `rel_reactivation`. On reactivation a woman draws a fresh trajectory, counted under `new_reactivations` rather than `infection`.
 
-Latency is decided as a woman leaves `precin` or CIN. A woman cleared by ablation or excision returns to susceptible, not latent.
+The latency roll happens when the clearance date is set, not when clearance arrives. A woman cleared by ablation or excision returns to susceptible, not latent, whatever she rolled.
 
 ## How to make one genotype progress faster
 

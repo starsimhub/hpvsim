@@ -12,16 +12,19 @@ def test_hpv_has_latency_pars_and_states():
     p = mod.pars
     assert p.hpv_control_prob == 0.0
     assert p.hpv_reactivation.value == 0.025
-    for name in ('latent', 'reactivation', 'ti_reactivation'):
-        assert hasattr(mod, name), f'HPV missing {name!r}'
+    for name in ('to_latent', 'ti_latent', 'ti_reactivation'):
+        assert hasattr(mod, name), f'HPV missing state {name!r}'
+    assert hasattr(mod, '_latent_bern')
+    assert hasattr(mod, '_reactivation_bern')
 
 
 def test_latency_states_default_correctly():
-    """latent defaults False; ti_latent/ti_reactivation default nan."""
+    """to_latent and latent default False; ti_latent/ti_reactivation default nan."""
     sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)
     sim.init()
     mod = sim.diseases.hpv16
     uids = sim.people.auids
+    assert not mod.to_latent[uids].any()
     assert not mod.latent[uids].any()
     assert np.all(np.isnan(mod.ti_latent[uids]))
     assert np.all(np.isnan(mod.ti_reactivation[uids]))
@@ -48,6 +51,7 @@ def test_forced_control_prob_produces_latent_agents():
     latent_uids = uids[latent_mask]
     assert np.all(~np.isnan(mod.ti_latent[latent_uids]))
     assert not mod.susceptible[latent_uids].any()
+    assert not mod.to_latent[latent_uids].any(), 'to_latent should clear once latent is stamped'
 
 
 def test_males_never_enter_latency():
@@ -67,6 +71,7 @@ def test_zero_control_prob_is_a_no_op():
     mod = sim.diseases.hpv16
     uids = sim.people.auids
     assert not mod.latent[uids].any()
+    assert not mod.to_latent[uids].any()
 
 
 def test_latent_agents_reactivate_and_regain_a_trajectory():
@@ -83,8 +88,9 @@ def test_latent_agents_reactivate_and_regain_a_trajectory():
     # Only final-step reactivators: earlier ones may have relapsed into latency again.
     just_reactivated = reactivated_uids[mod.ti_reactivation[reactivated_uids] == sim.ti]
     assert len(just_reactivated) > 0
-    # A stay in precin shorter than half a step can end in the step it starts, in latency again
-    assert mod.infected[just_reactivated].any() or mod.cancerous[just_reactivated].any() or mod.latent[just_reactivated].all()
+    assert not mod.latent[just_reactivated].any()
+    assert mod.infected[just_reactivated].any() or mod.precin[just_reactivated].any() \
+        or mod.cin[just_reactivated].any() or mod.cancerous[just_reactivated].any()
     assert sim.results.hpv16.new_reactivations.sum() > 0
 
 
@@ -96,6 +102,7 @@ def test_reactivations_are_not_double_counted_as_new_infections():
     sim_react.run()
     n_react = sim_react.results.hpv16.new_reactivations.sum()
     assert n_react > 0
+    # step_state adds then subtracts the same n_react, so new_infections can't go negative.
     assert (sim_react.results.hpv16.infection.values >= 0).all()
 
 

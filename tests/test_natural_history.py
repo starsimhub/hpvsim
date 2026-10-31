@@ -69,12 +69,14 @@ def test_hpv_progression_pars_hpv16():
     assert np.all(durs >= 0)
 
 
-def test_infection_starts_in_precin(nathist_sim):
-    """Every agent ever infected has entered precin."""
+def test_set_prognoses_assigns_ti_clearance_or_ti_cin(nathist_sim):
+    """Every newly-infected agent has either ti_clearance or ti_cin set."""
     sim = nathist_sim
     mod = sim.diseases.hpv16
     ever_infected = mod.ti_first_infection.notnan
-    assert mod.ti_precin.notnan[ever_infected].all()
+    has_clearance = mod.ti_clearance.notnan
+    has_cin = mod.ti_cin.notnan
+    assert (has_clearance | has_cin)[ever_infected].all()
 
 
 def test_set_prognoses_cancer_only_in_females(nathist_sim):
@@ -97,9 +99,9 @@ def test_set_prognoses_chain_consistency(nathist_sim):
     uids = has_cancer_sched.uids
     ti_cin = mod.ti_cin[uids]
     ti_cancerous = mod.ti_cancerous[uids]
-    ti_dead = mod.ti_dead_cancer[uids] # NaN for those who have left
+    ti_dead = mod.ti_dead_cancer[uids]
     assert (ti_cin <= ti_cancerous).all()
-    assert (ti_cancerous[~np.isnan(ti_dead)] <= ti_dead[~np.isnan(ti_dead)]).all()
+    assert (ti_cancerous <= ti_dead).all()
 
 
 def test_step_state_progresses_precin_to_cin(nathist_sim):
@@ -121,6 +123,8 @@ def test_step_state_progresses_cin_to_cancerous(nathist_sim):
     assert len(cancerous_now), 'no agent is cancerous at sim end — test is vacuous'
     assert not mod.infected[cancerous_now].any()
     assert not mod.susceptible[cancerous_now].any()
+    rel_trans_arr = np.asarray(mod.rel_trans[cancerous_now])
+    assert (rel_trans_arr == 0).all()
 
 
 def test_step_state_cancer_death_removes_agents(nathist_sim):
@@ -191,8 +195,7 @@ def test_cleared_agents_have_reduced_susceptibility(cleared_sim):
         nab_arr = np.asarray(mod.nab_imm[cleared_f])
         seroconverted = cleared_f[nab_arr > 0]
         if len(seroconverted):
-            sim.diseases.hpv.attr_prot = {}
-            rel_sus_arr = np.asarray(mod.current_value('rel_sus', seroconverted))
+            rel_sus_arr = np.asarray(mod.rel_sus[seroconverted])
             assert (rel_sus_arr < 1.0).all(), \
                 f'seroconverted female cleared agents have rel_sus={rel_sus_arr[:5]}; expected <1.0'
 
@@ -206,13 +209,11 @@ def test_clearance_writes_raw_immunity_not_effective(cleared_sim):
     assert (nab > 0).any(), 'no agents cleared and bumped nab_imm'
     assert (cell > 0).any(), 'no agents cleared and bumped cell_imm'
     # Single-genotype Connector identity: rel_sus = 1 - nab_imm, sev_imm = cell_imm.
-    sim.diseases.hpv.attr_prot = {}
-    rel_sus = np.asarray(mod.current_value('rel_sus', sim.people.auids))
+    rel_sus = np.asarray(mod.rel_sus.values)
     sev_imm = np.asarray(mod.sev_imm.values)
     cleared_uids = (nab > 0).nonzero()[0]
     assert np.allclose(rel_sus[cleared_uids], 1.0 - nab[cleared_uids], atol=1e-6)
-    # sev_imm is as of the connector's step, so before anyone who cleared in the step's transmission
-    assert np.mean(np.isclose(sev_imm[cleared_uids], cell[cleared_uids], atol=1e-6)) > 0.95
+    assert np.allclose(sev_imm[cleared_uids], cell[cleared_uids], atol=1e-6)
 
 
 @pytest.mark.parametrize('genotype', ['hpv18', 'hi5', 'ohr'])
@@ -266,9 +267,9 @@ def test_clearance_sero_prob_gates_first_immunity(cleared_sim):
     first-cleared agents keep nab_imm=0 (still fully susceptible)."""
     sim = cleared_sim
     mod = sim.diseases.hpv16
-    # Ever infected and not any more is the proxy for "cleared at least once".
+    # ti_clearance.notnan is the proxy for "cleared at least once".
     female = sim.people.female
-    ever_cleared_f = (mod.ti_first_infection.notnan & mod.susceptible & female).uids
+    ever_cleared_f = (mod.ti_clearance.notnan & female).uids
     assert len(ever_cleared_f) >= 50, 'too few cleared females to estimate the sero_prob gate'
     nab = np.asarray(mod.nab_imm[ever_cleared_f])
     zero_imm_frac = float((nab == 0).sum()) / float(len(ever_cleared_f))

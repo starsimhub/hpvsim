@@ -2,9 +2,9 @@
 title: "Results and analyzers"
 ---
 
-Results are grouped by the module that produced them, because each module records what it can see. `sim.results.hpv16` holds HPV16's own time series; `sim.results.agemigration` holds migration flows; `sim.results.hpv` holds the family's unions and sums over the genotypes, and `sim.results.all_hpv` the pooled HPV totals with their rates. A named intervention appears under its own name.
+Results are grouped by the module that produced them, because each module records what it can see. `sim.results.hpv16` holds HPV16's own time series; `sim.results.agemigration` holds migration flows; `sim.results.all_hpv` holds the pooled HPV totals. A named intervention appears under its own name.
 
-Every genotype module records the same set: the stocks `susceptible`, `infected`, `precin`, `cin`, `cancerous`, `latent`; the flows `infection`, `new_cancers`, `new_undetected_cancers`, `new_cancer_deaths`, `new_reactivations`, and one for each transition; `cum_cancers` and `cum_cancer_deaths` (any flow has `.cum`, e.g. `res.infection.cum`); and `prevalence`. Two accumulators, `sum_age_at_cancer` and `sum_age_at_cancer_death`, let you recover mean age at diagnosis or death: divide by `new_cancers` or `new_cancer_deaths` over the period you care about.
+Every genotype module records the same set: the stocks `susceptible`, `infected`, `precin`, `cin`, `cancerous`, `latent`; the flows `infection`, `new_cancers`, `new_undetected_cancers`, `new_cancer_deaths`, `new_reactivations`; `cum_cancers` and `cum_cancer_deaths` (any flow has `.cum`, e.g. `res.infection.cum`); and `prevalence`. Two accumulators, `sum_age_at_cancer` and `sum_age_at_cancer_death`, let you recover mean age at diagnosis or death: divide by `new_cancers` or `new_cancer_deaths` over the period you care about.
 
 ## Pooling across genotypes
 

@@ -7,8 +7,9 @@ Contains:
   - hpv.txvx: therapeutic vaccine product
   - hpv.radiation: cancer treatment product
 
-Each is a product written as code (an ``ss.Product`` with an ``administer()``), since each uses a
-table by state and genotype, or per-agent immunity. Each returns its outcomes from
+Each is a product written as code (an ``ss.Product`` with an ``administer()``), since the
+genotypes are diseases written as code, whose states v4's ``ss.Diagnostic`` and ``ss.Treatment``
+cannot key their results by (see ``v4_port_oct26.md``, HP70). Each returns its outcomes from
 ``administer()``, so they are results and events of the delivery (e.g. ``screening.positive``).
 """
 import functools
@@ -199,7 +200,7 @@ def _default_name(product, name):
     """Name a product after the product it looks up (e.g. 'via'), as its default name: if a delivery has the same name
     (``ablation = ss.treat(hpv.tx('ablation'))``), the sim renames the product (``ablation_product``); ``module_name=`` names it for good"""
     if name is not None and product._default_name:
-        product.name = product.label = 'hpv_dna' if name == 'hpv' else name # 'hpv' is the disease
+        product.name = product.label = name
     return
 
 
@@ -443,7 +444,7 @@ class txvx(tx):
 
 
 class radiation(ss.Product):
-    """HPV cancer-treatment product: delays the cancer death of each cancerous genotype.
+    """HPV cancer-treatment product: extends ``ti_dead_cancer`` per cancerous genotype.
 
     Default duration: normal(mean=18 months, sd=2 months).
 
@@ -463,5 +464,5 @@ class radiation(ss.Product):
         for module in iter_hpv_modules(self.sim):
             cancer_uids = module.cancerous.uids.intersect(uids)
             if len(cancer_uids):
-                module.extend_cancer(cancer_uids, np.ceil(self.pars.dur.rvs(cancer_uids))) # In the module's steps
+                module.ti_dead_cancer[cancer_uids] += np.ceil(self.pars.dur.rvs(cancer_uids)) # In the module's steps
         return

@@ -333,7 +333,14 @@ def test_hiv_rel_imm_effect():
             hivmod.cd4_latent[uid] = 100.0  # lo stratum
         hivmod.step_state()  # their CD4 count
         sim.connectors.hiv_effects.step()  # populate hiv_rel_imm before clearance reads it
-        hpvmod.clear_infection(ss.uids([uid]))
+        hpvmod.infected[uid] = True
+        hpvmod.precin[uid] = True
+        hpvmod.cin[uid] = False
+        hpvmod.cancerous[uid] = False
+        hpvmod.nab_imm[uid] = 0.0
+        hpvmod.cell_imm[uid] = 0.0
+        hpvmod.ti_clearance[uid] = sim.ti
+        hpvmod.step_state()
         return float(hpvmod.nab_imm[uid]), float(hpvmod.cell_imm[uid])
 
     nab_neg, cell_neg = _build(seed=1, make_positive=False)

@@ -50,7 +50,7 @@ def test_txvx_clears_lesions_and_confers_scaled_immunity():
     product.administer(uids)
 
     assert not m16.cin[uids].any(), 'lesions not cleared'
-    assert m16.susceptible[uids].all(), 'not returned to susceptible'
+    assert np.isfinite(m16.ti_clearance[uids]).all(), 'clearance not scheduled'
     # Severity immunity, not susceptibility: the therapeutic never touches rel_sus.
     assert (m16.txvx_sev_imm[uids] > 0).all()
     np.testing.assert_allclose(mohr.txvx_sev_imm[uids],

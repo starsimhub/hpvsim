@@ -28,7 +28,6 @@ __all__ = [
     'iter_hpv_modules',
     'find_genotype_module',
     'any_genotype_cancer',
-    'any_genotype',
 ]
 
 
@@ -272,8 +271,3 @@ def any_genotype_cancer(sim):
     for module in iter_hpv_modules(sim):
         out[module.cancerous.uids] = True
     return out
-
-
-def any_genotype(sim, state):
-    """Whether each living person (by position in ``auids``) is in a state in any genotype: the union over the ``HPV`` modules."""
-    return np.logical_or.reduce([getattr(module, state).values for module in iter_hpv_modules(sim)])

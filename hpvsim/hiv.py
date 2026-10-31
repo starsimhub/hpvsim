@@ -199,7 +199,9 @@ class HIVEffects(ss.Connector):
         alive = people.alive.values
         scale = people.scale.values
         infected = np.asarray(self.hiv.infected.values, dtype=bool)
-        any_hpv = np.logical_or.reduce([m.infected.values for m in self.hpv_modules])
+        any_hpv = np.zeros(alive.shape, dtype=bool)
+        for m in self.hpv_modules:
+            any_hpv |= m.infected.values
         for key, group in (('hpv_prevalence_with_hiv', infected & alive), ('hpv_prevalence_no_hiv', ~infected & alive)):
             n = float((group * scale).sum())
             self.results[key][ti] = float(((any_hpv & group) * scale).sum()) / n if n else 0.0

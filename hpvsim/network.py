@@ -63,20 +63,6 @@ class SexualNetwork(ss.SexualNet):
     into ``self._layer_pars`` / ``self._debut`` for runtime access.
     """
 
-    def transmit(self, rel_trans, rel_sus, edge_beta, rng, prob=None):
-        """Each edge transmits with probability ``rel_sus*(1 - (1 - beta)**acts)``: susceptibility scales the chance
-        over the acts of the step, not each act, which is how HPVsim's immunity is defined and calibrated.
-
-        WORKAROUND: a declared disease scales each act's hazard by ``rel_sus``, with no way to say otherwise
-        (``ss.solvers.Agents.transmit_acts()``), so the chance it gives is taken back to the hazard and scaled here.
-        """
-        if prob is None:
-            return super().transmit(rel_trans, rel_sus, edge_beta, rng)
-        def over_acts(d, inds, src, trg):
-            sus = rel_sus[trg]
-            return sus*-np.expm1(np.log1p(-np.minimum(prob(d, inds, src, trg), 1 - 1e-15))/sus)
-        return super().transmit(rel_trans, rel_sus, edge_beta, rng, prob=over_acts)
-
     def active(self, people):
         """Network participation requires a non-fine (level0) agent.
 

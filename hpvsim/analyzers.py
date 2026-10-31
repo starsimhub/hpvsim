@@ -4,8 +4,6 @@ import pandas as pd
 import sciris as sc
 import starsim as ss
 
-from .utils import any_genotype
-
 
 __all__ = ['by_age', 'snapshot', 'age_pyramid', 'age_causal_infection',
            'dalys', 'results_by_genotype']
@@ -138,7 +136,10 @@ class by_age(ss.Analyzer):
         weights = scale.values if scale is not None else None
         for key in self.keys:
             if key in self._COUNT_KEYS:
-                state_any = any_genotype(self.sim, self._COUNT_KEYS[key])
+                attr = self._COUNT_KEYS[key]
+                state_any = np.zeros_like(alive)
+                for mod in self.hpv_modules:
+                    state_any |= getattr(mod, attr).values
                 self._write_bins(key, ti, ages, state_any & alive, weights)
             elif key in self._DEMO_KEYS:
                 attr = self._DEMO_KEYS[key]
@@ -146,7 +147,9 @@ class by_age(ss.Analyzer):
                 self._write_bins(key, ti, ages, mask, weights)
             elif key in self._PREV_KEYS:
                 attr, female_only = self._PREV_KEYS[key]
-                state_any = any_genotype(self.sim, attr)
+                state_any = np.zeros_like(alive)
+                for mod in self.hpv_modules:
+                    state_any |= getattr(mod, attr).values
                 denom_mask = alive & female if female_only else alive
                 num_mask = state_any & denom_mask
                 self._write_ratio(key, ti, ages, num_mask, denom_mask, weights)
@@ -154,7 +157,7 @@ class by_age(ss.Analyzer):
                 date_attr, state_attr = self._FLOW_KEYS[key]
                 new_event = np.zeros_like(alive)
                 for mod in self.hpv_modules:
-                    new_event |= (getattr(mod, date_attr).isclose(ti).values
+                    new_event |= ((getattr(mod, date_attr).values == ti)
                                   & getattr(mod, state_attr).values)
                 self._write_bins(key, ti, ages, new_event & alive, weights)
 
@@ -442,7 +445,7 @@ class age_causal_infection(ss.Analyzer):
             # dur_undetected lag between biological onset and clinical
             # recognition. Gate on cancerous so scheduled-but-unrealized
             # events (e.g. death from another cause first) don't count.
-            new = (m.ti_cancer_detection.isclose(ti) & m.cancerous).uids
+            new = ((m.ti_cancer_detection == ti) & m.cancerous).uids
             if not len(new):
                 continue
             ti_inf = m.ti_infected[new]
@@ -543,11 +546,11 @@ class dalys(ss.Analyzer):
         scale = getattr(people, 'scale', None)
         for m in self.hpv_modules:
             # Gate on cancerous so scheduled-but-unrealized onsets don't count.
-            new = (m.ti_cancerous.isclose(ti) & m.cancerous).uids
+            new = ((m.ti_cancerous == ti) & m.cancerous).uids
             if not len(new):
                 continue
             # One NaN death_age would poison the whole year's YLL/YLD sum.
-            ti_dead = m.ti_exit_cancerous[new]
+            ti_dead = m.ti_dead_cancer[new]
             ok = np.isfinite(ti_dead)
             new, ti_dead = new[ok], ti_dead[ok]
             if not len(new):

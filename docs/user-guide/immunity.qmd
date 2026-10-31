@@ -10,10 +10,10 @@ Only women update immunity on clearance; men clear without seroconverting. At a 
 
 ## Cross-protection is a matrix, vaccine protection is not
 
-Immunity earned against one genotype partly protects against the others. The `CrossImmunity` module holds two 4×4 matrices — rows are the genotype being protected, columns the genotype that was cleared. The first is the family's `ss.immunity`, and the rest is applied by `CrossImmunity` every timestep, so that for each genotype `g`:
+Immunity earned against one genotype partly protects against the others. The `CrossImmunity` module holds two 4×4 matrices — rows are the genotype being protected, columns the genotype that was cleared — and every timestep it computes, for each genotype `g`:
 
 ```
-susceptibility reduction = min(1, Σ over sources k of cross_imm_sus[g, k] × nab_imm[k])
+susceptibility reduction = Σ over sources k of cross_imm_sus[g, k] × nab_imm[k]
 rel_sus[g]               = (1 − that) × (1 − vax_imm[g])
 sev_imm[g]               = Σ over sources k of cross_imm_sev[g, k] × cell_imm[k]
                            + txvx_sev_imm[g]

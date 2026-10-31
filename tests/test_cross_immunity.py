@@ -4,12 +4,6 @@ import pytest
 import starsim as ss
 
 import hpvsim as hpv
-
-
-def protected(sim, mod):
-    """rel_sus of the living agents, with the protection of the family, as transmission reads it"""
-    sim.diseases.hpv.attr_prot = {}
-    return np.asarray(mod.current_value('rel_sus', sim.people.auids))
 from hpvsim.parameters import GENOTYPE_KEYS
 
 
@@ -208,7 +202,7 @@ def test_cross_immunity_step_identity_for_single_genotype():
     mod.cell_imm.values[:5] = 0.3
     conn.step()
     # Identity multiply: rel_sus = 1 - 0.4 = 0.6 for first five, 1.0 elsewhere.
-    rel = protected(sim, mod)
+    rel = np.asarray(mod.rel_sus.values)
     sev = np.asarray(mod.sev_imm.values)
     assert np.allclose(rel[:5], 0.6)
     assert np.allclose(rel[5:], 1.0)
@@ -238,10 +232,10 @@ def test_cross_immunity_step_two_genotype_hand_computed():
     h18.cell_imm.values[1] = 0.5
     conn.step()
     # rel_sus[t] = 1 - sum_s cross_imm_sus[t, s] * nab_imm[s]
-    assert protected(sim, h16)[0] == pytest.approx(0.6, abs=1e-6)
-    assert protected(sim, h18)[0] == pytest.approx(0.8, abs=1e-6)
-    assert protected(sim, h16)[1] == pytest.approx(0.7, abs=1e-6)
-    assert protected(sim, h18)[1] == pytest.approx(0.4, abs=1e-6)
+    assert h16.rel_sus.values[0] == pytest.approx(0.6, abs=1e-6)
+    assert h18.rel_sus.values[0] == pytest.approx(0.8, abs=1e-6)
+    assert h16.rel_sus.values[1] == pytest.approx(0.7, abs=1e-6)
+    assert h18.rel_sus.values[1] == pytest.approx(0.4, abs=1e-6)
     # sev_imm[t] = sum_s cross_imm_sev[t, s] * cell_imm[s]
     assert h16.sev_imm.values[0] == pytest.approx(0.3, abs=1e-6)
     assert h18.sev_imm.values[1] == pytest.approx(0.5, abs=1e-6)
@@ -297,10 +291,10 @@ def test_cross_immunity_step_four_genotype_hand_computed():
 
     # --- Agent 0 (cleared hpv16 only) ---
     # rel_sus[t] = 1 - cross_imm_sus[t, hpv16] * 0.4
-    assert protected(sim, h16)[0] == pytest.approx(0.60, abs=1e-6)
-    assert protected(sim, h18)[0] == pytest.approx(0.80, abs=1e-6)
-    assert protected(sim, hi5)[0] == pytest.approx(0.88, abs=1e-6)
-    assert protected(sim, ohr)[0] == pytest.approx(0.88, abs=1e-6)
+    assert h16.rel_sus.values[0] == pytest.approx(0.60, abs=1e-6)
+    assert h18.rel_sus.values[0] == pytest.approx(0.80, abs=1e-6)
+    assert hi5.rel_sus.values[0] == pytest.approx(0.88, abs=1e-6)
+    assert ohr.rel_sus.values[0] == pytest.approx(0.88, abs=1e-6)
     # sev_imm[t] = cross_imm_sev[t, hpv16] * 0.3
     assert h16.sev_imm.values[0] == pytest.approx(0.30, abs=1e-6)
     assert h18.sev_imm.values[0] == pytest.approx(0.21, abs=1e-6)
@@ -309,10 +303,10 @@ def test_cross_immunity_step_four_genotype_hand_computed():
 
     # --- Agent 1 (cleared hi5 only) ---
     # rel_sus[t] = 1 - cross_imm_sus[t, hi5] * 0.5
-    assert protected(sim, h16)[1] == pytest.approx(0.85, abs=1e-6)
-    assert protected(sim, h18)[1] == pytest.approx(0.85, abs=1e-6)
-    assert protected(sim, hi5)[1] == pytest.approx(0.55, abs=1e-6)
-    assert protected(sim, ohr)[1] == pytest.approx(0.85, abs=1e-6)
+    assert h16.rel_sus.values[1] == pytest.approx(0.85, abs=1e-6)
+    assert h18.rel_sus.values[1] == pytest.approx(0.85, abs=1e-6)
+    assert hi5.rel_sus.values[1] == pytest.approx(0.55, abs=1e-6)
+    assert ohr.rel_sus.values[1] == pytest.approx(0.85, abs=1e-6)
     # sev_imm[t] = cross_imm_sev[t, hi5] * 0.4
     assert h16.sev_imm.values[1] == pytest.approx(0.20, abs=1e-6)
     assert hi5.sev_imm.values[1] == pytest.approx(0.36, abs=1e-6)
@@ -320,16 +314,16 @@ def test_cross_immunity_step_four_genotype_hand_computed():
 
     # --- Agent 2 (cleared hpv16 AND hi5) — additivity test ---
     # rel_sus[t] = 1 - (cross_imm_sus[t, hpv16]*0.4 + cross_imm_sus[t, hi5]*0.5)
-    assert protected(sim, h16)[2] == pytest.approx(0.45, abs=1e-6)
-    assert protected(sim, h18)[2] == pytest.approx(0.65, abs=1e-6)
-    assert protected(sim, hi5)[2] == pytest.approx(0.43, abs=1e-6)
-    assert protected(sim, ohr)[2] == pytest.approx(0.73, abs=1e-6)
+    assert h16.rel_sus.values[2] == pytest.approx(0.45, abs=1e-6)
+    assert h18.rel_sus.values[2] == pytest.approx(0.65, abs=1e-6)
+    assert hi5.rel_sus.values[2] == pytest.approx(0.43, abs=1e-6)
+    assert ohr.rel_sus.values[2] == pytest.approx(0.73, abs=1e-6)
 
     # --- Agent 3 (cleared ohr only) — non-canonical source asymmetry ---
     # rel_sus[t] = 1 - cross_imm_sus[t, ohr] * 0.6
-    assert protected(sim, h16)[3] == pytest.approx(0.82, abs=1e-6)
-    assert protected(sim, hi5)[3] == pytest.approx(0.82, abs=1e-6)
-    assert protected(sim, ohr)[3] == pytest.approx(0.46, abs=1e-6)
+    assert h16.rel_sus.values[3] == pytest.approx(0.82, abs=1e-6)
+    assert hi5.rel_sus.values[3] == pytest.approx(0.82, abs=1e-6)
+    assert ohr.rel_sus.values[3] == pytest.approx(0.46, abs=1e-6)
 
 
 def test_cross_immunity_step_clips_to_unit_interval():
@@ -343,7 +337,7 @@ def test_cross_immunity_step_clips_to_unit_interval():
     sim.diseases.hpv18.nab_imm.values[0] = 0.9
     sim.connectors.crossimmunity.step()
     # sus_imm to hpv16 = 1*0.9 + 0.5*0.9 = 1.35, clipped to 1.0
-    assert protected(sim, sim.diseases.hpv16)[0] == pytest.approx(0.0, abs=1e-6)
+    assert sim.diseases.hpv16.rel_sus.values[0] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_cross_immunity_step_writes_survive_dead_agents():
@@ -372,7 +366,7 @@ def test_cross_immunity_step_writes_survive_dead_agents():
     mod.cell_imm[ss.uids([target_auid])] = 0.3
     conn.step()
     # The write must land in raw, not an ephemeral .values copy.
-    assert float(protected(sim, mod)[np.flatnonzero(sim.people.auids == target_auid)[0]]) == pytest.approx(0.6, abs=1e-6)
+    assert float(mod.rel_sus.raw[target_auid]) == pytest.approx(0.6, abs=1e-6)
     assert float(mod.sev_imm.raw[target_auid]) == pytest.approx(0.3, abs=1e-6)
 
 

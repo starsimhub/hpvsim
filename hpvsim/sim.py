@@ -1,13 +1,14 @@
 """HPVsim convenience Sim wrapper.
 
 ``hpv.Sim(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'])`` instantiates
-the default stack — one HPV disease with the genotypes as its strains
-(``hpv.make_family()``), multi-layer SexualNetwork, ss.Births + ss.Deaths +
-AgeMigration demographics, ss.People with location-specific age pyramid, plus a
-CrossImmunity connector and an HPVTotal analyzer — and forwards to ``ss.Sim``.
+the default stack — one HPV disease module per genotype, multi-layer
+SexualNetwork, ss.Births + ss.Deaths + AgeMigration demographics, ss.People
+with location-specific age pyramid, plus a CrossImmunity connector and an
+HPVTotal analyzer — and forwards to ``ss.Sim``.
 
 ``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
-modules are added after the auto-defaults (CrossImmunity and the HPVTotal
+modules are added after the auto-defaults (CrossImmunity, the
+``_ExclusiveSeeder`` when ``init_seeding='exclusive'``, and the HPVTotal
 analyzer). Other slots (``diseases``, ``networks``, ``demographics``,
 ``people``) retain override semantics. ``diseases=`` is mutually exclusive
 with ``genotypes=``. See ``Sim.__init__`` for the full argument set.
@@ -23,9 +24,9 @@ from . import misc
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration, AnnualBirths, Births
-from .hpv import HPV, make_family, _normalize_genotype
+from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
-from .seeding import total_init_prev
+from .seeding import _ExclusiveSeeder
 
 
 class Sim(ss.Sim):
@@ -36,7 +37,7 @@ class Sim(ss.Sim):
 
     Args:
       init_seeding (str, default ``'exclusive'``):
-        ``'exclusive'`` — seeded by the family: one Bernoulli per agent using the hpv16 age-banded
+        ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
         curve as the total HPV prevalence, then exactly one genotype
         assigned per infected agent. No co-infection at initialisation.
         ``'independent'`` — each genotype draws from its own per-genotype
@@ -195,7 +196,7 @@ class Sim(ss.Sim):
                 auto_connectors.append(HIVEffects(pars=effects_pars))
 
         if hpv_instances:
-            hpv_family = make_family(hpv_instances)  # override path; these manage their own init_prev
+            hpv_diseases = hpv_instances  # override path; these manage their own init_prev
         else:
             # Default to single-genotype HPV16 if neither supplied.
             keys = (tuple(hpv._normalize_genotype(g) for g in genotypes)
@@ -216,14 +217,19 @@ class Sim(ss.Sim):
                         f'resolved genotype keys {sorted(sim_keys)}'
                     )
 
-            # One chance per agent of any HPV, then one genotype each: the family's seeding.
-            exclusive = init_seeding == 'exclusive'
-            hpv_diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio, **({'init_prev': None} if exclusive else {}),
+            hpv_diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
                                 **gpars_overrides.get(k, {})) for k in keys]
-            split = None if init_hpv_dist is None else [init_hpv_dist[k] for k in keys]
-            hpv_family = make_family(hpv_diseases, init_prev=total_init_prev if exclusive else None, split=split)
+            if init_seeding == 'exclusive':
+                # One Bernoulli per agent for any HPV, then one genotype each.
+                self._seeder = hpv._ExclusiveSeeder(
+                    genotype_keys=keys, init_hpv_dist=init_hpv_dist
+                )
+                for d, k in zip(hpv_diseases, keys):
+                    d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
+                # Registered so the seeder's Dists get the standard init lifecycle.
+                auto_connectors.append(self._seeder)
 
-        diseases = [hpv_family] + other_diseases
+        diseases = hpv_diseases + other_diseases
         auto_analyzers = [HPVTotal()]
         connectors = auto_connectors + user_connectors
 
@@ -318,9 +324,6 @@ class Sim(ss.Sim):
         continuous ages while every subsequent step sees integer ages; this
         one-off transient at initialisation is negligible.
         """
-        for iv in sc.tolist(self.pars.interventions): # A delivery of an HPV product is for HPV, whose genotypes are a family, unless it says
-            if isinstance(iv, ss.Delivery) and isinstance(iv.product, (hpv.vx, hpv.dx, hpv.tx, hpv.radiation)) and iv.disease is None and iv.disease_list is None:
-                iv.disease = 'hpv'
         super().init(**kwargs)
         if self._v2_compat_demographics:
             uids = self.people.auids
@@ -331,8 +334,8 @@ class Sim(ss.Sim):
         """Shrink the sim for saving; skips the per-module size check by default.
 
         Identical to ``ss.Sim.shrink`` except ``size_limit`` defaults to None
-        rather than 1.0. The HPVTotal analyzer holds references to the shared
-        disease modules; starsim's per-module size
+        rather than 1.0. The CrossImmunity connector and HPVTotal analyzer each
+        hold references to the shared disease modules; starsim's per-module size
         budget counts those referenced modules against them and raises on a
         multi-genotype sim, even though ``sc.save`` serializes the disease
         modules once and the actual file is small (~1 MB). Dist and
