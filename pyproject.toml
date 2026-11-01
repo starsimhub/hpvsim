@@ -42,7 +42,7 @@ dependencies = [
     'numpy',
     'pandas>=2.0.0',
     'sciris>=3.0.0',
-    'starsim>=4.0.0',
+    'starsim>=4.0.0rc1',
     'matplotlib',
     'optuna',  # not imported directly, but sim.fit(method='optuna') uses it and starsim ships optuna only as an optional extra
 ]
