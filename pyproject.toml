@@ -42,7 +42,7 @@ dependencies = [
     'numpy',
     'pandas>=2.0.0',
     'sciris>=3.0.0',
-    'starsim>=3.6',  # 3.6 disallows float(TimePar); verified against 3.6.0
+    'starsim>=3.6,<4',  # 3.6 disallows float(TimePar); verified against 3.6.0
     'matplotlib',
     'optuna',  # not imported directly, but hpv.Calibration subclasses ss.Calibration and starsim ships optuna only as an optional extra
 ]

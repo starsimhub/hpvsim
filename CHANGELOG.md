@@ -1,6 +1,8 @@
 All notable changes to the codebase are documented in this file. Changes that may result in differences in model output, or are required in order to run an old parameter set with the current version, are flagged with the term "Regression information".
 
-## Version 3.3.0 (unreleased)
+## Version 3.3.0 (2026-11-01)
+
+Require Starsim below 4 (`starsim<4`), since this version does not run on Starsim 4.
 
 **HIV-dependent HPV trajectories now update when CD4 crosses a stratum boundary.** The CD4-based `hiv_rel_sev` multiplier was previously read once at HPV infection and baked into the trajectory, so a woman who seroconverted mid-infection, dropped a CD4 stratum on untreated HIV, or rebounded on ART kept her original (and typically wrong) trajectory for the rest of that infection. `hpv.HPV` now exposes `refresh_prognoses(uids)`, which re-draws the still-future portion of the trajectory for a subset of active infections (preserving ti_cin if already in the past, keeping cancer-scheduled trajectories untouched), and `hpv.HIV.step_state` fires it for exactly the agents whose stratum changed each step — within-stratum CD4 drift stays a no-op. This restores the v2 `update_hpv_progs` hook that was lost in the port.
 
