@@ -215,7 +215,7 @@ def test_validate_beta_zeroes_non_sexual_networks():
     non-sexual network sharing the sim -- ss.Infection.validate_beta's
     scalar branch expands to every network by default; HPV.validate_beta
     must zero out anything that isn't the sexual network."""
-    sim = make_sim(genotypes=[16], networks=[hpv.SexualNetwork(), ss.MaternalNet()],
+    sim = make_sim(genotypes=[16], networks=[hpv.SexualNetwork(), ss.MaternalNet()], demographics=ss.Pregnancy(),
                    beta=0.2)
     sim.init()
     betamap = sim.diseases.hpv16.validate_beta()
