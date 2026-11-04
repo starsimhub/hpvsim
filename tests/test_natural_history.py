@@ -142,7 +142,7 @@ def test_step_state_cancer_death_removes_agents(nathist_sim):
                 f'{int(alive_arr.sum())} cancer-death-scheduled agents still alive'
 
 
-def test_step_die_resets_bool_states():
+def test_on_death_resets_bool_states():
     """Dying agents have precin/cin/cancerous cleared (so result counts are accurate)."""
     sim = hpv.Sim(n_agents=500, location='nigeria',
                   start=1990, stop=2010, dt=0.25, rand_seed=0)
@@ -157,13 +157,13 @@ def test_step_die_resets_bool_states():
     mod.cin[test_uids[[1, 2, 3]]] = True
     mod.cancerous[test_uids[[2, 3]]] = True
 
-    mod.step_die(test_uids)
+    mod.on_death(test_uids)
 
-    assert not mod.precin[test_uids].any(), "precin not cleared after step_die"
-    assert not mod.cin[test_uids].any(), "cin not cleared after step_die"
-    assert not mod.cancerous[test_uids].any(), "cancerous not cleared after step_die"
-    assert not mod.infected[test_uids].any(), "infected not cleared after step_die"
-    assert not mod.susceptible[test_uids].any(), "susceptible not cleared after step_die"
+    assert not mod.precin[test_uids].any(), "precin not cleared after on_death"
+    assert not mod.cin[test_uids].any(), "cin not cleared after on_death"
+    assert not mod.cancerous[test_uids].any(), "cancerous not cleared after on_death"
+    assert not mod.infected[test_uids].any(), "infected not cleared after on_death"
+    assert not mod.susceptible[test_uids].any(), "susceptible not cleared after on_death"
 
 
 def test_hpv_has_raw_immunity_states():

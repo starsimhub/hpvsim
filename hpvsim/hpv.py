@@ -842,11 +842,11 @@ class HPV(ss.Infection):
             self.results.sum_age_at_cancer_death[ti] = float((ages_at_death * w).sum())
             self.sim.people.request_death(to_dead)
 
-    def step_die(self, uids):
+    def on_death(self, uids):
         """ Set states to False for the newly-dead. 
         IMPORTANT: if you add any new states, remember to add them here!
         """
-        super().step_die(uids)
+        super().on_death(uids)
         self.precin[uids] = False
         self.cin[uids] = False
         self.cancerous[uids] = False
