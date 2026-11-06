@@ -19,7 +19,7 @@ SMALL_PARS = dict(
     verbose=0,
 )
 
-girls = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14)
+girls = ss.person.female & (ss.person.age >= 9) & (ss.person.age < 14)
 
 
 def run_vx(delivery, **kwargs):
@@ -44,7 +44,7 @@ def test_routine_vx_fires_once_per_person():
 
 def test_campaign_vx_fires_on_each_round():
     """A campaign fires on each of its rounds."""
-    women = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 30)
+    women = ss.person.female & (ss.person.age >= 9) & (ss.person.age < 30)
     sim, uids, ages = run_vx(ss.vaccinate(hpv.vx('bivalent'), where=women, coverage=0.5, at=['2020', '2021'], name='vx'))
     delivered = np.asarray(sim.results.vx.delivered)
     assert (delivered > 0).sum() == 2
@@ -60,7 +60,7 @@ def test_routine_vx_respects_sex_and_age():
 
 def test_vx_at_age_reaches_girls_as_they_turn_nine():
     """at_age=9 reaches girls as they reach 9, and not those already older at the start."""
-    sim, uids, ages = run_vx(ss.vaccinate(hpv.vx('bivalent'), where=ss.ppl.female, at_age=9, coverage=1.0, start=2020, name='vx'))
+    sim, uids, ages = run_vx(ss.vaccinate(hpv.vx('bivalent'), where=ss.person.female, at_age=9, coverage=1.0, start=2020, name='vx'))
     assert len(uids) > 0
     assert np.all((ages >= 9) & (ages < 9 + 2*sim.t.dt.years))
 

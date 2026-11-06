@@ -38,8 +38,8 @@ def HIV_transmit(init_prev_data=None, pars=None, name='hiv', **kwargs):
 class HIV_incidence(sti.HIV):
     """HIV driven by an imposed incidence curve, with no network transmission.
 
-    STIsim's HIV, with infection at the rate of the curve in place of
-    transmission (``transmit()``). A testing intervention (e.g. ``sti.HIVTest``) diagnoses
+    STIsim's HIV, with infection at the rate of the curve (the transition
+    ``acquisition``) in place of transmission. A testing intervention (e.g. ``sti.HIVTest``) diagnoses
     them, as for any HIV; ``hpv.Sim(model_hiv=...)`` adds one that diagnoses
     everyone with HIV each step, so a plain ``sti.ART(coverage=...)`` treats them.
 
@@ -60,7 +60,7 @@ class HIV_incidence(sti.HIV):
         super().__init__(init_prev_data=init_prev_data, name=name,
                          **hiv_values(pars, kwargs, beta_m2f=0, beta_m2c=0, beta_breastfeed=0))
         self.incidence = incidence
-        self.u_acquisition = ss.random() # Who is infected, at the rate of the curve
+        self.define_transitions(acquisition=ss.Transition(self.susceptible, self.acute, rate=self.incidence_rate)) # New cases with no source or network
         # Filled in init_pre:
         self._years = None          # sorted unique years (int)
         self._ages = None           # sorted unique age-band lower bounds (int)
@@ -106,19 +106,6 @@ class HIV_incidence(sti.HIV):
         ages = np.asarray(people.age[uids], dtype=float)
         female = np.asarray(people.female[uids], dtype=bool)
         return ss.peryear(self._lookup_rates(float(self.t.now('year')), ages, female))
-
-    def transmit(self):
-        """Infection at the rate of the curve, in place of transmission: new cases with no source (-1) or network"""
-        sus = self.susceptible.uids
-        new = sus[self.u_acquisition.rvs(sus) < self.incidence_rate(self.sim, sus).to_prob(self.dt)]
-        none = np.full(len(new), -1)
-        return new, none, none
-
-    def step(self):
-        """STIsim's HIV step, with no one counted as a sexual source (see ``transmit()``)"""
-        out = super().step()
-        self.sexual_sources = ss.uids()
-        return out
 
 
 class HIVEffects(ss.Connector):
@@ -191,9 +178,9 @@ class HIVEffects(ss.Connector):
             ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
         )
 
-    def update_results(self):
-        """HPV prevalence by HIV status, each agent weighted by its scale, so fine agents count fractionally"""
-        super().update_results()
+    def record_stocks(self):
+        """HPV prevalence by HIV status at the start of the step, each agent weighted by its scale, so fine agents count fractionally"""
+        super().record_stocks()
         ti = self.ti
         people = self.sim.people
         alive = people.alive.values

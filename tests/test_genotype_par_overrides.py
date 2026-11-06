@@ -77,24 +77,24 @@ def test_higher_rel_beta_raises_prevalence():
 def test_unitless_duration_raises():
     """A duration distribution without ss.years must raise (bug 2)."""
     with pytest.raises(ValueError, match='without time units'):
-        hpv.HPV(genotype='hpv16', dur_precin=ss.lognorm_ex(mean=3, std=9))
+        hpv.HPV(genotype='hpv16', dur_precin=ss.lognormal(mean=3, std=9))
 
 
 def test_unitless_duration_raises_via_sim():
     with pytest.raises(ValueError, match='without time units'):
         hpv.Sim(genotypes=[16],
-                genotype_pars={'hpv16': {'dur_cin': ss.lognorm_ex(mean=5, std=20)}},
+                genotype_pars={'hpv16': {'dur_cin': ss.lognormal(mean=5, std=20)}},
                 n_agents=200, start=2000, stop=2001)
 
 
 def test_years_wrapped_duration_ok():
     """A properly unit-wrapped duration override must be accepted."""
     mod = hpv.HPV(genotype='hpv16',
-                  dur_precin=ss.lognorm_ex(mean=ss.years(3), std=ss.years(9)))
+                  dur_precin=ss.lognormal(mean=ss.years(3), std=ss.years(9)))
     assert isinstance(mod.pars.dur_precin, ss.Dist)
 
 
 def test_partial_years_duration_ok():
     """lognorm_ex with only mean wrapped (test_hpv.py pattern) is accepted."""
-    mod = hpv.HPV(genotype='hpv16', dur_precin=ss.lognorm_ex(mean=ss.years(4)))
+    mod = hpv.HPV(genotype='hpv16', dur_precin=ss.lognormal(mean=ss.years(4)))
     assert isinstance(mod.pars.dur_precin, ss.Dist)

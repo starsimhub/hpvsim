@@ -23,9 +23,8 @@ def _tiny(**kw):
 
 def _make_latent(hivmod, uids):
     """Infect these agents with HIV, in latent infection"""
-    hivmod.set_prognoses(uids)
-    hivmod.acute[uids] = False
-    hivmod.latent[uids] = True
+    hivmod.move(uids, hivmod.latent)
+    hivmod.set_infection(uids)
 
 # --------------------------------------------------------------------------- #
 # Wiring: gating
@@ -51,8 +50,8 @@ def test_hiv_gating():
 def test_hiv_transmission():
     """HIV transmits per act on the SexualNetwork, at beta_m2f (and beta_m2f*rel_beta_f2m from women to men)."""
     h = hpv.HIV_transmit(beta_m2f=0.0035, rel_beta_f2m=0.5)
-    assert np.isclose(h.pars.beta_m2f, 0.0035)
-    assert np.isclose(h.pars.rel_beta_f2m, 0.5)
+    assert np.isclose(h.pars.beta_m2f.value, 0.0035)
+    assert np.isclose(h.pars.rel_beta_f2m.value, 0.5)
     assert 'sexualnetwork' in h.hetero_networks
     infections = []
     for beta in [0.0, 0.2]:
@@ -143,8 +142,9 @@ def test_hiv_results_are_scale_weighted():
     sim = hpv.Sim(location='nigeria', genotypes=[16], n_agents=2000, rand_seed=1, # Seed 1: 4 infected fine agents (about 7 on average)
                   start=1990, stop=2005, dt=1.0, ms_agent_ratio=10,
                   model_hiv='transmission', verbose=0)
-    sim.run()
-    r, ppl, hiv = sim.results.hiv, sim.people, sim.diseases.hiv
+    sim.init()
+    sim.run(until=sim.t.tvec[-2]) # Stop before the last step, whose stocks are the state at its start
+    ppl, hiv = sim.people, sim.diseases.hiv
     w, alive = ppl.scale.values, ppl.alive.values
     infected = hiv.infected.values & alive
     scale = sim.pars.pop_scale
@@ -154,6 +154,9 @@ def test_hiv_results_are_scale_weighted():
 
     wtd = float((w * infected).sum())
     raw = float(infected.sum())
+    n_alive = float((w * alive).sum())
+    sim.run()
+    r = sim.results.hiv
     assert wtd < raw, 'fine agents should weigh less than whole people'
     assert np.isclose(float(r['infected'][-1]), wtd * scale, rtol=0.02)
     # The uncorrected value would have been the raw count x pop_scale. The two
@@ -163,7 +166,6 @@ def test_hiv_results_are_scale_weighted():
     assert not np.isclose(float(r['infected'][-1]), raw * scale, rtol=0.001)
 
     # Prevalence is a scale-weighted fraction, and stays a fraction.
-    n_alive = float((w * alive).sum())
     assert np.isclose(float(r['prevalence'][-1]), wtd / n_alive, rtol=0.02)
     assert 0 <= r['prevalence'][-1] <= 1
     assert 0 <= r['prevalence_15_49'][-1] <= 1
@@ -323,7 +325,7 @@ def test_hiv_rel_imm_effect():
         sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25, location='nigeria',
                       rand_seed=seed, genotypes=[16],
                       genotype_pars={'hpv16': {'sero_prob': 1.0}},
-                      diseases=[hpv.HIV_transmit(beta_m2f=0.0)])
+                      diseases=[hpv.HIV_transmit(beta_m2f=0.0, init_prev=0.0)]) # No one with HIV but the one made positive
         sim.init()
         hpvmod = sim.diseases.hpv16
         hivmod = sim.diseases.hiv

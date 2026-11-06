@@ -40,7 +40,7 @@ def _lognorm_params(par1, par2):
 
 
 def _dur_mean_std_years(dist):
-    """Pull (mean, std) in years from an ``ss.lognorm_ex`` instance."""
+    """Pull (mean, std) in years from an ``ss.lognormal`` instance."""
     mean = dist.pars.mean
     std = dist.pars.std
     return float(getattr(mean, 'years', mean)), float(getattr(std, 'years', std))

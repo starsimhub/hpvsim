@@ -20,9 +20,9 @@ Treatment products act on the model's disease states directly. Ablation and exci
 
 ## Delivery, coverage and targeting
 
-A delivery with `interval=` runs in rounds: `ss.screen(..., interval=ss.years(1), start=2015, coverage=0.3)` screens 30% of those eligible each year from 2015. With `at=['2015', '2025']` it runs twice, a campaign. With neither, it is routine: each person is offered the product once, at the first step on which they are eligible, e.g. vaccination of girls as they turn 9 with `at_age=9`. `coverage` is the share reached in each round, whatever the timestep. To ramp coverage over time, give it as a time series, e.g. `coverage=ss.timeseries({'2010': 0.1, '2030': 0.7}, mode='linear')`. `start` must fall inside the simulation window; a `stop` after its end never stops the delivery.
+A delivery with `every=` runs in rounds: `ss.screen(..., every=ss.years(1), start=2015, coverage=0.3)` screens 30% of those eligible each year from 2015. With `at=['2015', '2025']` it runs twice, a campaign. With neither, it is routine: each person is offered the product once, at the first step on which they are eligible, e.g. vaccination of girls as they turn 9 with `at_age=9`. `coverage` is the share reached in each round, whatever the timestep. To ramp coverage over time, give it as a time series, e.g. `coverage=ss.timeseries({'2010': 0.1, '2030': 0.7}, interpolation='linear')`. `start` must fall inside the simulation window; a `stop` after its end never stops the delivery.
 
-Who is eligible is a condition on people, given as `where=`, e.g. `ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)` for women up to their 50th birthday. Nothing is limited to women unless you say so: leave out `ss.ppl.female` for gender-neutral vaccination.
+Who is eligible is a condition on people, given as `where=`, e.g. `ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)` for women up to their 50th birthday. Nothing is limited to women unless you say so: leave out `ss.person.female` for gender-neutral vaccination.
 
 A delivery is named after the variable it is assigned to (or `name=`), and its results are under that name, e.g. `sim.results.screening.positive`: each has `delivered`, `eligible`, `coverage`, and one result per outcome. A product is named after the product it looks up (`'via'`), and is renamed `<name>_product` if a delivery has that name.
 
@@ -35,14 +35,14 @@ import numpy as np
 import starsim as ss
 import hpvsim as hpv
 
-women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
-screening = ss.screen(hpv.dx('hpv'), where=women, coverage=0.35, interval=ss.years(1), start=2010)
+women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
+screening = ss.screen(hpv.dx('hpv'), where=women, coverage=0.35, every=ss.years(1), start=2010)
 
 # Women who screen positive go to colposcopy
-triage = ss.screen(hpv.dx('colposcopy'), who=screening.positive, coverage=0.9)
+triage = ss.screen(hpv.dx('colposcopy'), on=screening.positive, coverage=0.9)
 
 # Women with a low- or high-grade lesion are offered ablation, unless they have cancer
-ablation = ss.treat(hpv.tx('ablation'), who=(triage.hsil | triage.lsil) & hpv.no_cancer, coverage=0.9)
+ablation = ss.treat(hpv.tx('ablation'), on=triage.hsil | triage.lsil, where=hpv.no_cancer, coverage=0.9)
 
 pars = dict(location='nigeria', genotypes=[16, 18], n_agents=2000,
             start=2000, stop=2020, verbose=0)

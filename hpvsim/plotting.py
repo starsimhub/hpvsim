@@ -253,7 +253,7 @@ def _plot_genotype_box(ax, name, cols, expected, actual_list, top_n):
 
 
 def plot_calibration(fit, top_n=50, fig=None, ncols=None):
-    """Data-vs-fit plot for a fit of a sim with calibration data (``sim.fit(gof=hpv.calibration.gof)``).
+    """Data-vs-fit plot for a fit of a sim with calibration data (``sim.fit(loss=hpv.calibration.gof)``).
 
     Auto-inspects the sim's data (``fit.sim.calib_data``) and renders one panel per
     (scope, name) target group, overlaying a top-``top_n``-trial model

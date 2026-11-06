@@ -39,7 +39,7 @@ def test_death_rate_shape():
 
     Columns match ss.Deaths' default UN-style metadata
     (Time, AgeGrpStart, Sex, mx); rates are per-1000 (matching default
-    rate_units=1e-3) and Sex labels are 'Female'/'Male' (matching default
+    rate_per=1000) and Sex labels are 'Female'/'Male' (matching default
     sex_keys).
     """
     out = hpvsim.data.load_country('nigeria')

@@ -1,4 +1,4 @@
-"""Unit tests for calibration: hpv.Sim(data=...) with sim.fit(gof=hpv.calibration.gof), compute_gof, and the default eval_fn."""
+"""Unit tests for calibration: hpv.Sim(data=...) with sim.fit(loss=hpv.calibration.gof), compute_gof, and the default eval_fn."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -17,7 +17,7 @@ def test_fit_shared_beta():
     df = pd.DataFrame({'all_hpv.asr_cancer_incidence': [10.0]}, index=pd.Index([2020.0], name='t'))
     sim = hpv.Sim(n_agents=200, start=2017, stop=2019, dt=1.0, rand_seed=0, genotypes=[16, 18], data=df,
                   pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])), verbose=0)
-    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    fit = sim.fit(loss=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
     assert list(fit.pars.keys()) == ['beta']
     assert 0.1 <= fit.pars.beta <= 0.3
 
@@ -304,7 +304,7 @@ def test_data_genotype_dist_e2e_calibrates(tmp_path):
     sim = hpv.Sim(location='nigeria', n_agents=200, start=2019, stop=2021, dt=1.0,
                   genotypes=[16, 18, 'hi5', 'ohr'], rand_seed=0, verbose=0,
                   data=[str(csv)], pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
-    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    fit = sim.fit(loss=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
     assert np.isfinite(fit.mismatch)
 
 
@@ -324,7 +324,7 @@ def test_data_asr_reads_from_hpv_total(tmp_path):
     assert 'all_hpv_by_age' not in names
     assert 'all_hpv_pyramid' not in names
     # E2E: calibration runs without error via HPVTotal.asr path.
-    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    fit = sim.fit(loss=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
     assert np.isfinite(fit.mismatch)
 
 
@@ -335,7 +335,7 @@ def test_data_cancers_e2e_calibrates(tmp_path):
     csv = _write_cancer_cases_csv(tmp_path, [2020], ages, values)
     sim = hpv.Sim(n_agents=200, start=2019, stop=2021, dt=1.0, rand_seed=0,
                   data=[str(csv)], pars=dict(beta=ss.par(0.2, bounds=[0.1, 0.3])))
-    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
+    fit = sim.fit(loss=hpv.calibration.gof, method='optuna', n_trials=2, verbose=False)
     assert np.isfinite(fit.mismatch)
 
 

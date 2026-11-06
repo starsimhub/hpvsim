@@ -10,7 +10,7 @@ import hpvsim as hpv
 
 
 def _make_tiny_vx_sim(coverage):
-    girls = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14)
+    girls = ss.person.female & (ss.person.age >= 9) & (ss.person.age < 14)
     return hpv.Sim(
         n_agents=500, location='nigeria', genotypes=[16], start=2010, stop=2013, dt=0.25,
         verbose=0, label=f'coverage={coverage:.0%}',

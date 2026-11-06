@@ -15,7 +15,7 @@ Algorithm — once per year:
        if diff < 0:  weight-pick ``|diff|`` agents at this age and request
                      their removal (treated as emigration)
 
-Annual cadence is enforced by ``dt=ss.year`` in ``__init__``: ``ss.Loop``
+Annual cadence is enforced by ``dt=ss.year`` in ``__init__``: ``ss.loop.Loop``
 only fires ``step()`` at times in this module's ``t.tvec``, so it runs once
 per integer year regardless of sim.dt.
 
@@ -50,7 +50,7 @@ class AgeMigration(ss.Demographics):
 
     def __init__(self, pars=None, pop_total=None, pop_by_age=None,
                  v2_compat=False, **kwargs):
-        # dt=ss.year makes ss.Loop fire step() once per year, whatever sim.dt is.
+        # dt=ss.year makes ss.loop.Loop fire step() once per year, whatever sim.dt is.
         super().__init__(dt=ss.year)
         self.update_pars(pars, **kwargs)
         self._pop_total = pop_total                 # [year, pop_size] DataFrame; sets _scale and the data-year window.
@@ -233,7 +233,7 @@ class AgeMigration(ss.Demographics):
         self._n_emi = n_emi_total
         return
 
-    def update_results(self):
+    def record_flows(self):
         """Store immigrant/emigrant counts for this timestep."""
         self.results.new_immigrants[self.ti] = self._n_imm
         self.results.new_emigrants[self.ti] = self._n_emi
@@ -307,7 +307,7 @@ class AnnualBirths(Births):
 
     Standard ``ss.Births`` distributes births evenly across all steps. This
     subclass fires a single birth pulse at each integer year boundary by giving
-    the module an annual Timeline (``dt=ss.year``). ``ss.Loop`` then only calls
+    the module an annual Timeline (``dt=ss.year``). ``ss.loop.Loop`` then only calls
     ``step()`` once per calendar year, and because ``self.t.dt`` equals
     ``ss.years(1)``, ``get_births()`` naturally computes the full annual
     probability rather than a per-quarter fraction.
@@ -342,7 +342,7 @@ class AnnualBirths(Births):
     """
 
     def __init__(self, pars=None, **kwargs):
-        # An annual Timeline makes ss.Loop fire once per year, and self.t.dt ==
+        # An annual Timeline makes ss.loop.Loop fire once per year, and self.t.dt ==
         # ss.years(1) makes get_births() compute the full annual probability.
         import sciris as sc
         pars = sc.mergedicts({'dt': ss.year}, pars)

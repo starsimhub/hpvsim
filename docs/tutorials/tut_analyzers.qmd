@@ -187,8 +187,8 @@ handles the per-agent weighting that `ms_agent_ratio` introduces.
 Attach it like any other analyzer:
 
 ```{python}
-women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
-screening = ss.screen(hpv.dx('via'), where=women, coverage=0.2, interval=ss.years(1), start=2015)
+women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
+screening = ss.screen(hpv.dx('via'), where=women, coverage=0.2, every=ss.years(1), start=2015)
 sim2 = hpv.Sim(location='nigeria', genotypes=[16, 18], n_agents=2000,
                start=2000, stop=2030, verbose=0,
                interventions=[screening], analyzers=[UnscreenedWomen()])

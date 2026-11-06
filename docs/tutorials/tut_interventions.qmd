@@ -24,7 +24,7 @@ ones that ship with HPVsim are in three CSV files you can read directly:
 
 A program decides who is offered the product, when, and how often. In HPVsim a program is one of Starsim's deliveries: `ss.screen` for a test, `ss.treat` for a treatment, and `ss.vaccinate` for a vaccine. Naming a product as a string, as in `hpv.dx('via')`, picks up the standard version from those files.
 
-Who is eligible is a condition on people, given as `where=`, e.g. women aged 30 to 49 is `ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)`.
+Who is eligible is a condition on people, given as `where=`, e.g. women aged 30 to 49 is `ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)`.
 
 ## Wire up a screen-and-treat cascade
 
@@ -35,15 +35,15 @@ import numpy as np
 import starsim as ss
 import hpvsim as hpv
 
-women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
+women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
 
 def screen_and_treat(coverage):
     """A VIA screen, triage to a treatment decision, then ablation or excision."""
 
-    screening = ss.screen(hpv.dx('via'), where=women, coverage=coverage, interval=ss.years(1), start=2015)
-    assignment = ss.screen(hpv.dx('tx_assigner'), who=screening.positive, coverage=0.9)
-    ablation = ss.treat(hpv.tx('ablation'), who=assignment.ablation & hpv.no_cancer, coverage=0.9)
-    excision = ss.treat(hpv.tx('excision'), who=assignment.excision & hpv.no_cancer, coverage=0.9,
+    screening = ss.screen(hpv.dx('via'), where=women, coverage=coverage, every=ss.years(1), start=2015)
+    assignment = ss.screen(hpv.dx('tx_assigner'), on=screening.positive, coverage=0.9)
+    ablation = ss.treat(hpv.tx('ablation'), on=assignment.ablation, where=hpv.no_cancer, coverage=0.9)
+    excision = ss.treat(hpv.tx('excision'), on=assignment.excision, where=hpv.no_cancer, coverage=0.9,
                         delay=ss.months(6)) # Six months from decision to surgery
     return [screening, assignment, ablation, excision]
 ```
@@ -52,7 +52,7 @@ Three things make this work.
 
 Each result of a test is an event that triggers the next link, on the same step: `screening.positive` sends women to `assignment`; the `tx_assigner` product sorts them into `ablation` or `excision` according to how advanced the lesion is (or `radiation`, for cancer); each treatment picks up its own group. `hpv.no_cancer` leaves out women who have cancer, since ablation and excision do not treat it. Each delivery is named after its variable, so its results are `sim.results.screening`, `sim.results.ablation`, and so on.
 
-`interval=ss.years(1)` makes screening a round each year, and `coverage` is the share of the eligible women reached in each round, not a lifetime coverage. `coverage=0.2` means a woman in the eligible age range has a 20% chance of being screened each year, which averages out to roughly one screen every five years — close to what WHO recommends. `coverage=0.7` is almost annual screening.
+`every=ss.years(1)` makes screening a round each year, and `coverage` is the share of the eligible women reached in each round, not a lifetime coverage. `coverage=0.2` means a woman in the eligible age range has a 20% chance of being screened each year, which averages out to roughly one screen every five years — close to what WHO recommends. `coverage=0.7` is almost annual screening.
 
 `delay=ss.months(6)` puts six months between the treatment decision and the treatment. Women who die or develop cancer in the meantime are never treated, which is what happens when surgical capacity is scarce.
 
@@ -103,7 +103,7 @@ A therapeutic vaccine is offered to women who already have HPV, to help them cle
 def screen_then_txvx(coverage):
     cascade = screen_and_treat(coverage)
     screening = cascade[0]
-    txvx = ss.treat(hpv.txvx('txvx1'), who=screening.positive & hpv.no_cancer, coverage=0.8)
+    txvx = ss.treat(hpv.txvx('txvx1'), on=screening.positive, where=hpv.no_cancer, coverage=0.8)
     return cascade + [txvx]
 
 s_screen = hpv.Sim(**PARS, interventions=screen_and_treat(0.2),

@@ -95,7 +95,7 @@ sim = hpv.Sim(
     pars           = pars,
 )
 
-fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=4, n_workers=2, verbose=False) # Far too few trials; see below
+fit = sim.fit(loss=hpv.calibration.gof, method='optuna', n_trials=4, workers=2, verbose=False) # Far too few trials; see below
 print('Best fit:', fit.pars)
 ```
 
@@ -126,7 +126,7 @@ different ones rather than running more trials.
 This fit is a demonstration of the mechanics. A real calibration needs:
 
 - **Hundreds to thousands of trials.** Set `trials` to at least a few
-  hundred and `n_workers` to the number of cores you have. That belongs on a
+  hundred and `workers` to the number of cores you have. That belongs on a
   server, not a laptop.
 - **More agents.** At `n_agents=2000` the model's own noise is comparable to the
   differences between parameter sets, so the search partly fits noise. Raise

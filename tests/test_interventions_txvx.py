@@ -22,7 +22,7 @@ def make_txvx(efficacy=1.0, **kwargs):
         for state in ('precin', 'cin') for g in GENOTYPES
     ])
     return hpv.txvx(df=df, rel_imm={'hpv16': 1.0, 'hpv18': 1.0, 'hi5': 0.5, 'ohr': 0.5},
-                    imm_init=ss.beta_mean(mean=0.35, var=0.025), **kwargs)
+                    imm_init=ss.beta_dist(mean=0.35, std=0.025**0.5), **kwargs)
 
 
 def make_sim(interventions, n_agents=500, stop=2025):
@@ -76,11 +76,11 @@ def test_txvx_immunity_reaches_those_it_fails_to_cure():
 def test_txvx_in_a_screening_program_reduces_cancer():
     """Delivered to screen-positive women, the therapeutic averts cancer."""
     def run(with_txvx):
-        women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
-        scr = ss.screen(hpv.dx('hpv'), where=women, coverage=1.0, interval=ss.years(1), start=2022, name='scr')
+        women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
+        scr = ss.screen(hpv.dx('hpv'), where=women, coverage=1.0, every=ss.years(1), start=2022, name='scr')
         ivs = [scr]
         if with_txvx:
-            ivs.append(ss.treat(make_txvx(efficacy=0.9), who=scr.positive & hpv.no_cancer, name='txv'))
+            ivs.append(ss.treat(make_txvx(efficacy=0.9), on=scr.positive, where=hpv.no_cancer, name='txv'))
         sim = make_sim(ivs, n_agents=3000, stop=2060)
         sim.run()
         return sim

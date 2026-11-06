@@ -74,7 +74,7 @@ LONG = dict(PARS, stop=2060)
 COVERAGES = [0.0, 0.5, 0.9]
 N_SEEDS = 5
 
-girls = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14)
+girls = ss.person.female & (ss.person.age >= 9) & (ss.person.age < 14)
 
 def make_sim(coverage):
     """One sim for a given vaccination coverage."""

@@ -87,7 +87,7 @@ def _genotype_pars(cin_k_scale, tp_scale, tp_rel, rb_mult):
         d = {'beta': {'sexualnetwork': [rc.BASE_BETA * rb * rc._TRANSF2M,
                                         rc.BASE_BETA * rb * rc._TRANSM2F]}}
         mean, std = rc._DUR_CIN[key]
-        d['dur_cin'] = ss.lognorm_ex(mean=ss.years(mean * DUR_CIN_FIXED),
+        d['dur_cin'] = ss.lognormal(mean=ss.years(mean * DUR_CIN_FIXED),
                                      std=ss.years(std * DUR_CIN_FIXED))
         base_k = rc._RWANDA_CIN_K.get(key, float(gp.cin_fn['k']))
         k = base_k * cin_k_scale

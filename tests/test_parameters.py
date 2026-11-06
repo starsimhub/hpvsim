@@ -157,8 +157,8 @@ def test_hiv_par_routing():
     effects = sim.connectors.hiv_effects
     assert effects.pars.rel_sus_lo == 0.4
     assert effects.pars.rel_sus_hi == 0.5
-    assert sim.diseases.hiv.pars.beta_m2f == 0.01
-    assert sim.diseases.hiv.pars.rel_beta_f2m == 0.7
+    assert sim.diseases.hiv.pars.beta_m2f.value == 0.01
+    assert sim.diseases.hiv.pars.rel_beta_f2m.value == 0.7
 
 
 def test_bare_beta_does_not_broadcast_to_hiv():
@@ -168,7 +168,7 @@ def test_bare_beta_does_not_broadcast_to_hiv():
     forms may touch HIV's pars."""
     sim = make_sim(genotypes=[16], model_hiv='transmission', pars=dict(beta=0.2))
     sim.init()
-    assert sim.diseases.hiv.pars.beta_m2f == hpv.HIV_transmit().pars.beta_m2f
+    assert sim.diseases.hiv.pars.beta_m2f.value == hpv.HIV_transmit().pars.beta_m2f.value
     assert sim.diseases.hpv16.pars.beta == 0.2
 
 
@@ -215,11 +215,11 @@ def test_validate_beta_zeroes_non_sexual_networks():
     non-sexual network sharing the sim -- ss.Infection.validate_beta's
     scalar branch expands to every network by default; HPV.validate_beta
     must zero out anything that isn't the sexual network."""
-    sim = make_sim(genotypes=[16], networks=[hpv.SexualNetwork(), ss.MaternalNet()], demographics=ss.Pregnancy(),
+    sim = make_sim(genotypes=[16], networks=[hpv.SexualNetwork(), ss.PrenatalNet()], demographics=ss.Pregnancy(),
                    beta=0.2)
     sim.init()
     betamap = sim.diseases.hpv16.validate_beta()
-    assert betamap['maternal'] == [0.0, 0.0]
+    assert betamap['prenatal'] == [0.0, 0.0]
     assert betamap['sexualnetwork'] != [0.0, 0.0]
 
 

@@ -13,10 +13,10 @@ def _cascade_sim(intvs):
 
 
 def _cascade():
-    women = ss.ppl.female & (ss.ppl.age >= 30) & (ss.ppl.age < 50)
-    screen = ss.screen(hpv.dx('hpv'), where=women, coverage=0.7, interval=ss.years(1), start=2021, stop=2024, name='primary')
-    triage = ss.screen(hpv.dx('colposcopy'), who=screen.positive, coverage=0.9, name='colpo')
-    treat = ss.treat(hpv.tx('excision'), who=triage.hsil & hpv.no_cancer, coverage=0.8, name='excision_rx')
+    women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
+    screen = ss.screen(hpv.dx('hpv'), where=women, coverage=0.7, every=ss.years(1), start=2021, stop=2024, name='primary')
+    triage = ss.screen(hpv.dx('colposcopy'), on=screen.positive, coverage=0.9, name='colpo')
+    treat = ss.treat(hpv.tx('excision'), on=triage.hsil, where=hpv.no_cancer, coverage=0.8, name='excision_rx')
     return screen, triage, treat
 
 
@@ -46,10 +46,10 @@ def test_cascade_order_does_not_matter():
 
 def test_linked_txvx_in_cascade():
     """A therapeutic vaccine triggered by colposcopy's LSIL results reaches at most those with them."""
-    women = ss.ppl.female & (ss.ppl.age >= 25) & (ss.ppl.age < 55)
-    screen = ss.screen(hpv.dx('hpv'), where=women, coverage=1.0, interval=ss.years(1), start=2021, stop=2024, name='primary')
-    triage = ss.screen(hpv.dx('colposcopy'), who=screen.positive, coverage=1.0, name='colpo')
-    linked = ss.treat(hpv.txvx('txvx1'), who=triage.lsil & hpv.no_cancer, coverage=1.0, name='linked_v')
+    women = ss.person.female & (ss.person.age >= 25) & (ss.person.age < 55)
+    screen = ss.screen(hpv.dx('hpv'), where=women, coverage=1.0, every=ss.years(1), start=2021, stop=2024, name='primary')
+    triage = ss.screen(hpv.dx('colposcopy'), on=screen.positive, coverage=1.0, name='colpo')
+    linked = ss.treat(hpv.txvx('txvx1'), on=triage.lsil, where=hpv.no_cancer, coverage=1.0, name='linked_v')
     sim = _cascade_sim([screen, triage, linked])
     sim.run()
     r = sim.results

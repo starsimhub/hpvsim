@@ -92,10 +92,10 @@ parameters carry explicit time units (`ss.years`). v2 stored them as
 `{'dist': 'lognormal', 'par1': 3, 'par2': 9}`; the v3 equivalent is
 
 ```python
-genotype_pars={'hpv16': {'dur_precin': ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))}}
+genotype_pars={'hpv16': {'dur_precin': ss.lognormal(mean=ss.years(3), std=ss.years(9))}}
 ```
 
-If you pass a *unit-less* distribution — `ss.lognorm_ex(mean=3, std=9)` — the
+If you pass a *unit-less* distribution — `ss.lognormal(mean=3, std=9)` — the
 value is interpreted in timesteps rather than years, so at `dt=0.25` the
 infectious period is ~4× too short and **the epidemic silently collapses to
 near-zero prevalence with no error**. Always wrap duration means/stds in
@@ -110,7 +110,7 @@ explicit `beta={'sexualnetwork': [f2m, m2f]}` dict instead to bypass the
 expansion and fully hand-specify the pair.
 
 **Shape functions merge partial overrides.** `cin_fn` / `cancer_fn` are
-`ss.Pars` (not plain dicts) carrying shape params (`form`, `k`, `x_infl`,
+`ss.parameters.Pars` (not plain dicts) carrying shape params (`form`, `k`, `x_infl`,
 `ttc`). A partial override, e.g. `{'k': 0.5}`, merges into the existing
 sibling keys rather than replacing the whole dict.
 
@@ -250,8 +250,8 @@ the aggregate `hpv.HPVTotal` analyzer is added automatically. See the
 [analyzers](tutorials/tut_analyzers.qmd) tutorials for the full API. The
 practical changes that break most v2 cascade code:
 
-- **Programs are deliveries.** v2's (and v3's) intervention classes are gone. `hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 14], start_year=2020)` is `ss.vaccinate(hpv.vx('bivalent'), where=ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14), coverage=0.9, start=2020)`, and each person is vaccinated once. `hpv.routine_screening(product='via', prob=0.2, ...)` is `ss.screen(hpv.dx('via'), where=..., coverage=0.2, interval=ss.years(1), start=...)`, a round each year; a campaign is `at=['2022', '2023']`. Nothing is limited to women unless `where=` says so.
-- **Cascades are wired by results, not eligibility functions.** A test's results are events: `ss.screen(hpv.dx('colposcopy'), who=screening.positive, coverage=0.9)` triages those who screened positive, on the same step, and `ss.treat(hpv.tx('ablation'), who=colpo.hsil & hpv.no_cancer)` treats those with a high-grade lesion, unless they have cancer. `max_capacity=` is `capacity=`, and `hpv.treat_delay(delay=2)` is `delay=ss.years(2)`.
+- **Programs are deliveries.** v2's (and v3's) intervention classes are gone. `hpv.routine_vx(product='bivalent', prob=0.9, age_range=[9, 14], start_year=2020)` is `ss.vaccinate(hpv.vx('bivalent'), where=ss.person.female & (ss.person.age >= 9) & (ss.person.age < 14), coverage=0.9, start=2020)`, and each person is vaccinated once. `hpv.routine_screening(product='via', prob=0.2, ...)` is `ss.screen(hpv.dx('via'), where=..., coverage=0.2, every=ss.years(1), start=...)`, a round each year; a campaign is `at=['2022', '2023']`. Nothing is limited to women unless `where=` says so.
+- **Cascades are wired by results, not eligibility functions.** A test's results are events: `ss.screen(hpv.dx('colposcopy'), on=screening.positive, coverage=0.9)` triages those who screened positive, on the same step, and `ss.treat(hpv.tx('ablation'), on=colpo.hsil, where=hpv.no_cancer)` treats those with a high-grade lesion, unless they have cancer. `max_capacity=` is `capacity=`, and `hpv.treat_delay(delay=2)` is `delay=ss.years(2)`.
 - **Look-ups by name, not label.** `sim.interventions` and `sim.analyzers` are
   keyed by each module's `name` (a delivery is named after the variable it is assigned to, other modules after their class), not by
   `label`. There is
@@ -371,12 +371,12 @@ Choosing the lever:
   multiscale-CIN-regate patch is cancer-side only). And v3 is never bit-identical
   to v2 (different RNG) — compare on intervals/trends, never exact values.
 
-**Calibration API.** HPVsim 4 uses Starsim's `sim.fit()`: the parameters to fit are given with bounds, as `ss.par(value, bounds=[low, high])`, through `hpv.Sim(pars=...)` (e.g. `pars=dict(beta=ss.par(0.25, bounds=[0.15, 0.35]))`), and the targets through `hpv.Sim(data=...)`; then `fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=200)`. A parameter inside a dict parameter can be fitted too, by its dotted name (e.g. `cancer_fn.transform_prob`). Results live in `fit.pars` / `fit.trials`, and `fit.project()` re-runs the fitted model to draw uncertainty bands. The v2 `analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim storage are gone.
+**Calibration API.** HPVsim 4 uses Starsim's `sim.fit()`: the parameters to fit are given with bounds, as `ss.par(value, bounds=[low, high])`, through `hpv.Sim(pars=...)` (e.g. `pars=dict(beta=ss.par(0.25, bounds=[0.15, 0.35]))`), and the targets through `hpv.Sim(data=...)`; then `fit = sim.fit(loss=hpv.calibration.gof, method='optuna', n_trials=200)`. A parameter inside a dict parameter can be fitted too, by its dotted name (e.g. `cancer_fn.transform_prob`). Results live in `fit.pars` / `fit.trials`, and `fit.project()` re-runs the fitted model to draw uncertainty bands. The v2 `analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim storage are gone.
 
 ## Known issues and tips
 
 - **Guard multi-worker calibration/parallel with `if __name__ == '__main__':`
-  (Windows).** `sim.fit(..., n_workers=4)` (and any
+  (Windows).** `sim.fit(..., workers=4)` (and any
   `ss.MultiSim` / `ss.parallel`) uses process *spawn* on Windows, so each
   worker re-imports your driver module. Without the `__main__` guard the workers
   re-launch the calibration recursively, spawning ever more processes until the

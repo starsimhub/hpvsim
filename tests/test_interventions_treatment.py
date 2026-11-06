@@ -40,7 +40,7 @@ def test_cancer_conditions_are_complements():
 
 def test_treatment_excludes_cancer_with_no_cancer():
     """A CIN treatment given where=hpv.no_cancer does not reach women with cancer."""
-    treat = ss.treat(hpv.tx('excision'), where=ss.ppl.female & hpv.no_cancer, coverage=1.0, at=['2022'], name='rx')
+    treat = ss.treat(hpv.tx('excision'), where=ss.person.female & hpv.no_cancer, coverage=1.0, at=['2022'], name='rx')
     sim, uids, reached = _run_with_cancers(treat)
     assert reached, 'nobody was treated'
     assert not set(uids.tolist()) & reached
@@ -48,7 +48,7 @@ def test_treatment_excludes_cancer_with_no_cancer():
 
 def test_radiation_only_treats_cancer_with_has_cancer():
     """Radiation given where=hpv.has_cancer reaches the women with cancer, and nobody else."""
-    treat = ss.treat(hpv.radiation(), where=ss.ppl.female & hpv.has_cancer, coverage=1.0, at=['2022'], name='rx')
+    treat = ss.treat(hpv.radiation(), where=ss.person.female & hpv.has_cancer, coverage=1.0, at=['2022'], name='rx')
     sim, uids, reached = _run_with_cancers(treat)
     alive = uids[sim.people.alive[uids]] # Those who have not died of other causes
     assert len(alive) and set(alive.tolist()) <= reached
@@ -59,7 +59,7 @@ def test_radiation_only_treats_cancer_with_has_cancer():
 def test_treatment_capacity_respected():
     """With a capacity per round (in people, not agents), no more than that many are treated per round."""
     capacity = 1e6
-    treat = ss.treat(hpv.tx('excision'), where=ss.ppl.female & hpv.no_cancer, capacity=capacity, interval=ss.years(1), name='rx')
+    treat = ss.treat(hpv.tx('excision'), where=ss.person.female & hpv.no_cancer, capacity=capacity, every=ss.years(1), name='rx')
     sim = _four_genotype_sim_with([treat])
     sim.run()
     delivered = np.asarray(sim.results.rx.delivered)
@@ -70,7 +70,7 @@ def test_treatment_capacity_respected():
 
 def test_ablation_cures_cin():
     """Ablation of women with CIN cures 93.6% of them (products_tx.csv)."""
-    treat = ss.treat(hpv.tx('ablation'), where=ss.ppl.female, coverage=1.0, at=['2021'], name='rx')
+    treat = ss.treat(hpv.tx('ablation'), where=ss.person.female, coverage=1.0, at=['2021'], name='rx')
     sim = hpv.Sim(n_agents=4000, start=2020, stop=2022, location='nigeria', genotypes=[16], interventions=[treat], verbose=0)
     sim.init()
     women = sim.people.female.uids

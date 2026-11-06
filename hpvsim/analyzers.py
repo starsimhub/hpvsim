@@ -126,7 +126,15 @@ class by_age(ss.Analyzer):
                 ))
         self.define_results(*defs)
 
+    def record_stocks(self):
+        """The stocks and prevalences, as at the start of the step"""
+        self._record([key for key in self.keys if key not in self._FLOW_KEYS])
+
     def step(self):
+        """The flows, over the step just taken"""
+        self._record([key for key in self.keys if key in self._FLOW_KEYS])
+
+    def _record(self, keys):
         ti = self.sim.ti
         people = self.sim.people
         alive = people.alive.values
@@ -134,7 +142,7 @@ class by_age(ss.Analyzer):
         female = people.female.values
         scale = getattr(people, 'scale', None)
         weights = scale.values if scale is not None else None
-        for key in self.keys:
+        for key in keys:
             if key in self._COUNT_KEYS:
                 attr = self._COUNT_KEYS[key]
                 state_any = np.zeros_like(alive)

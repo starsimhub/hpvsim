@@ -17,6 +17,29 @@ class _GrownRun:
         self.fine_in_emigrate = []   # per _emigrate call: was any candidate fine?
         self.fine_existed = []       # per _emigrate call: did any fine agent exist?
         self.hazard_removed = []     # per _emigrate_fine call: how many were removed?
+        self.last_stocks = {}        # (module, state): scale-weighted count at the start of the last step
+
+
+_STOCK_STATES = ('susceptible', 'infected', 'precin', 'cin', 'cancerous', 'latent')
+
+def _scale_weighted_stocks(sim):
+    """Each HPV module's stocks, and the union of infected, scale-weighted, as the state is now"""
+    ppl = sim.people
+    auids = ppl.auids
+    alive_mask = np.asarray(ppl.alive[auids], dtype=bool)
+    stocks = {}
+    any_infected = np.zeros(len(auids), dtype=bool)
+    for dis in sim.diseases.values():
+        if isinstance(dis, hpv.HPV):
+            for state_name in _STOCK_STATES:
+                state_arr = getattr(dis, state_name)
+                uids_in = ppl.auids[np.asarray(state_arr[ppl.auids], dtype=bool)]
+                stocks[(dis.name, state_name)] = ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
+            any_infected |= np.asarray(dis.infected[auids], dtype=bool)
+    # Index via auids, not alive.values: grow() extends uids past n_agents slots.
+    inf_uids = auids[any_infected & alive_mask]
+    stocks[('all_hpv', 'infected')] = ppl.scale_flows(inf_uids) if len(inf_uids) > 0 else 0.0
+    return stocks
 
 
 @pytest.fixture(scope='module')
@@ -47,6 +70,8 @@ def grown():
 
     mig._emigrate = recording_emigrate
     mig._emigrate_fine = recording_emigrate_fine
+    sim.run(until=sim.t.tvec[-2]) # Stop before the last step, whose stocks are recorded at its start
+    run.last_stocks = _scale_weighted_stocks(sim)
     sim.run()
     return run
 
@@ -190,13 +215,13 @@ def test_fine_agents_do_not_drive_births():
         assert not np.asarray(ppl.fine[uids]).any()
 
 
-def test_stock_prevalence_scale_weighted(grown_sim):
+def test_stock_prevalence_scale_weighted(grown):
     """Fine agents (scale=1/ratio) count as 1/ratio in n_* stock results.
 
     Every per-genotype stock and the HPVTotal union stocks must be float-typed
-    and match a scale_flows recompute at the final step.
+    and match a scale_flows recompute at the start of the final step.
     """
-    sim = grown_sim
+    sim = grown.sim
 
     ppl = sim.people
     fine_uids = ppl.auids[np.asarray(ppl.fine[ppl.auids], dtype=bool)]
@@ -212,8 +237,7 @@ def test_stock_prevalence_scale_weighted(grown_sim):
         if not isinstance(dis, hpv.HPV):
             continue
         r = dis.results
-        for state_name in ('susceptible', 'infected', 'precin', 'cin',
-                           'cancerous', 'latent'):
+        for state_name in _STOCK_STATES:
             key = state_name
             assert key in r, f'{dis.name}: expected result {key}'
             assert r[key].dtype == float, (
@@ -222,10 +246,8 @@ def test_stock_prevalence_scale_weighted(grown_sim):
             assert r[key].values.dtype == np.float64, (
                 f'{dis.name}.{key}: values.dtype={r[key].values.dtype}, expected float64'
             )
-            # Post-run people state still matches what was stored at sim.ti.
-            state_arr = getattr(dis, state_name)
-            uids_in = ppl.auids[np.asarray(state_arr[ppl.auids], dtype=bool)]
-            expected = ppl.scale_flows(uids_in) if len(uids_in) > 0 else 0.0
+            # The people state at the start of the last step matches what was stored at sim.ti.
+            expected = grown.last_stocks[(dis.name, state_name)]
             stored = float(r[key].values[ti_last]) / pop_scale
             assert np.isclose(stored, expected, rtol=1e-6), (
                 f'{dis.name}.{key} at ti={ti_last}: stored/pop_scale={stored:.4f}, '
@@ -242,16 +264,7 @@ def test_stock_prevalence_scale_weighted(grown_sim):
         assert hpvt[key].values.dtype == np.float64, (
             f'hpvtotal.{key}: values.dtype={hpvt[key].values.dtype}, expected float64'
         )
-    # Index via auids, not alive.values: grow() extends uids past n_agents slots.
-    auids = ppl.auids
-    alive_mask = np.asarray(ppl.alive[auids], dtype=bool)
-    any_infected = np.zeros(len(auids), dtype=bool)
-    for dis in sim.diseases.values():
-        if isinstance(dis, hpv.HPV):
-            any_infected |= np.asarray(dis.infected[auids], dtype=bool)
-    any_infected &= alive_mask
-    inf_uids = auids[any_infected]
-    expected_hpvt_inf = ppl.scale_flows(inf_uids) if len(inf_uids) > 0 else 0.0
+    expected_hpvt_inf = grown.last_stocks[('all_hpv', 'infected')]
     stored_hpvt_inf = float(hpvt['infected'].values[ti_last]) / pop_scale
     assert np.isclose(stored_hpvt_inf, expected_hpvt_inf, rtol=1e-6), (
         f'hpvtotal.infected at ti={ti_last}: stored/pop_scale={stored_hpvt_inf:.4f}, '
@@ -287,7 +300,7 @@ def test_per_genotype_prevalence_scale_weighted(grown_sim):
         # infected has scale=True, prevalence is a ratio: divide out pop_scale.
         n_infected_sw = float(r['infected'].values[ti_last]) / sim.pars.pop_scale
 
-        # rtol=5% absorbs one step's births/deaths between update_results and here.
+        # rtol=5% absorbs one step's births/deaths between record_stocks and here.
         back_calc_numerator = stored_prev * n_alive_sw
         assert np.isclose(back_calc_numerator, n_infected_sw, rtol=0.05), (
             f'{dis.name}.prevalence back-calc numerator mismatch at ti={ti_last}: '

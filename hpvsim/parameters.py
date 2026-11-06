@@ -137,7 +137,7 @@ def _lognorm_yr(spec):
     mean, std = spec
     if std == 0:
         return ss.constant(ss.years(mean))
-    return ss.lognorm_ex(mean=ss.years(mean), std=ss.years(std))
+    return ss.lognormal(mean=ss.years(mean), std=ss.years(std))
 
 
 class GenotypePars(ss.Pars):
@@ -321,7 +321,7 @@ class NetworkPars(sc.objdict):
         self.acts_casual  = _nbinom_mean_k(mean=50, k=5)
 
         self.dur_pship_marital = _nbinom_mean_k(mean=80, k=3)
-        self.dur_pship_casual  = ss.lognorm_ex(mean=1, std=2)
+        self.dur_pship_casual  = ss.lognormal(mean=1, std=2)
 
         # Acts ramp linearly: debut_ratio -> 1.0 at peak -> retirement_ratio, then 0.
         self.age_act_pars_marital = ss.Pars(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)

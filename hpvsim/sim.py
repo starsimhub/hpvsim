@@ -67,7 +67,7 @@ class Sim(ss.Sim):
 
       data (list, dict, or DataFrame): calibration targets (see
         ``hpv.data.loaders.load_calib_data``): the sim adds the analyzers they
-        need and runs past their last year, and ``sim.fit(gof=hpv.calibration.gof)``
+        need and runs past their last year, and ``sim.fit(loss=hpv.calibration.gof)``
         fits the parameters given with bounds (``ss.par``) to them.
 
       v2_compat_demographics (bool, default ``False``):

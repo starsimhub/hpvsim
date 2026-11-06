@@ -176,7 +176,7 @@ class HPV(ss.Infection):
             hpv_control_prob=0.0,
             # Reactivation hazard for latents; only active when hpv_control_prob>0.
             hpv_reactivation=ss.probperyear(0.025),
-            dur_undetected=ss.lognorm_ex(mean=ss.years(1), std=ss.years(1)),
+            dur_undetected=ss.lognormal(mean=ss.years(1), std=ss.years(1)),
         )
         self.update_pars(pars=pars, **kwargs)
         self.pars.ms_agent_ratio = int(self.pars.ms_agent_ratio)
@@ -237,8 +237,8 @@ class HPV(ss.Infection):
             return v.years if hasattr(v, 'years') else v
         pc = self.pars.dur_precin.pars
         cn = self.pars.dur_cin.pars
-        self._extra_dur_precin = ss.lognorm_ex(mean=_yr(pc['mean']), std=_yr(pc['std']))
-        self._extra_dur_cin = ss.lognorm_ex(mean=_yr(cn['mean']), std=_yr(cn['std']))
+        self._extra_dur_precin = ss.lognormal(mean=_yr(pc['mean']), std=_yr(pc['std']))
+        self._extra_dur_cin = ss.lognormal(mean=_yr(cn['mean']), std=_yr(cn['std']))
         self._extra_cin_unif = ss.random()
         self._extra_cancer_unif = ss.random()
         return
@@ -246,9 +246,9 @@ class HPV(ss.Infection):
     def _validate_duration_units(self):
         """Raise if a duration par lost its time units.
 
-        Duration distributions must carry ``ss.years`` (an ``ss.dur``): starsim
+        Duration distributions must carry ``ss.years`` (an ``ss.Duration``): starsim
         converts duration TimePars to timesteps by dividing by ``dt``, so a
-        unit-less value (e.g. ``ss.lognorm_ex(mean=3, std=9)``) is treated as
+        unit-less value (e.g. ``ss.lognormal(mean=3, std=9)``) is treated as
         timesteps and, at ``dt<1``, makes the infectious period ~``1/dt`` too
         short — the epidemic silently collapses. Only the public module duration
         pars are checked (the private ``_extra_dur_*`` dists are intentionally
@@ -257,16 +257,16 @@ class HPV(ss.Infection):
         for key in ('dur_precin', 'dur_cin', 'dur_cancer', 'dur_undetected',
                     'dur_inf_male'):
             dist = self.pars.get(key, None)
-            if dist is None or isinstance(dist, ss.dur):
-                continue  # a bare ss.dur constant is fine
+            if dist is None or isinstance(dist, ss.Duration):
+                continue  # a bare ss.Duration constant is fine
             if isinstance(dist, ss.Dist):
                 vals = list(getattr(dist, 'pars', {}).values())
-                has_dur = any(isinstance(v, ss.dur) for v in vals)
+                has_dur = any(isinstance(v, ss.Duration) for v in vals)
                 has_plain = any(isinstance(v, (int, float)) and not isinstance(v, bool)
                                 for v in vals)
                 bad = has_plain and not has_dur
             else:
-                # A plain scalar (not a Dist, not an ss.dur) is unit-less too.
+                # A plain scalar (not a Dist, not an ss.Duration) is unit-less too.
                 bad = isinstance(dist, (int, float)) and not isinstance(dist, bool)
             if bad:
                 raise ValueError(
@@ -275,7 +275,7 @@ class HPV(ss.Infection):
                     f"in timesteps, not years, so at dt<1 the infectious period is "
                     f"~1/dt too short and the epidemic silently collapses. Wrap the "
                     f"magnitude in ss.years(...), e.g. "
-                    f"ss.lognorm_ex(mean=ss.years(3), std=ss.years(9))."
+                    f"ss.lognormal(mean=ss.years(3), std=ss.years(9))."
                 )
         return
 

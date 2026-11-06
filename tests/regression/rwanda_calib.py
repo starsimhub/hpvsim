@@ -194,7 +194,7 @@ def rwanda_genotype_pars():
         }
         if _DUR_CIN_SCALE != 1.0:
             mean, std = _DUR_CIN[key]
-            d['dur_cin'] = ss.lognorm_ex(mean=ss.years(mean * _DUR_CIN_SCALE),
+            d['dur_cin'] = ss.lognormal(mean=ss.years(mean * _DUR_CIN_SCALE),
                                          std=ss.years(std * _DUR_CIN_SCALE))
         # cin_fn.k: Rwanda override (hi5/ohr) or genotype default, x _CIN_K_SCALE.
         base_k = _RWANDA_CIN_K.get(key, float(gp.cin_fn['k']))

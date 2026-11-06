@@ -6,7 +6,7 @@ sim it minimizes::
 
     sim = hpv.Sim(location='nigeria', genotypes=[16, 18], data=['nigeria_cancer_cases.csv'],
                   pars=dict(beta=ss.par(0.25, bounds=[0.15, 0.35])))
-    fit = sim.fit(gof=hpv.calibration.gof, method='optuna', n_trials=100)
+    fit = sim.fit(loss=hpv.calibration.gof, method='optuna', n_trials=100)
 
 ``hpv.Sim(data=...)`` loads the data (``hpv.data.loaders.load_calib_data``),
 adds the analyzers it needs, and runs the sim past its last year.
@@ -41,12 +41,12 @@ __all__ = ['gof', 'data_analyzers', 'build_sim', 'compute_gof', 'default_eval_fn
 
 
 def gof(sim, weights=None, gof_kwargs=None):
-    """The weighted mismatch of a run sim to its calibration data (``hpv.Sim(data=...)``), for ``sim.fit(gof=hpv.calibration.gof)``
+    """The weighted mismatch of a run sim to its calibration data (``hpv.Sim(data=...)``), for ``sim.fit(loss=hpv.calibration.gof)``
 
     Args:
         sim (hpv.Sim): a run sim made with ``data=``
         weights (dict): the weight of each column (default 1); with weights, give
-            ``gof=functools.partial(hpv.calibration.gof, weights=...)``
+            ``loss=functools.partial(hpv.calibration.gof, weights=...)``
         gof_kwargs (dict): passed to ``compute_gof()``
 
     Returns:

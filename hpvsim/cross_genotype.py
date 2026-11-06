@@ -303,7 +303,7 @@ class HPVTotal(ss.Analyzer):
         as a template when this runs.
 
         The union-based stocks (infected, precin, cin, cancerous) are
-        declared as ``dtype=float`` so that ``step()`` can write scale-weighted
+        declared as ``dtype=float`` so that ``record_stocks()`` can write scale-weighted
         values (fine agents carry ``scale=1/ratio`` and must count as 1/ratio).
         """
         super().init_results()
@@ -320,7 +320,7 @@ class HPVTotal(ss.Analyzer):
             # kind=src.kind: a float result is otherwise guessed to be a ratio, and left unscaled.
             defs.append(ss.Result(key, dtype=result_dtype, kind=src.kind,
                                   label=f'{src.label} (any genotype)'))
-        # Derived results (computed in step()).
+        # Derived results (computed in record_stocks()).
         defs.append(ss.Result('susceptible', dtype=float, kind='stock',
                               label='Currently uninfected with any genotype'))
         # scale=False: prevalence is a ratio, not a count.
@@ -355,8 +355,8 @@ class HPVTotal(ss.Analyzer):
                                   label='Cancer incidence rate ratio (HIV+/HIV-)'))
         self.define_results(*defs)
 
-    def step(self):
-        """Capture per-step union-based state counts and derived results.
+    def record_stocks(self):
+        """Capture union-based state counts and derived results at the start of the step.
 
         Element-wise sums for the remaining results are computed in
         ``finalize_results`` once each module's full per-step array exists.
@@ -403,7 +403,10 @@ class HPVTotal(ss.Analyzer):
         ever_infected &= people.alive.values
         self.results['cum_infections_unique'][ti] = ever_infected.sum()
 
-        self.accumulate_asr_histograms(ti, people, hpvs)
+    def step(self):
+        """Capture the cancer rates over the step just taken"""
+        if self.hpv_modules and self.sim.people.scale_flows(self.sim.people.alive.uids) > 0:
+            self.accumulate_asr_histograms(self.ti, self.sim.people, self.hpv_modules)
 
     def accumulate_asr_histograms(self, ti, people, hpvs):
         """Compute per-ti annualized cancer rates (crude, ASR, HIV-strat).

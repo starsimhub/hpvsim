@@ -15,7 +15,7 @@ def _run_hpv16_vaccine():
     reached = []
     def track(sim):
         reached.extend(sim.interventions.vx.reached().tolist())
-    girls = ss.ppl.female & (ss.ppl.age >= 9) & (ss.ppl.age < 14)
+    girls = ss.person.female & (ss.person.age >= 9) & (ss.person.age < 14)
     vx = ss.vaccinate(hpv.vx(rel_imm={'hpv16': 1.0}), where=girls, coverage=1.0, start=2020, name='vx')
     sim = hpv.Sim(location='nigeria', start=2018, stop=2022, n_agents=500, genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
                   rand_seed=0, interventions=[vx], analyzers=track, verbose=0)

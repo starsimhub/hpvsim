@@ -118,7 +118,7 @@ def _genotype_pars(dur_cin_scale, base_beta, tp_scale, cin_k_scale,
                                         base_beta * rb * rc._TRANSM2F]}}
         if dur_cin_scale != 1.0 or dur_cin_std_scale != 1.0:
             mean, std = rc._DUR_CIN[key]
-            d['dur_cin'] = ss.lognorm_ex(
+            d['dur_cin'] = ss.lognormal(
                 mean=ss.years(mean * dur_cin_scale),
                 std=ss.years(std * dur_cin_scale * dur_cin_std_scale))
         # cin_fn.k: base = Rwanda override (hi5/ohr) or genotype default,

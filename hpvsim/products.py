@@ -233,7 +233,7 @@ class vx(ss.Product):
     Examples::
 
         bivalent = hpv.vx('bivalent')
-        routine = ss.vaccinate(bivalent, where=ss.ppl.female, at_age=9, coverage=0.9, start=2020)
+        routine = ss.vaccinate(bivalent, where=ss.person.female, at_age=9, coverage=0.9, start=2020)
     """
 
     def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95, module_name=None, **kwargs):
@@ -303,8 +303,8 @@ class dx(ss.Product):
 
     Examples::
 
-        via = ss.screen(hpv.dx('via'), where=women, coverage=0.6, interval=ss.years(1))
-        ablation = ss.treat(hpv.tx('ablation'), who=via.positive & hpv.no_cancer)
+        via = ss.screen(hpv.dx('via'), where=women, coverage=0.6, every=ss.years(1))
+        ablation = ss.treat(hpv.tx('ablation'), on=via.positive, where=hpv.no_cancer)
     """
 
     def __init__(self, name=None, df=None, hierarchy=None, module_name=None, **kwargs):
@@ -354,7 +354,7 @@ class tx(ss.Product):
 
     Examples::
 
-        ablation = ss.treat(hpv.tx('ablation'), who=screening.positive & hpv.no_cancer, coverage=0.9)
+        ablation = ss.treat(hpv.tx('ablation'), on=screening.positive, where=hpv.no_cancer, coverage=0.9)
     """
 
     def __init__(self, name=None, df=None, module_name=None, **kwargs):
@@ -402,13 +402,13 @@ class txvx(tx):
     target genotype by ``rel_imm`` (``products_txvx.csv``).
 
     Named products reproduce the v2 defaults: ``txvx1`` is a first dose
-    conferring ``beta_mean(0.35, 0.025)`` immunity, ``txvx2`` a booster
+    conferring ``beta_dist(mean=0.35, std=0.025**0.5)`` immunity, ``txvx2`` a booster
     multiplying existing immunity by 1.5.
     """
 
     #: v2 default immunity per named product: (imm_init, imm_boost).
     _DEFAULTS = {
-        'txvx1': (ss.beta_mean(mean=0.35, var=0.025), None),
+        'txvx1': (ss.beta_dist(mean=0.35, std=0.025**0.5), None),
         'txvx2': (None, 1.5),
     }
 
@@ -450,7 +450,7 @@ class radiation(ss.Product):
 
     Examples::
 
-        radiation = ss.treat(hpv.radiation(), who=screening.positive & hpv.has_cancer)
+        radiation = ss.treat(hpv.radiation(), on=screening.positive, where=hpv.has_cancer)
     """
 
     def __init__(self, dur=None, **kwargs):

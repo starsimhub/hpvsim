@@ -40,7 +40,7 @@ VX_PARS = sc.objdict(
 
 def make_sim(coverage, **kwargs):
     """Build the sim of one coverage: routine bivalent vaccination of girls as they turn 9, from 2020"""
-    vaccination = ss.vaccinate(hpv.vx('bivalent'), where=ss.ppl.female, at_age=9, coverage=coverage, start=2020, name='routine_bivalent_girls')
+    vaccination = ss.vaccinate(hpv.vx('bivalent'), where=ss.person.female, at_age=9, coverage=coverage, start=2020, name='routine_bivalent_girls')
     return hpv.Sim(**(VX_PARS | kwargs), verbose=0, label=f'coverage={coverage:.0%}', interventions=vaccination)
 
 

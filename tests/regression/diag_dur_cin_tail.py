@@ -24,7 +24,7 @@ from tests.regression.rwanda_calib import build_rwanda_sim  # noqa: E402
 
 def _lognorm_pctiles(mean, std):
     """Percentiles of a lognormal with the given (arithmetic) mean & std,
-    matching ss.lognorm_ex's parameterization."""
+    matching ss.lognormal's parameterization."""
     sigma = np.sqrt(np.log(1 + (std / mean) ** 2))
     mu = np.log(mean) - sigma ** 2 / 2
     qs = [0.5, 0.75, 0.9, 0.95, 0.99]
