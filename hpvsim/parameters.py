@@ -2,7 +2,7 @@
 
 ``SimPars`` subclasses ``ss.SimPars`` with HPV-specific defaults.
 ``GenotypePars`` holds per-genotype natural-history defaults (durations,
-severity functions, immunity, age risk) consumed by ``HPV(ss.Infection)``;
+severity functions, immunity, age risk) consumed by ``HPV(ss.AgentDisease)``;
 ``get_genotype_pars(genotype)`` is the factory multi-genotype consumers
 use to look up defaults by name. Supports the four canonical genotypes:
 ``hpv16``, ``hpv18``, ``hi5`` (high-risk-5 pool), and ``ohr`` (other

@@ -77,8 +77,8 @@ def test_beta_scalar_expansion():
     a = make_sim(genotypes=[16], genotype_pars={'hpv16': dict(beta=0.2, rel_beta=1.5)})
     b = make_sim(genotypes=[16], pars=dict(hpv16=dict(beta=0.2, rel_beta=1.5)))
     a.init(); b.init()
-    betamap_a = a.diseases.hpv16.validate_beta()
-    betamap_b = b.diseases.hpv16.validate_beta()
+    betamap_a = a.diseases.hpv16.route_betas()
+    betamap_b = b.diseases.hpv16.route_betas()
     assert betamap_a == betamap_b
     assert betamap_a['sexualnetwork'][0] == pytest.approx(0.2 * 1.5 * g.transf2m)
     assert betamap_a['sexualnetwork'][1] == pytest.approx(0.2 * 1.5 * g.transm2f)
@@ -210,15 +210,15 @@ def test_pars_dict_not_mutated():
     assert pars == dict(location='kenya')
 
 
-def test_validate_beta_zeroes_non_sexual_networks():
+def test_route_betas_zeroes_non_sexual_networks():
     """A scalar beta must not leak a nonzero symmetric value onto a
-    non-sexual network sharing the sim -- ss.Infection.validate_beta's
-    scalar branch expands to every network by default; HPV.validate_beta
+    non-sexual network sharing the sim -- ss.AgentDisease.route_betas's
+    scalar branch expands to every network by default; HPV.route_betas
     must zero out anything that isn't the sexual network."""
     sim = make_sim(genotypes=[16], networks=[hpv.SexualNetwork(), ss.PrenatalNet()], demographics=ss.Pregnancy(),
                    beta=0.2)
     sim.init()
-    betamap = sim.diseases.hpv16.validate_beta()
+    betamap = sim.diseases.hpv16.route_betas()
     assert betamap['prenatal'] == [0.0, 0.0]
     assert betamap['sexualnetwork'] != [0.0, 0.0]
 

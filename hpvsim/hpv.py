@@ -129,7 +129,7 @@ def _normalize_genotype(key):
     )
 
 
-class HPV(ss.Infection):
+class HPV(ss.AgentDisease):
     """Per-genotype HPV disease module.
 
     The ``genotype`` attribute identifies which strain this instance models.
@@ -153,7 +153,7 @@ class HPV(ss.Infection):
         gpars = get_genotype_pars(genotype)
         self.define_pars(
             init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
-            # Scalar beta; validate_beta() expands it. A dict bypasses expansion.
+            # Scalar beta; route_betas() expands it. A dict bypasses expansion.
             beta=gpars.beta,
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
@@ -183,7 +183,7 @@ class HPV(ss.Infection):
 
         # A duration without ss.years() is read in timesteps, not years.
         self._validate_duration_units()
-        # ss.Infection already provides susceptible/infected/rel_sus/rel_trans/ti_infected.
+        # ss.AgentDisease already provides susceptible/infected/rel_sus/rel_trans/ti_infected.
         self.define_states(
             ss.FloatArr('ti_clearance', label='Time of natural clearance'),
             # Set on first infection only; ti_infected is overwritten on reinfection.
@@ -302,9 +302,8 @@ class HPV(ss.Infection):
                 return c
         return None
 
-    def validate_beta(self):
-        """Expand a scalar pars.beta via rel_beta/transf2m/transm2f (mirrors
-        stisim's BaseSTI.validate_beta). An explicit dict pars.beta is passed
+    def route_betas(self):
+        """Expand a scalar pars.beta via rel_beta/transf2m/transm2f. An explicit dict pars.beta is passed
         through unchanged. A bare (unattached) module has no self.sim to
         validate networks against, so skip super() and expand/pass-through
         directly."""
@@ -316,7 +315,7 @@ class HPV(ss.Infection):
                     base * self.pars.transf2m, base * self.pars.transm2f, self.genotype,
                 )}
             return dict(beta)
-        betamap = super().validate_beta()
+        betamap = super().route_betas()
         if sc.isnumber(beta):
             base = beta * self.pars.rel_beta
             for net in betamap:
@@ -427,7 +426,7 @@ class HPV(ss.Infection):
         so init_prev-seeded agents get ti_first_infection set too (at ti=0).
         """
         super().set_prognoses(uids, sources)
-        ti = self.ti + 1 # Infected at the end of this step, so the course starts at the next (as ss.Infection schedules; the seeds are dated at ti=0)
+        ti = self.ti + 1 # Infected at the end of this step, so the course starts at the next (as ss.AgentDisease schedules; the seeds are dated at ti=0)
         p = self.pars
 
         first_uids = uids[self.ti_first_infection.isnan[uids]]

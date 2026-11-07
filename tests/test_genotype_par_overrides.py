@@ -12,7 +12,7 @@ from hpvsim.parameters import get_genotype_pars
 
 
 def _beta(mod):
-    return mod.validate_beta()['sexualnetwork']
+    return mod.route_betas()['sexualnetwork']
 
 
 def test_default_beta_matches_formula():
