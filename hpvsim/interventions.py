@@ -4,9 +4,9 @@ Screening, triage, treatment, and vaccination are Starsim's deliveries of
 HPVsim's products (see ``hpvsim.products``)::
 
     women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
-    screening = ss.screen(hpv.dx('via'), where=women, coverage=0.6, every=ss.years(1), start=2025)
-    ablation = ss.treat(hpv.tx('ablation'), on=screening.positive, where=hpv.no_cancer, coverage=0.9)
-    vaccination = ss.vaccinate(hpv.vx('bivalent'), where=ss.person.female, at_age=9, coverage=0.9, start=2025)
+    screening = ss.screen(hpv.dx('via'), who=women, when=ss.schedule(every=ss.years(1), start=2025), coverage=0.6)
+    ablation = ss.treat(hpv.tx('ablation'), who=hpv.no_cancer, when=screening.positive, coverage=0.9)
+    vaccination = ss.vaccinate(hpv.vx('bivalent'), who=ss.at_age(9) & ss.person.female, coverage=0.9, start=2025)
 
 This module has the conditions on cancer that treatments use, and ``dynamic_pars``.
 """
@@ -19,14 +19,14 @@ __all__ = ['has_cancer', 'no_cancer', 'dynamic_pars']
 
 
 def has_cancer(sim):
-    """Whether each person has cancer of any genotype: for a delivery's ``where=``,
-    e.g. ``ss.treat(hpv.radiation(), on=screening.positive, where=hpv.has_cancer)``"""
+    """Whether each person has cancer of any genotype: for a delivery's ``who=``,
+    e.g. ``ss.treat(hpv.radiation(), who=hpv.has_cancer, when=screening.positive)``"""
     return any_genotype_cancer(sim)
 
 
 def no_cancer(sim):
-    """Whether each person has no cancer of any genotype: for a delivery's ``where=``,
-    e.g. ``ss.treat(hpv.tx('ablation'), on=screening.positive, where=hpv.no_cancer)``"""
+    """Whether each person has no cancer of any genotype: for a delivery's ``who=``,
+    e.g. ``ss.treat(hpv.tx('ablation'), who=hpv.no_cancer, when=screening.positive)``"""
     return ~any_genotype_cancer(sim)
 
 

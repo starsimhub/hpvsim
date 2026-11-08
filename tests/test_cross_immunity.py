@@ -151,7 +151,7 @@ def test_cross_immunity_connector_rejects_diagonal_outside_unit_interval():
     bad = np.array([[1.5]], dtype=np.float32)
     conn = CrossImmunity(cross_imm_sus=bad, cross_imm_sev=bad)
     sim = ss.Sim(
-        n_agents=10, start=ss.years(1990), stop=ss.years(1991), dt=ss.years(1.0),
+        n_agents=10, start=1990, stop=1991, dt=ss.years(1.0),
         diseases=[hpv.HPV(genotype='hpv16')],
         connectors=[conn],
     )
@@ -181,7 +181,7 @@ def test_cross_immunity_connector_rejects_shape_mismatch():
     bad = np.eye(2, dtype=np.float32)
     conn = CrossImmunity(cross_imm_sus=bad, cross_imm_sev=bad)
     sim = ss.Sim(
-        n_agents=10, start=ss.years(1990), stop=ss.years(1991), dt=ss.years(1.0),
+        n_agents=10, start=1990, stop=1991, dt=ss.years(1.0),
         diseases=[hpv.HPV(genotype='hpv16')],
         connectors=[conn],
     )

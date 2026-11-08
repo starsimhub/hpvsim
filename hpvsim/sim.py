@@ -96,6 +96,7 @@ class Sim(ss.Sim):
         # the sc.mergedicts(pars, kwargs) precedence used further down.
         pars = sc.mergedicts(pars)  # Copy, so the caller's dict isn't mutated.
         location = sc.ifelse(location, pars.pop('location', None))
+        total_pop = sc.ifelse(total_pop, pars.pop('total_pop', None)) # Likewise, since a location fills it in
         # location=None: uniform ages, no vitals, no auto pop scaling.
         if location is None:
             country = None
@@ -288,8 +289,8 @@ class Sim(ss.Sim):
         mod_pars = {k: v for k, v in merged.items() if k not in sim_par_keys}
 
         super().__init__(
-            start=ss.years(start),
-            stop=ss.years(stop),
+            start=start,
+            stop=stop,
             dt=ss.years(dt),
             people=people,
             diseases=diseases,

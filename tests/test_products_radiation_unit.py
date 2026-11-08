@@ -55,8 +55,8 @@ def test_radiation_empty_uids_noop():
 def test_radiation_default_duration():
     """Default duration is normal(18 months, 2 months)."""
     r = hpv_radiation()
-    assert r.pars.dur.pars.loc == ss.years(1.5)
-    assert np.isclose(r.pars.dur.pars.scale.years, 2/12)
+    assert r.pars.dur.pars.mean == ss.years(1.5)
+    assert np.isclose(r.pars.dur.pars.std.years, 2/12)
 
 
 def test_radiation_extension_is_positive_for_non_sorted_input():

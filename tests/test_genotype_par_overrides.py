@@ -95,6 +95,6 @@ def test_years_wrapped_duration_ok():
 
 
 def test_partial_years_duration_ok():
-    """lognorm_ex with only mean wrapped (test_hpv.py pattern) is accepted."""
+    """ss.lognormal with only mean wrapped (test_hpv.py pattern) is accepted."""
     mod = hpv.HPV(genotype='hpv16', dur_precin=ss.lognormal(mean=ss.years(4)))
     assert isinstance(mod.pars.dur_precin, ss.Dist)

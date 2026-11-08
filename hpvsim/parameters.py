@@ -47,8 +47,7 @@ class SimPars(ss.SimPars):
     def __init__(self, **kwargs):
         super().__init__()
         self.n_agents  = 10_000
-        self.total_pop = None  # If set, pop_scale = total_pop / n_agents.
-        self.pop_scale = None  # Computed at init if total_pop is set.
+        self.total_pop = None  # If set, sim.pop_scale = total_pop / n_agents.
 
         self.start     = ss.years(1990)
         self.stop      = ss.years(2060)
@@ -131,7 +130,7 @@ def _lognorm_yr(spec):
     """Build a duration ``ss.Dist`` from a ``(mean, std)`` tuple in years.
 
     ``std == 0`` returns ``ss.constant(ss.years(mean))`` because
-    ``lognorm_ex`` is undefined for zero variance; both branches carry
+    ``ss.lognormal`` is undefined for zero variance; both branches carry
     ``ss.years`` units so ``_validate_duration_units`` passes.
     """
     mean, std = spec
@@ -308,14 +307,14 @@ class NetworkPars(sc.objdict):
         self.m_cross_layer = 0.760
         self.f_cross_layer = 0.185
 
-        self.debut_f = ss.normal(loc=15.0, scale=2.1)
-        self.debut_m = ss.normal(loc=17.6, scale=1.8)
+        self.debut_f = ss.normal(mean=15.0, std=2.1)
+        self.debut_m = ss.normal(mean=17.6, std=1.8)
 
         # Concurrent-partner-count Poisson lambda; +1 shift applied in network.
-        self.m_partners_marital = ss.poisson(lam=0.01)
-        self.m_partners_casual  = ss.poisson(lam=0.5)
-        self.f_partners_marital = ss.poisson(lam=0.01)
-        self.f_partners_casual  = ss.poisson(lam=0.5)
+        self.m_partners_marital = ss.poisson(mean=0.01)
+        self.m_partners_casual  = ss.poisson(mean=0.5)
+        self.f_partners_marital = ss.poisson(mean=0.01)
+        self.f_partners_casual  = ss.poisson(mean=0.5)
 
         self.acts_marital = _nbinom_mean_k(mean=80, k=40)
         self.acts_casual  = _nbinom_mean_k(mean=50, k=5)

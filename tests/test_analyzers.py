@@ -86,7 +86,7 @@ def test_grow_analyzer_matches_engine_cancer_total(grow_sim):
     assert engine_total > 0
     assert abs(analyzer_total - engine_total) / engine_total < 0.05
     # age_cancer is a raw agent count, so divide pop_scale out of the total.
-    assert len(aci.age_cancer) > analyzer_total / grow_sim.pars.pop_scale
+    assert len(aci.age_cancer) > analyzer_total / grow_sim.pop_scale
 
 
 def test_resolve_date_ticks_nearest():
@@ -149,7 +149,7 @@ def test_age_pyramid_bins_sum_to_alive(base_sim):
         return np.histogram(ages[mask], bins=PYRAMID_EDGES, weights=ww)[0]
 
     # Analyzer output is pop-scaled; the histogram ground truth is agent-scale.
-    pop_scale = base_sim.pars.pop_scale
+    pop_scale = base_sim.pop_scale
     exp_male = hist(alive & ~female) * pop_scale
     exp_female = hist(alive & female) * pop_scale
     assert np.allclose(arr[:, 0], exp_male), 'male column mismatch (possible male/female swap)'
@@ -178,7 +178,7 @@ def test_age_causal_infection_single_scale(base_sim):
     assert np.allclose(a.dwelltime['total'],
                        a.dwelltime['precin'] + a.dwelltime['cin'], atol=1e-6)
     # At ratio==1 every event weight is just pop_scale.
-    assert np.allclose(a.weights, base_sim.pars.pop_scale)
+    assert np.allclose(a.weights, base_sim.pop_scale)
 
 
 def test_dalys_basic_and_av_disutility(base_sim):

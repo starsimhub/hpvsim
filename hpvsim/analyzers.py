@@ -20,13 +20,13 @@ class by_age(ss.Analyzer):
 
     Supported keys:
 
-      - count (``scale=True``, annualize mean):
+      - counts (``kind='stock'``, scaled):
         ``cancerous``, ``cin``, ``precin``, ``infected``, ``hpv``
-      - demographic denominators (``scale=True``, annualize mean):
+      - demographic denominators (``kind='stock'``, scaled):
         ``alive``, ``n_females``, ``n_males``
-      - annual event flows (``scale=True``, annualize sum):
+      - event flows (``kind='flow'``, scaled, summed when resampled):
         ``cancers``, ``cins``
-      - prevalences (``scale=False``, annualize mean, ratio in [0, 1]):
+      - prevalences (``kind='ratio'``, unscaled, averaged when resampled; in [0, 1]):
         ``hpv_prevalence``, ``cin_prevalence``, ``cancer_prevalence``,
         ``precin_prevalence``
 
@@ -38,7 +38,7 @@ class by_age(ss.Analyzer):
     Args:
         keys: result key (``'cancers'``) or list of keys.
         years: reporting-only filter for ``to_dataframe``. Storage is always
-            per-timestep so ``ss.Result.annualize`` can be applied. Scalar
+            per-timestep so ``ss.Result.resample("year")`` can be applied. Scalar
             or list of ints. Default None -> all sim years.
         edges: age bin edges. Default ``np.arange(0, 101, 5)``.
 
@@ -376,7 +376,7 @@ class age_pyramid(ss.Analyzer):
     def finalize_results(self):
         # people.scale-weighted counts * pop_scale = real-population units.
         super().finalize_results()
-        pop_scale = self.sim.pars.pop_scale
+        pop_scale = self.sim.pop_scale
         if pop_scale != 1.0:
             for date in self.age_pyramids:
                 self.age_pyramids[date] = self.age_pyramids[date] * pop_scale
@@ -470,7 +470,7 @@ class age_causal_infection(ss.Analyzer):
         self.age_cin = np.array(self.age_cin)
         self.age_cancer = np.array(self.age_cancer)
         # * pop_scale so weights.sum() is a real-population cancer count.
-        pop_scale = self.sim.pars.pop_scale
+        pop_scale = self.sim.pop_scale
         self.weights = np.array(self.weights) * pop_scale
         for k in self.dwelltime:
             self.dwelltime[k] = np.array(self.dwelltime[k])
@@ -485,7 +485,7 @@ class dalys(ss.Analyzer):
     """Incidence-based DALYs (YLL + YLD) from cervical cancer, by calendar year.
 
     YLL and YLD are attributed at the year of cancer onset (incidence-based),
-    weighted by ``people.scale`` and multiplied by ``sim.pars.pop_scale`` at
+    weighted by ``people.scale`` and multiplied by ``sim.pop_scale`` at
     finalize so the emitted arrays are in real-population units.  Reads live
     agents on the standard code path: on the grow multiscale engine, extra
     cancers are real fine agents (``scale=1/ratio``) in ``sim.people``, so
@@ -571,7 +571,7 @@ class dalys(ss.Analyzer):
     def finalize(self):
         super().finalize()
         # * pop_scale so absolute DALYs match sim.results.* magnitudes.
-        pop_scale = self.sim.pars.pop_scale
+        pop_scale = self.sim.pop_scale
         self.yll *= pop_scale
         self.yld *= pop_scale
         self.dalys = self.yll + self.yld

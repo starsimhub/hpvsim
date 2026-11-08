@@ -133,7 +133,7 @@ to 14 from 2015, and run that alongside the unchanged model:
 import starsim as ss
 
 girls = ss.person.female & (ss.person.age >= 9) & (ss.person.age < 14)
-vaccination = ss.vaccinate(hpv.vx('bivalent'), where=girls, coverage=0.9, start=2015)
+vaccination = ss.vaccinate(hpv.vx('bivalent'), who=girls, coverage=0.9, start=2015)
 
 s0 = hpv.Sim(**pars, label='No vaccination')
 s1 = hpv.Sim(**pars, interventions=vaccination, label='Vaccination from 2015')

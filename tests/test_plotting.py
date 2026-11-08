@@ -98,7 +98,7 @@ def test_plot_intervention_impact_averted_identity():
                    stop=2015, dt=1.0, n_agents=300, rand_seed=1)
     base.run()
     # Scenario with routine vaccination from 2000.
-    vx = ss.vaccinate(hpv.vx('bivalent'), where=ss.person.female, at_age=9, coverage=0.9, start=2000)
+    vx = ss.vaccinate(hpv.vx('bivalent'), who=ss.at_age(9) & ss.person.female, coverage=0.9, start=2000)
     scen = hpv.Sim(genotypes=['hpv16'], location='nigeria', start=1995,
                    stop=2015, dt=1.0, n_agents=300, rand_seed=1, interventions=[vx])
     scen.run()
@@ -126,10 +126,10 @@ def test_plot_intervention_impact_multisim_smoke():
                         interventions=interventions or [])
                 for s in seeds]
         msim = ss.MultiSim(sims)
-        msim.run(parallel=False)  # 4 tiny sims: process startup costs more than the runs
+        msim.run(workers=1)  # 4 tiny sims: process startup costs more than the runs
         return msim
     base = make_msim([1, 2])
-    vx = ss.vaccinate(hpv.vx('bivalent'), where=ss.person.female, at_age=9, coverage=0.9, start=2000)
+    vx = ss.vaccinate(hpv.vx('bivalent'), who=ss.at_age(9) & ss.person.female, coverage=0.9, start=2000)
     scen = make_msim([1, 2], interventions=[vx])
     fig = hpv.plot_intervention_impact(base, scen, key='cum_cancers')
     assert len(fig.axes) == 2

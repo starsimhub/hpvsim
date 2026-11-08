@@ -4,7 +4,7 @@ See documentation here: https://www.ncbi.nlm.nih.gov/books/NBK572308/
 
 Each step of an algorithm is a delivery of an HPVsim product (``ss.screen``,
 ``ss.treat``), and each later step is triggered by a result of an earlier one
-(e.g. ``on=cytology.ascus``), on the same step.
+(e.g. ``when=cytology.ascus``), on the same step.
 '''
 
 import starsim as ss
@@ -36,17 +36,17 @@ def make_sim(seed=0, **kwargs):
 # Each step is named (name=), since steps made in a function cannot take the name of a variable, and later steps refer to them
 def primary(product, name='screening'):
     ''' Primary screening: the women eligible, each year '''
-    return ss.screen(hpv.dx(product), where=women, coverage=primary_screen_prob, every=ss.years(1), start=start_year, name=name)
+    return ss.screen(hpv.dx(product), who=women, when=ss.schedule(every=ss.years(1), start=start_year), coverage=primary_screen_prob, name=name)
 
 
 def triage(product, on, name):
     ''' A test for those referred by an earlier step '''
-    return ss.screen(hpv.dx(product), on=on, coverage=triage_screen_prob, name=name)
+    return ss.screen(hpv.dx(product), when=on, coverage=triage_screen_prob, name=name)
 
 
 def ablate(on):
     ''' Ablation for those referred, unless they have cancer '''
-    return ss.treat(hpv.tx('ablation'), on=on, where=hpv.no_cancer, coverage=ablate_prob, name='ablation')
+    return ss.treat(hpv.tx('ablation'), who=hpv.no_cancer, when=on, coverage=ablate_prob, name='ablation')
 
 
 def algorithm1():

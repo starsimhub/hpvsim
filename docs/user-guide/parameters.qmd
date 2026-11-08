@@ -59,7 +59,7 @@ print('HPV16 cin_fn:    ', dict(sim.diseases.hpv16.pars.cin_fn))
 print('HPV18 cin_fn:    ', dict(sim.diseases.hpv18.pars.cin_fn))
 print('f_cross_layer:   ', sim.networks.sexualnetwork.pars.f_cross_layer)
 print('own_imm_hr:      ', sim.connectors.crossimmunity.pars.own_imm_hr)
-print('people per agent:', f'{sim.pars.pop_scale:,.0f}')
+print('people per agent:', f'{sim.pop_scale:,.0f}')
 ```
 
 `beta` reached both genotypes but their per-act transmission probabilities still differ, because each genotype scales `beta` by its own `rel_beta`. Check what the model actually uses with `sim.diseases.hpv16.validate_beta()`.

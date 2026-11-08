@@ -38,7 +38,7 @@ def test_overrides_merge_over_defaults():
     assert net.pars.m_cross_layer == 0.0
     assert net.pars.f_cross_layer == 0.0
     # Untouched pars keep NetworkPars defaults.
-    assert float(net.pars.debut_f.pars.loc) == 15.0
+    assert float(net.pars.debut_f.pars.mean) == 15.0
 
 
 # ---------------------------------------------------------------------------- #

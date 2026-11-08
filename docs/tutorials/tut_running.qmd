@@ -78,7 +78,7 @@ girls = ss.person.female & (ss.person.age >= 9) & (ss.person.age < 14)
 
 def make_sim(coverage):
     """One sim for a given vaccination coverage."""
-    vaccination = ss.vaccinate(hpv.vx('bivalent'), where=girls, coverage=coverage, start=2010)
+    vaccination = ss.vaccinate(hpv.vx('bivalent'), who=girls, coverage=coverage, start=2010)
     return hpv.Sim(**LONG, label=f'coverage={coverage:.0%}', interventions=vaccination)
 
 sims = [make_sim(coverage=c) for c in COVERAGES]

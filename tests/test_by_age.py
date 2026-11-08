@@ -96,7 +96,7 @@ def test_by_age_cancers_pop_scaled():
                   analyzers=[hpv.by_age('cancers', edges=[0., 40., 100.])])
     sim.run()
     ar = sim.analyzers['by_age']
-    assert sim.pars.pop_scale == pytest.approx(100.0)
+    assert sim.pop_scale == pytest.approx(100.0)
     r = sim.results.by_age.cancers_0_40
     assert r.scale is True
     assert (ar.cancers >= 0).all()

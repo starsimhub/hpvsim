@@ -14,7 +14,7 @@ def _make_tiny_vx_sim(coverage):
     return hpv.Sim(
         n_agents=500, location='nigeria', genotypes=[16], start=2010, stop=2013, dt=0.25,
         verbose=0, label=f'coverage={coverage:.0%}',
-        interventions=ss.vaccinate(hpv.vx('bivalent'), where=girls, coverage=coverage),
+        interventions=ss.vaccinate(hpv.vx('bivalent'), who=girls, coverage=coverage),
     )
 
 

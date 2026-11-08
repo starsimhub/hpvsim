@@ -58,7 +58,7 @@ def test_sim_pop_scale_computed_from_total_pop():
     sim = hpv.Sim(n_agents=10_000, total_pop=2_000_000,
                   start=1990, stop=1991, dt=1.0, rand_seed=0)
     sim.init()
-    assert sim.pars.pop_scale == 200.0
+    assert sim.pop_scale == 200.0
 
 
 def test_sim_pop_scale_default_one_when_no_location():
@@ -68,7 +68,7 @@ def test_sim_pop_scale_default_one_when_no_location():
         warnings.simplefilter('ignore')
         sim = hpv.Sim(n_agents=1000, start=1990, stop=1991, dt=1.0, rand_seed=0)
         sim.init()
-    assert sim.pars.pop_scale == 1.0
+    assert sim.pop_scale == 1.0
     assert sim.location is None
 
 
@@ -82,7 +82,7 @@ def test_sim_auto_populates_total_pop_from_location():
     # Kazakhstan 1960 UN WPP total ≈ 9.28M; pop_scale ≈ 9275.
     assert sim.pars.total_pop > 9_000_000
     assert sim.pars.total_pop < 10_000_000
-    assert sim.pars.pop_scale > 9_000
+    assert sim.pop_scale > 9_000
 
 
 def test_sim_explicit_total_pop_wins_over_auto_populate():
@@ -92,7 +92,7 @@ def test_sim_explicit_total_pop_wins_over_auto_populate():
                   start=1960, stop=1961, dt=1.0, rand_seed=0)
     sim.init()
     assert sim.pars.total_pop == 500_000
-    assert sim.pars.pop_scale == 500.0
+    assert sim.pop_scale == 500.0
 
 
 def test_bare_sim_uniform_ages_no_vitals_default_network():
@@ -131,7 +131,7 @@ def test_hpv_demo_returns_nigeria_sim():
     assert sim.location == 'nigeria'
     # Auto-populated total_pop and pop_scale for Nigeria.
     assert sim.pars.total_pop > 10_000_000
-    assert sim.pars.pop_scale > 100
+    assert sim.pop_scale > 100
     # Demographics wired up.
     dem_names = [type(d).__name__ for d in sim.demographics.values()]
     assert any('irth' in n for n in dem_names), dem_names  # Births or AnnualBirths

@@ -174,8 +174,8 @@ class HIVEffects(ss.Connector):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, label='HPV prevalence (HIV+)'),
-            ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, label='HPV prevalence (HIV-)'),
+            ss.Result('hpv_prevalence_with_hiv', dtype=float, scale=False, kind='ratio', label='HPV prevalence (HIV+)'),
+            ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, kind='ratio', label='HPV prevalence (HIV-)'),
         )
 
     def record_stocks(self):

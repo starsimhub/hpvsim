@@ -229,13 +229,13 @@ def test_sim_key_source_of_truth_consistent():
     route_pars directly (as calibration does) and constructing via
     pars= must both accept the same sim-level keys."""
     sim = make_sim(genotypes=[16])
-    hpv.route_pars(sim, pars={'pop_scale': 2}) # Before init, after which the sim's settings are fixed
+    hpv.route_pars(sim, pars={'total_pop': 400}) # Before init, after which the sim's settings are fixed
     sim.init()
-    assert sim.pars.pop_scale == 2
+    assert sim.pop_scale == 2
 
-    sim2 = make_sim(genotypes=[16], pars=dict(pop_scale=2))
+    sim2 = make_sim(genotypes=[16], pars=dict(total_pop=400))
     sim2.init()
-    assert sim2.pars.pop_scale == 2
+    assert sim2.pop_scale == 2
 
 
 def test_simpars_defaults_match_sim_defaults():

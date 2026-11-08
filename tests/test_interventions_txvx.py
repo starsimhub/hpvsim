@@ -77,10 +77,10 @@ def test_txvx_in_a_screening_program_reduces_cancer():
     """Delivered to screen-positive women, the therapeutic averts cancer."""
     def run(with_txvx):
         women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
-        scr = ss.screen(hpv.dx('hpv'), where=women, coverage=1.0, every=ss.years(1), start=2022, name='scr')
+        scr = ss.screen(hpv.dx('hpv'), who=women, when=ss.schedule(every=ss.years(1), start=2022), coverage=1.0, name='scr')
         ivs = [scr]
         if with_txvx:
-            ivs.append(ss.treat(make_txvx(efficacy=0.9), on=scr.positive, where=hpv.no_cancer, name='txv'))
+            ivs.append(ss.treat(make_txvx(efficacy=0.9), who=hpv.no_cancer, when=scr.positive, name='txv'))
         sim = make_sim(ivs, n_agents=3000, stop=2060)
         sim.run()
         return sim

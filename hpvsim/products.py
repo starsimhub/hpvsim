@@ -233,7 +233,7 @@ class vx(ss.Product):
     Examples::
 
         bivalent = hpv.vx('bivalent')
-        routine = ss.vaccinate(bivalent, where=ss.person.female, at_age=9, coverage=0.9, start=2020)
+        routine = ss.vaccinate(bivalent, who=ss.at_age(9) & ss.person.female, coverage=0.9, start=2020)
     """
 
     def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95, module_name=None, **kwargs):
@@ -303,8 +303,8 @@ class dx(ss.Product):
 
     Examples::
 
-        via = ss.screen(hpv.dx('via'), where=women, coverage=0.6, every=ss.years(1))
-        ablation = ss.treat(hpv.tx('ablation'), on=via.positive, where=hpv.no_cancer)
+        via = ss.screen(hpv.dx('via'), who=women, when=ss.schedule(every=ss.years(1)), coverage=0.6)
+        ablation = ss.treat(hpv.tx('ablation'), who=hpv.no_cancer, when=via.positive)
     """
 
     def __init__(self, name=None, df=None, hierarchy=None, module_name=None, **kwargs):
@@ -354,7 +354,7 @@ class tx(ss.Product):
 
     Examples::
 
-        ablation = ss.treat(hpv.tx('ablation'), on=screening.positive, where=hpv.no_cancer, coverage=0.9)
+        ablation = ss.treat(hpv.tx('ablation'), who=hpv.no_cancer, when=screening.positive, coverage=0.9)
     """
 
     def __init__(self, name=None, df=None, module_name=None, **kwargs):
@@ -450,7 +450,7 @@ class radiation(ss.Product):
 
     Examples::
 
-        radiation = ss.treat(hpv.radiation(), on=screening.positive, where=hpv.has_cancer)
+        radiation = ss.treat(hpv.radiation(), who=hpv.has_cancer, when=screening.positive)
     """
 
     def __init__(self, dur=None, **kwargs):

@@ -230,7 +230,7 @@ def test_stock_prevalence_scale_weighted(grown):
     # sim.ti after run() is the index of the last completed step (npts - 1).
     ti_last = sim.ti
     # Stored results carry pop_scale (applied at finalize); scale_flows does not.
-    pop_scale = sim.pars.pop_scale
+    pop_scale = sim.pop_scale
 
     # ---- Per-genotype HPV module stocks ----
     for dis in sim.diseases.values():
@@ -298,7 +298,7 @@ def test_per_genotype_prevalence_scale_weighted(grown_sim):
 
         stored_prev = float(r['prevalence'].values[ti_last])
         # infected has scale=True, prevalence is a ratio: divide out pop_scale.
-        n_infected_sw = float(r['infected'].values[ti_last]) / sim.pars.pop_scale
+        n_infected_sw = float(r['infected'].values[ti_last]) / sim.pop_scale
 
         # rtol=5% absorbs one step's births/deaths between record_stocks and here.
         back_calc_numerator = stored_prev * n_alive_sw
@@ -347,7 +347,7 @@ def test_per_genotype_prevalence_ratio1_unchanged(ratio1_sim):
         r = dis.results
         stored_prev = float(r['prevalence'].values[ti_last])
         # infected carries pop_scale (applied at finalize); n_alive_sw does not.
-        n_infected_sw = float(r['infected'].values[ti_last]) / sim.pars.pop_scale
+        n_infected_sw = float(r['infected'].values[ti_last]) / sim.pop_scale
         back_calc_numerator = stored_prev * n_alive_sw
         assert np.isclose(back_calc_numerator, n_infected_sw, rtol=0.05), (
             f'{dis.name}.prevalence ratio==1 back-calc mismatch at ti={ti_last}: '

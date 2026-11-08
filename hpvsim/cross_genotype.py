@@ -92,7 +92,7 @@ class CrossImmunity(ss.Connector):
         )
         self.define_pars(
             # Folded normal: ensure_rel_sev takes abs(), so a lower loc is safe.
-            rel_sev=ss.normal(loc=1.0, scale=0.2),
+            rel_sev=ss.normal(mean=1.0, std=0.2),
             # Scalars make_cross_immunity() uses when no explicit matrix is passed.
             cross_imm_sus_med=0.3,
             cross_imm_sus_high=0.5,
@@ -341,8 +341,8 @@ class HPVTotal(ss.Analyzer):
                               label='Crude cervical cancer incidence '
                                     '(per 100,000 women per year)'))
         if self.hiv_module is not None:
-            # Per-ti flow counts; the ``new_`` prefix triggers the sum-based
-            # annualize heuristic (matches ``new_cancers``).
+            # Per-ti flow counts; the ``new_`` prefix makes them flows, summed
+            # when resampled (as ``new_cancers``).
             defs.append(ss.Result('new_cancers_with_hiv', dtype=float, label='New cancers (HIV+)'))
             defs.append(ss.Result('new_cancers_no_hiv', dtype=float, label='New cancers (HIV-)'))
             defs.append(ss.Result('cancer_incidence_with_hiv', dtype=float, scale=False, kind='ratio',

@@ -393,13 +393,13 @@ class SexualNetwork(ss.SexualNet):
                 raw_acts, age_pars, age_f, age_m, debut_f, debut_m
             )
         acts = raw_acts * dt_yr
-        beta = np.ones(n_new)
+        weight = np.ones(n_new)
         start_ti = np.full(n_new, float(self.t.ti))
         layer_id = np.full(n_new, self._layer_idx[lkey], dtype=int)
         self.append(
             p1=f_uids,
             p2=m_uids,
-            beta=beta,
+            weight=weight,
             dur=dur,
             acts=acts,
             start_ti=start_ti,

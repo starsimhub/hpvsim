@@ -353,9 +353,9 @@ class HPV(ss.AgentDisease):
                       label='Cumulative cancers'),
             ss.Result('cum_cancer_deaths', dtype=float, scale=True,
                       label='Cumulative cancer deaths'),
-            ss.Result('sum_age_at_cancer', dtype=float, scale=True,
+            ss.Result('sum_age_at_cancer', dtype=float, scale=True, kind='flow',
                       label='Sum of ages at cancer onset'),
-            ss.Result('sum_age_at_cancer_death', dtype=float, scale=True,
+            ss.Result('sum_age_at_cancer_death', dtype=float, scale=True, kind='flow',
                       label='Sum of ages at cancer death'),
             ss.Result('new_reactivations', dtype=float, scale=True,
                       label='New reactivations from latency'),
@@ -422,19 +422,15 @@ class HPV(ss.AgentDisease):
           - Cancer agents get ti_cancerous and ti_dead_cancer scheduled; the
             CIN -> cancerous transition and request_death fire from step_state.
 
-        Initial seeding via ``init_post -> set_prognoses`` flows through here
-        so init_prev-seeded agents get ti_first_infection set too (at ti=0).
+        Initial seeding (``init_post -> infect``) flows through here too, so
+        init_prev-seeded agents get ti_first_infection set (at ti=-1, the step before the first).
         """
-        super().set_prognoses(uids, sources)
-        ti = self.ti + 1 # Infected at the end of this step, so the course starts at the next (as ss.AgentDisease schedules; the seeds are dated at ti=0)
+        super().set_prognoses(uids, sources) # Infected, no longer susceptible, and ti_infected
+        ti = self.ti + 1 # Infected at the end of this step, so the course starts at the next (as ss.AgentDisease schedules)
         p = self.pars
 
         first_uids = uids[self.ti_first_infection.isnan[uids]]
         self.ti_first_infection[first_uids] = self.ti
-
-        self.susceptible[uids] = False
-        self.infected[uids] = True
-        self.ti_infected[uids] = self.ti
         self.precin[uids] = True
 
         # Clear stale schedules from a prior infection.
@@ -785,13 +781,10 @@ class HPV(ss.AgentDisease):
             if len(reactivated):
                 self.latent[reactivated] = False
                 self.ti_reactivation[reactivated] = ti
-                # Fresh trajectory; immunity carries over. set_prognoses bumps
-                # the infection flow unconditionally, so back it out here.
-                ppl = self.sim.people
-                n_react = ppl.scale_flows(reactivated)
+                # Fresh trajectory; immunity carries over. Not a new infection
+                # (latent agents are not susceptible), so not counted in infection.
                 self.set_prognoses(reactivated)
-                self.results.infection[ti] -= n_react
-                self.results.new_reactivations[ti] = n_react
+                self.results.new_reactivations[ti] = self.sim.people.scale_flows(reactivated)
 
         # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids

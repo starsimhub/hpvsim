@@ -147,7 +147,7 @@ def test_hiv_results_are_scale_weighted():
     ppl, hiv = sim.people, sim.diseases.hiv
     w, alive = ppl.scale.values, ppl.alive.values
     infected = hiv.infected.values & alive
-    scale = sim.pars.pop_scale
+    scale = sim.pop_scale
 
     # Multiscale actually engaged, or the test proves nothing.
     assert (w < 1).any(), 'no fine agents; ms_agent_ratio had no effect'
@@ -279,7 +279,7 @@ def test_hiv_cancer_rates_are_annual_and_female():
         assert (r[k] >= 0).all()
     assert (r['new_cancers_with_hiv'] + r['new_cancers_no_hiv']).sum() > 0
 
-    # annualize() on the per-ti annualized rate collapses quarters to the
+    # resample('year') on the per-ti annualized rate collapses quarters to the
     # annual rate; a valid rate for a year with cancers should be > 0.
     ann = r['cancer_incidence_no_hiv'].resample('year')
     assert (ann.values >= 0).all()
@@ -302,10 +302,10 @@ def test_crude_cancer_incidence():
 
     assert 'cancer_incidence' in r
     assert (r['cancer_incidence'] >= 0).all()
-    # Both rates are per-ti annualized; annualize() then averages quarters.
+    # Both rates are per-ti annualized; resample('year') then averages quarters.
     assert r['cancer_incidence'].max() > 0
     assert r['asr_cancer_incidence'].max() > 0
-    # annualize is idempotent on already-annualized-per-ti rates: the annual
+    # resample('year') is idempotent on already-annualized-per-ti rates: the annual
     # mean should be within the min/max of the sub-annual quarters.
     ann = r['cancer_incidence'].resample('year')
     per_ti = np.asarray(r['cancer_incidence'])

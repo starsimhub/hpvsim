@@ -102,7 +102,7 @@ def test_reactivations_are_not_double_counted_as_new_infections():
     sim_react.run()
     n_react = sim_react.results.hpv16.new_reactivations.sum()
     assert n_react > 0
-    # step_state adds then subtracts the same n_react, so new_infections can't go negative.
+    # Reactivation gives a fresh trajectory without counting an infection, so new_infections stays non-negative.
     assert (sim_react.results.hpv16.infection.values >= 0).all()
 
 
@@ -134,7 +134,7 @@ def test_to_latent_is_not_a_public_result():
     a result on a genotype or on all_hpv; latent stays the real scaled stock."""
     sim = _sim_with_forced_latency()
     mod = sim.diseases.hpv16
-    pop_scale = sim.pars.pop_scale
+    pop_scale = sim.pop_scale
     for res in (sim.results.hpv16, sim.results.all_hpv):
         assert 'n_to_latent' not in res
         assert res.latent.scale is True

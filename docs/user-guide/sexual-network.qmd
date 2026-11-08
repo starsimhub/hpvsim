@@ -49,7 +49,7 @@ sim.run()
 net = sim.networks.sexualnetwork
 print('marital pairs in 2020:', net.n_pairs_in_layer('m'))
 print('casual pairs in 2020: ', net.n_pairs_in_layer('c'))
-print('per-act [f2m, m2f]:   ', sim.diseases.hpv16.validate_beta()['sexualnetwork'])
+print('per-act [f2m, m2f]:   ', sim.diseases.hpv16.route_betas()['sexualnetwork'])
 print('HPV prevalence in 2020:', round(float(sim.results.all_hpv.prevalence[-1]), 3))
 ```
 

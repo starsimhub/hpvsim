@@ -16,9 +16,9 @@ def _intervention_factory():
     referred. Screening runs from 2000 to 2040.
     """
     women = ss.person.female & (ss.person.age >= 30) & (ss.person.age < 50)
-    primary = ss.screen(hpv.dx('hpv'), where=women, coverage=0.7, every=ss.years(1), start=2000, stop=2040, name='primary')
-    colpo = ss.screen(hpv.dx('colposcopy'), on=primary.positive, coverage=0.9, name='colpo')
-    excision = ss.treat(hpv.tx('excision'), on=colpo.hsil, where=hpv.no_cancer, coverage=0.8, name='excision_rx')
+    primary = ss.screen(hpv.dx('hpv'), who=women, when=ss.schedule(every=ss.years(1), start=2000, stop=2040), coverage=0.7, name='primary')
+    colpo = ss.screen(hpv.dx('colposcopy'), when=primary.positive, coverage=0.9, name='colpo')
+    excision = ss.treat(hpv.tx('excision'), who=hpv.no_cancer, when=colpo.hsil, coverage=0.8, name='excision_rx')
     return [primary, colpo, excision]
 
 
