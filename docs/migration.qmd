@@ -371,12 +371,12 @@ Choosing the lever:
   multiscale-CIN-regate patch is cancer-side only). And v3 is never bit-identical
   to v2 (different RNG) — compare on intervals/trends, never exact values.
 
-**Calibration API.** HPVsim 4 uses Starsim's `sim.fit()`: the parameters to fit are given with bounds, as `ss.par(value, bounds=[low, high])`, through `hpv.Sim(pars=...)` (e.g. `pars=dict(beta=ss.par(0.25, bounds=[0.15, 0.35]))`), and the targets through `hpv.Sim(data=...)`; then `fit = sim.fit(loss=hpv.calibration.gof, method=ss.fit.method('optuna', n_trials=200))`. A parameter inside a dict parameter can be fitted too, by its dotted name (e.g. `cancer_fn.transform_prob`). Results live in `fit.pars` / `fit.trials`, and `fit.project()` re-runs the fitted model to draw uncertainty bands. The v2 `analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim storage are gone.
+**Calibration API.** HPVsim 4 uses Starsim's `sim.fit()`: the parameters to fit are given with bounds, as `ss.par(value, bounds=[low, high])`, through `hpv.Sim(pars=...)` (e.g. `pars=dict(beta=ss.par(0.25, bounds=[0.15, 0.35]))`), and the targets through `hpv.Sim(data=...)`; then `fit = sim.fit(loss=hpv.calibration.gof, method=ss.fitting.method('optuna', n_trials=200))`. A parameter inside a dict parameter can be fitted too, by its dotted name (e.g. `cancer_fn.transform_prob`). Results live in `fit.pars` / `fit.trials`, and `fit.project()` re-runs the fitted model to draw uncertainty bands. The v2 `analyzer_results` / `sim_results` / `target_data` attributes and per-trial sim storage are gone.
 
 ## Known issues and tips
 
 - **Guard multi-worker calibration/parallel with `if __name__ == '__main__':`
-  (Windows).** `sim.fit(method=ss.fit.method('optuna', workers=4))` (and any
+  (Windows).** `sim.fit(method=ss.fitting.method('optuna', workers=4))` (and any
   `ss.MultiSim` / `ss.parallel`) uses process *spawn* on Windows, so each
   worker re-imports your driver module. Without the `__main__` guard the workers
   re-launch the calibration recursively, spawning ever more processes until the

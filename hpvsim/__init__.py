@@ -3,7 +3,7 @@
 Public API: ``Sim``, ``HPV``, ``SexualNetwork``, ``AgeMigration``,
 ``SimPars``, ``GenotypePars``, ``get_genotype_pars``, ``data``.
 """
-# Last verified on: Starsim 4.0.0rc3 (6239f72bf)
+# Last verified on: Starsim 4.0.0rc4 (34266c4c4)
 
 import sciris as sc
 

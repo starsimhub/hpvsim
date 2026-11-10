@@ -267,7 +267,7 @@ def plot_calibration(fit, top_n=50, fig=None, ncols=None):
       - ``by_genotype.<name>.<g>`` box plot per genotype vs. data markers.
 
     Args:
-        fit: the ``ss.fit.Fit`` returned by ``sim.fit()``.
+        fit: the ``ss.fitting.Fit`` returned by ``sim.fit()``.
         top_n (int): number of best-mismatch trials to re-run for the
             ribbon (default 50). Clamped to available trials.
         fig: matplotlib Figure to draw into (default: new).

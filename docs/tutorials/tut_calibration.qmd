@@ -95,7 +95,7 @@ sim = hpv.Sim(
     pars           = pars,
 )
 
-fit = sim.fit(loss=hpv.calibration.gof, method=ss.fit.method('optuna', n_trials=4, workers=2), verbose=False) # Far too few trials; see below
+fit = sim.fit(loss=hpv.calibration.gof, method=ss.fitting.method('optuna', n_trials=4, workers=2), verbose=False) # Far too few trials; see below
 print('Best fit:', fit.pars)
 ```
 
