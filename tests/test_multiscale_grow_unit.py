@@ -300,7 +300,7 @@ def test_per_genotype_prevalence_scale_weighted(grown_sim):
         # infected has scale=True, prevalence is a ratio: divide out pop_scale.
         n_infected_sw = float(r['infected'].values[ti_last]) / sim.pop_scale
 
-        # rtol=5% absorbs one step's births/deaths between record_stocks and here.
+        # rtol=5% absorbs one step's births/deaths between record_states and here.
         back_calc_numerator = stored_prev * n_alive_sw
         assert np.isclose(back_calc_numerator, n_infected_sw, rtol=0.05), (
             f'{dis.name}.prevalence back-calc numerator mismatch at ti={ti_last}: '

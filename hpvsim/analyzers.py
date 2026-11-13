@@ -126,7 +126,7 @@ class by_age(ss.Analyzer):
                 ))
         self.define_results(*defs)
 
-    def record_stocks(self):
+    def record_states(self):
         """The stocks and prevalences, as at the start of the step"""
         self._record([key for key in self.keys if key not in self._FLOW_KEYS])
 

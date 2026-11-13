@@ -303,7 +303,7 @@ class HPVTotal(ss.Analyzer):
         as a template when this runs.
 
         The union-based stocks (infected, precin, cin, cancerous) are
-        declared as ``dtype=float`` so that ``record_stocks()`` can write scale-weighted
+        declared as ``dtype=float`` so that ``record_states()`` can write scale-weighted
         values (fine agents carry ``scale=1/ratio`` and must count as 1/ratio).
         """
         super().init_results()
@@ -320,7 +320,7 @@ class HPVTotal(ss.Analyzer):
             # kind=src.kind: a float result is otherwise guessed to be a ratio, and left unscaled.
             defs.append(ss.Result(key, dtype=result_dtype, kind=src.kind,
                                   label=f'{src.label} (any genotype)'))
-        # Derived results (computed in record_stocks()).
+        # Derived results (computed in record_states()).
         defs.append(ss.Result('susceptible', dtype=float, kind='stock',
                               label='Currently uninfected with any genotype'))
         # scale=False: prevalence is a ratio, not a count.
@@ -355,7 +355,7 @@ class HPVTotal(ss.Analyzer):
                                   label='Cancer incidence rate ratio (HIV+/HIV-)'))
         self.define_results(*defs)
 
-    def record_stocks(self):
+    def record_states(self):
         """Capture union-based state counts and derived results at the start of the step.
 
         Element-wise sums for the remaining results are computed in

@@ -233,7 +233,7 @@ class AgeMigration(ss.Demographics):
         self._n_emi = n_emi_total
         return
 
-    def record_flows(self):
+    def record_events(self):
         """Store immigrant/emigrant counts for this timestep."""
         self.results.new_immigrants[self.ti] = self._n_imm
         self.results.new_emigrants[self.ti] = self._n_emi

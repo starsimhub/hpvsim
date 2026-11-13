@@ -178,9 +178,9 @@ class HIVEffects(ss.Connector):
             ss.Result('hpv_prevalence_no_hiv', dtype=float, scale=False, kind='ratio', label='HPV prevalence (HIV-)'),
         )
 
-    def record_stocks(self):
+    def record_states(self):
         """HPV prevalence by HIV status at the start of the step, each agent weighted by its scale, so fine agents count fractionally"""
-        super().record_stocks()
+        super().record_states()
         ti = self.ti
         people = self.sim.people
         alive = people.alive.values
