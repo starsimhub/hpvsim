@@ -116,7 +116,7 @@ class Sim(ss.Sim):
         if people is None:
             age_data = country['age_data'] if country is not None else ss.uniform(0, 60) # Without a location, uniform ages, not ss.People's default (the world's)
             people = ss.People(n_agents, age_data=age_data,
-                               extra_states=[ss.BoolArr('fine', default=False)])
+                               extra_states=[ss.BoolArr('fine', default=False, result=False)])
 
         user_diseases = sc.tolist(kwargs.pop('diseases', None))
         user_connectors = sc.tolist(kwargs.pop('connectors', None))
