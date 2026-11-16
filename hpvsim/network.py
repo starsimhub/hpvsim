@@ -333,7 +333,7 @@ class SexualNetwork(ss.SexualNet):
         ))
 
         # Tracks males already paired during this step's bin loop.
-        paired_m = ss.BoolArr(people=people, result=False)
+        paired_m = ss.BoolArr(people=people)
         f_arr = np.array([], dtype=int)
         m_arr = np.array([], dtype=int)
 

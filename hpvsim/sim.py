@@ -116,7 +116,7 @@ class Sim(ss.Sim):
         if people is None:
             age_data = country['age_data'] if country is not None else ss.uniform(0, 60) # Without a location, uniform ages, not ss.People's default (the world's)
             people = ss.People(n_agents, age_data=age_data,
-                               extra_states=[ss.BoolArr('fine', default=False, result=False)])
+                               extra_states=[ss.BoolArr('fine', default=False)])
 
         user_diseases = sc.tolist(kwargs.pop('diseases', None))
         user_connectors = sc.tolist(kwargs.pop('connectors', None))
@@ -259,8 +259,8 @@ class Sim(ss.Sim):
                     & (death_rate['Time'] <= int(stop) + 1)
                 ]
                 demographics = [
-                    births_cls(birth_rate=country['birth_rate']),
-                    ss.Deaths(death_rate=death_rate),
+                    births_cls(birth_rate=country['birth_rate'], rate_per=1000), # Crude birth rates are per 1,000 people
+                    ss.Deaths(death_rate=death_rate, rate_per=1000), # So are the death rates
                     hpv.AgeMigration(v2_compat=v2_compat_demographics),
                 ]
 

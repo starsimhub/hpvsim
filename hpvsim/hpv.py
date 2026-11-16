@@ -199,7 +199,7 @@ class HPV(ss.AgentDisease):
             # BoolArr, not BoolState: an internal scheduling flag, so it must not
             # auto-generate a public n_to_latent result (which would also be
             # summed into all_hpv, where it is meaningless).
-            ss.BoolArr('to_latent', label='Pending transition into latency', result=False),
+            ss.BoolArr('to_latent', label='Pending transition into latency'),
             ss.FloatArr('ti_latent', label='Time latency began'),
             ss.FloatArr('ti_reactivation', label='Time of reactivation from latency'),
             ss.FloatArr('ti_cin', label='Time of CIN onset'),

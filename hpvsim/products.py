@@ -199,7 +199,7 @@ def _resolve_txvx_pars(name, rel_imm):
 def _default_name(product, name):
     """Name a product after the product it looks up (e.g. 'via'), as its default name: if a delivery has the same name
     (``ablation = ss.treat(hpv.tx('ablation'))``), the sim renames the product (``ablation_product``); ``module_name=`` names it for good"""
-    if name is not None and product._default_name:
+    if name is not None and getattr(product, '_name_source', 'class') == 'class': # Not given with module_name=
         product.name = product.label = name
     return
 
